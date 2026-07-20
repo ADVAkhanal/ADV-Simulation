@@ -9,12 +9,20 @@ export async function generateMetadata(): Promise<Metadata> {
   const host = incoming.get("host") ?? "advcosinc.com";
   const protocol = incoming.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
   const origin = `${protocol}://${host}`;
+  const title = "Advanced | Precision Machining & Manufacturing";
+  const description = "Complex precision machining, engineered plastics, fabrication and documented quality systems for aerospace, defense, energy, food processing and industrial programs.";
   return {
-    title: "Advanced | Precision Manufacturing",
-    description: "Precision machining, engineered plastics, and connected manufacturing operations built for demanding work.",
+    metadataBase: new URL(origin),
+    title,
+    description,
+    applicationName: "Advanced",
+    keywords: ["precision machining", "5-axis machining", "AS9100", "ISO 9001", "engineered plastics", "aerospace manufacturing", "Owasso Oklahoma"],
     icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
-    openGraph: { title: "Advanced | Precision Manufacturing", description: "We make what matters.", images: [{ url: `${origin}/og.png`, width: 1200, height: 630, alt: "Advanced - We make what matters." }] },
-    twitter: { card: "summary_large_image", title: "Advanced | Precision Manufacturing", description: "We make what matters.", images: [`${origin}/og.png`] },
+    openGraph: { type: "website", url: origin, siteName: "Advanced", title, description, images: [{ url: `${origin}/og.png`, width: 1200, height: 630, alt: "Advanced — Precision engineered for demanding industries." }] },
+    twitter: { card: "summary_large_image", title, description, images: [`${origin}/og.png`] },
+    robots: { index: true, follow: true },
   };
 }
-export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) { return <html lang="en"><body className={`${geist.variable} ${mono.variable}`}>{children}</body></html>; }
+export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
+  return <html lang="en"><body className={`${geist.variable} ${mono.variable}`}>{children}</body></html>;
+}
