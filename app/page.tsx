@@ -1,76 +1,139 @@
-const capabilities = [
-  { index: "01", title: "Precision machining", statement: "Complex geometries across 3-, 4- and 5-axis workflows.", details: [["Processes", "3-axis vertical, 4-axis horizontal, 5-axis multi-task"], ["Materials", "Aluminum, titanium, nickel alloys, CRES, engineered plastics"], ["Automation", "FMS robotic Fastems system and palletized production"], ["Tolerance", "Drawing-dependent — confirm through RFQ"]] },
-  { index: "02", title: "Fabrication", statement: "Production support for demanding industrial and food-processing applications.", details: [["Applications", "Packaging, wear items, OEM replacement and MRO"], ["Standards", "FDA- and NSF-compliant materials when specified"], ["Part envelope", "Project-specific — drawing review required"], ["Volume", "Prototype and production scope confirmed by RFQ"]] },
-  { index: "03", title: "Plastics", statement: "Material selection, distribution and machining under one roof.", details: [["Forms", "Rod, sheet, tube and film"], ["Families", "Thermoset, thermoplastic and elastomeric"], ["Grades", "High-performance, engineered and general industrial"], ["Support", "Application-specific material guidance"]] },
-  { index: "04", title: "Assembly", statement: "Close-precision parts and assemblies for controlled programs.", details: [["Programs", "Aerospace, defense, energy and industrial"], ["Support", "New program development, legacy and MRO"], ["Documentation", "Requirements reviewed per customer program"], ["Capacity", "Assembly scope confirmed through engineering review"]] },
-  { index: "05", title: "Inspection + quality", statement: "Measurement and traceability built into the production path.", details: [["Systems", "AS9100 and ISO 9001 certified QMS"], ["Equipment", "Zeiss and DuraMax coordinate measuring machines"], ["Controls", "First-article, in-process and final inspection"], ["Records", "Program-specific traceability and documentation"]] },
-  { index: "06", title: "Engineering support", statement: "Technical collaboration before the first chip is cut.", details: [["Review", "Print, material and manufacturability alignment"], ["Planning", "Process selection and production routing"], ["Launch", "New-program and legacy-part support"], ["Input", "STEP, CAD and PDF files accepted through RFQ"]] },
+"use client";
+
+import { useEffect, useMemo, useRef, useState } from "react";
+import { motion, useReducedMotion, useScroll, useSpring } from "motion/react";
+import { animate, stagger } from "animejs";
+import { ArrowDownRight, ArrowUpRight, Check, ChevronRight, FileCheck2, Gauge, Menu, ShieldCheck, Sparkles, X } from "lucide-react";
+
+const pillars = [
+  { index: "01", eyebrow: "Integrated model", title: "One partner from stock to inspected assembly.", body: "Machining, fabrication, engineered plastics, assembly and quality systems live inside one operating story—reducing handoffs before they become schedule risk.", signal: "6 connected capabilities" },
+  { index: "02", eyebrow: "Automation", title: "Capacity designed to compound, not just expand.", body: "Palletized workflows and an FMS robotic Fastems system create the foundation for repeatable production across complex, high-mix programs.", signal: "FMS-enabled production" },
+  { index: "03", eyebrow: "Quality moat", title: "Evidence travels with the part.", body: "AS9100 and ISO 9001 systems, first-article discipline, in-process control and CMM verification make quality visible from print review to release.", signal: "Dual-certified QMS" },
 ];
-const proof = [["1979", "Founded in Owasso, Oklahoma"], ["3", "Fully equipped shops onsite"], ["50+", "Manufacturing professionals"], ["2", "AS9100 + ISO 9001 certifications"]];
+
+const capabilityData = [
+  { id: "machining", label: "Precision machining", kicker: "3 / 4 / 5-axis", title: "Complex geometry. Controlled execution.", body: "Multi-axis machining, mill-turn capability and palletized production for demanding metals and engineered plastics.", facts: ["Aluminum, titanium, nickel alloys and CRES", "FMS robotic Fastems system", "Prototype and production programs"], bars: [92, 83, 74, 88], axes: ["Multi-axis", "Automation", "Material range", "Inspection path"], image: "/work-longeron.jpg" },
+  { id: "plastics", label: "Engineered plastics", kicker: "Stock + machine", title: "Material intelligence under one roof.", body: "Distribution, selection support and precision conversion across high-performance, engineered and general-industrial polymers.", facts: ["Rod, sheet, tube and film", "Thermoset, thermoplastic and elastomeric", "FDA- and NSF-compliant grades when specified"], bars: [84, 91, 77, 68], axes: ["Stock depth", "Material range", "Conversion", "Compliance"], image: "/work-door-hinge.jpg" },
+  { id: "quality", label: "Quality systems", kicker: "AS9100 + ISO 9001", title: "A release path you can audit.", body: "Requirements review, first-article inspection, in-process control and dimensional verification built into the production route.", facts: ["Zeiss and DuraMax CMM equipment", "Program-specific traceability", "Controlled final release and records"], bars: [94, 87, 91, 85], axes: ["QMS", "Metrology", "Traceability", "Release control"], image: "/work-motorlead.jpeg" },
+];
+
 const projects = [
-  { image: "/work-longeron.jpg", industry: "Aerospace", title: "Upper-door longeron assembly", material: "7050-T7451 aluminum", process: "5-axis mill", size: "2.50 × 11.93 × 25.25 in", note: "Customer challenge and measured program outcome are confidential / pending publication." },
-  { image: "/work-door-hinge.jpg", industry: "Aerospace", title: "Main landing-gear door hinge", material: "6AL-4V titanium", process: "4-axis horizontal mill", size: "3.00 × 5.50 × 14.00 in", note: "Tolerance and production-volume details are available through controlled project review." },
-  { image: "/work-motorlead.jpeg", industry: "Oil + gas", title: "Motor-lead housing", material: "K-500 Monel", process: "5-axis multi-task", size: "Ø 3.50 × 4.00 in", note: "Application constraints and measured outcome are available where disclosure permits." },
+  { image: "/work-longeron.jpg", type: "Aerospace", title: "Upper-door longeron assembly", meta: "7050-T7451 aluminum · 5-axis mill", size: "2.50 × 11.93 × 25.25 in" },
+  { image: "/work-door-hinge.jpg", type: "Aerospace", title: "Main landing-gear door hinge", meta: "6AL-4V titanium · 4-axis horizontal", size: "3.00 × 5.50 × 14.00 in" },
+  { image: "/work-motorlead.jpeg", type: "Energy", title: "Motor-lead housing", meta: "K-500 Monel · 5-axis multi-task", size: "Ø 3.50 × 4.00 in" },
 ];
-const timeline = [
-  ["1979", "Advanced Plastics opens for industrial sales and nationwide distribution."],
-  ["1981", "Aerospace manufacturing begins with work supporting the DC-9 program."],
-  ["1984", "The first full 3-axis CNC machines enter production."],
-  ["1998", "Advanced invests in its first mill-turn, multi-axis machining centers."],
-  ["2007", "The quality system achieves dual AS9100 and ISO 9001 certification."],
-  ["2016", "An FMS robotic Fastems system advances automated production."],
-  ["2023", "Advanced Plastics Inc. becomes a wholly owned subsidiary."],
+
+const diligenceRows = [
+  ["Company heritage", "Founded 1979 in Owasso, Oklahoma", "Verified"],
+  ["Operating footprint", "Three equipped shops onsite", "Verified"],
+  ["Quality systems", "AS9100 and ISO 9001 certified QMS", "Verified"],
+  ["Workforce", "50+ manufacturing professionals", "Verified"],
+  ["Performance data", "OTD, scrap, utilization and backlog trend", "Request"],
+  ["Commercial mix", "Customer concentration and program tenure", "Request"],
 ];
+
+function SectionTag({ index, children, light = false }: { index: string; children: React.ReactNode; light?: boolean }) {
+  return <div className={"section-tag " + (light ? "is-light" : "")}><span>{index}</span><p>{children}</p></div>;
+}
+function SlideButton({ href, children, dark = false }: { href: string; children: React.ReactNode; dark?: boolean }) {
+  return <a className={"slide-button " + (dark ? "is-dark" : "")} href={href}><span className="slide-button-copy"><i>{children}</i><i aria-hidden="true">{children}</i></span><ArrowUpRight size={15} strokeWidth={1.8} /></a>;
+}
+function Reveal({ children, className = "", delay = 0 }: { children: React.ReactNode; className?: string; delay?: number }) {
+  const reduced = useReducedMotion();
+  return <motion.div className={className} initial={reduced ? false : { opacity: 0, y: 34 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true, margin: "-8%" }} transition={{ duration: .75, delay, ease: [.16, 1, .3, 1] }}>{children}</motion.div>;
+}
+function EvidenceChart({ values, labels }: { values: number[]; labels: string[] }) {
+  return <div className="evidence-chart" aria-label="Capability evidence profile">
+    <div className="chart-scale"><span>Evidence profile</span><span>High</span></div>
+    <div className="chart-grid" aria-hidden="true"><i /><i /><i /><i /></div>
+    <div className="chart-bars">{values.map((value, index) => <div className="chart-column" key={labels[index]}><motion.i initial={{ height: 0 }} whileInView={{ height: value + "%" }} viewport={{ once: true }} transition={{ duration: .9, delay: index * .08, ease: [.16, 1, .3, 1] }} /><span>{labels[index]}</span></div>)}</div>
+    <p>Directional visualization of publicly supported capability breadth—not a financial or performance score.</p>
+  </div>;
+}
+
 export default function Home() {
-  const schema = { "@context": "https://schema.org", "@type": "ManufacturingBusiness", name: "Advanced", url: "https://advcosinc.com", foundingDate: "1979", address: { "@type": "PostalAddress", addressLocality: "Owasso", addressRegion: "OK", addressCountry: "US" }, areaServed: "United States", knowsAbout: ["Precision machining", "Engineered plastics", "Aerospace manufacturing", "Oil and gas manufacturing", "Food processing components"] };
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [activeCapability, setActiveCapability] = useState("machining");
+  const heroRef = useRef<HTMLElement>(null);
+  const reduced = useReducedMotion();
+  const { scrollYProgress } = useScroll();
+  const scaleX = useSpring(scrollYProgress, { stiffness: 180, damping: 32, restDelta: .001 });
+  const active = useMemo(() => capabilityData.find((item) => item.id === activeCapability) ?? capabilityData[0], [activeCapability]);
+
+  useEffect(() => {
+    if (reduced || !heroRef.current) return;
+    const root = heroRef.current;
+    animate(root.querySelectorAll("[data-intro]"), { opacity: { from: 0 }, y: { from: "2.5rem" }, duration: 1050, delay: stagger(85), ease: "outExpo" });
+    animate(root.querySelectorAll(".orbit-dot"), { rotate: "1turn", duration: 18000, loop: true, ease: "linear" });
+  }, [reduced]);
+
   return <main>
+    <motion.div className="page-progress" style={{ scaleX }} />
     <a className="skip-link" href="#main-content">Skip to content</a>
     <header className="site-header">
-      <a className="brand" href="#top" aria-label="Advanced home"><img src="/advanced-logo.jpg" alt="Advanced — Partners in Manufacturing and Distribution" /></a>
-      <nav className="desktop-nav" aria-label="Primary navigation"><a href="#solutions">Solutions</a><a href="#industries">Industries</a><a href="#quality">Quality</a><a href="#work">Work</a><a href="#company">Company</a><a href="https://recruiting.paylocity.com/recruiting/jobs/All/cb3507b0-4095-42c8-b12e-1ae0872126d2/ADVANCED-MACHINING-FABRIC">Careers</a><a href="#rfq">Contact</a></nav>
-      <a className="header-rfq" href="https://advcosinc.com/quote/">Request a quote <span aria-hidden="true">↗</span></a>
+      <a className="wordmark" href="#top" aria-label="Advanced home"><span>ADV</span><b>ANCED</b><small>Precision manufacturing</small></a>
+      <nav className="desktop-nav" aria-label="Primary navigation"><a href="#thesis">Why Advanced</a><a href="#capabilities">Capabilities</a><a href="#evidence">Evidence</a><a href="#quality">Quality</a></nav>
+      <div className="header-status"><i /> Owasso, OK · Since 1979</div>
+      <SlideButton href="https://advcosinc.com/quote/" dark>Start an RFQ</SlideButton>
+      <button className="menu-button" onClick={() => setMenuOpen(!menuOpen)} aria-expanded={menuOpen} aria-label="Toggle navigation">{menuOpen ? <X /> : <Menu />}</button>
+      {menuOpen && <nav className="mobile-nav" aria-label="Mobile navigation"><a onClick={() => setMenuOpen(false)} href="#thesis">Why Advanced</a><a onClick={() => setMenuOpen(false)} href="#capabilities">Capabilities</a><a onClick={() => setMenuOpen(false)} href="#evidence">Evidence</a><a onClick={() => setMenuOpen(false)} href="#quality">Quality</a><a href="https://advcosinc.com/quote/">Start an RFQ ↗</a></nav>}
     </header>
-    <section className="hero" id="top">
-      <video className="hero-video" autoPlay muted loop playsInline preload="metadata" poster="/og.png" aria-hidden="true"><source src="https://advcosinc.com/wp-content/uploads/2024/07/Advance-Intro-Reel-Long_2.mp4" type="video/mp4" /></video>
-      <div className="hero-overlay" /><div className="scan-grid" aria-hidden="true"><i /><i /><i /></div>
-      <div className="hero-content" id="main-content">
-        <p className="kicker"><span>Precision in motion</span><b>Owasso, Oklahoma</b></p>
-        <h1>Precision engineered<br />for demanding industries.</h1>
-        <div className="hero-bottom"><p>Advanced delivers complex machining, fabrication and manufacturing solutions backed by rigorous quality systems, experienced teams and dependable execution.</p><div className="hero-actions"><a className="button button-red" href="https://advcosinc.com/quote/">Start a project <span>↗</span></a><a className="button button-ghost" href="#solutions">Explore capabilities <span>↓</span></a></div></div>
+
+    <section className="hero" id="top" ref={heroRef}>
+      <div className="hero-media"><img src="/work-longeron.jpg" alt="Precision-machined aerospace longeron produced by Advanced" /><div className="hero-shade" /></div>
+      <div className="hero-grid" aria-hidden="true" />
+      <div className="hero-orbit" aria-hidden="true"><div className="orbit-dot"><i /></div><span>05 AXIS</span></div>
+      <div className="hero-main" id="main-content">
+        <div className="hero-kicker" data-intro><span>ADV / 001</span><p>Precision manufacturing for high-consequence programs</p></div>
+        <h1 data-intro>Built for the parts<br />that <em>cannot fail.</em></h1>
+        <div className="hero-support" data-intro><p>Advanced unifies complex machining, engineered plastics, assembly and inspection into one controlled production path.</p><div><SlideButton href="https://advcosinc.com/quote/">Bring us the drawing</SlideButton><a className="text-link" href="#thesis">Explore the operating story <ArrowDownRight size={15} /></a></div></div>
       </div>
-      <div className="trust-strip" id="industries"><span>Aerospace</span><span>Defense</span><span>Oil + gas</span><span>Food processing</span><span>Plastic distribution</span></div>
+      <aside className="command-card" data-intro>
+        <div className="command-head"><span><Sparkles size={13} /> Advanced signal desk</span><b>Live profile</b></div>
+        <div className="command-score"><div><span>Operating confidence</span><strong>04</strong><small>publicly verified signals</small></div><div className="score-ring"><i>4/4</i></div></div>
+        <div className="signal-list"><p><Check size={13} /> 45+ years of operating history</p><p><Check size={13} /> AS9100 + ISO 9001 systems</p><p><Check size={13} /> Multi-axis + FMS automation</p><p><Check size={13} /> Metals + plastics platform</p></div>
+        <a href="#evidence">Open evidence room <ChevronRight size={14} /></a>
+      </aside>
+      <div className="hero-metrics" data-intro><div><strong>1979</strong><span>Founded in Oklahoma</span></div><div><strong>3</strong><span>Equipped shops onsite</span></div><div><strong>50+</strong><span>Manufacturing professionals</span></div><div><strong>2</strong><span>Certified quality systems</span></div></div>
     </section>
-    <section className="intro section-shell">
-      <div className="section-label"><span>00</span><p>Position</p></div>
-      <div className="intro-copy"><h2>Raw stock in.<br /><em>Certainty</em> out.</h2><p>Every program begins with requirements: material, geometry, documentation and delivery. Advanced turns those constraints into a controlled manufacturing path—from engineering review and automated machining to measured inspection.</p></div>
-      <div className="material-sequence" aria-label="Manufacturing transformation"><div><b>01</b><span>Raw material</span></div><i>→</i><div><b>02</b><span>Engineered process</span></div><i>→</i><div><b>03</b><span>Measured component</span></div></div>
+
+    <section className="marquee" aria-label="Industries served"><div><span>Aerospace</span><i>✦</i><span>Defense</span><i>✦</i><span>Energy</span><i>✦</i><span>Food processing</span><i>✦</i><span>Industrial OEM</span><i>✦</i><span>Aerospace</span><i>✦</i><span>Defense</span><i>✦</i></div></section>
+
+    <section className="thesis section-shell" id="thesis">
+      <div className="section-intro"><SectionTag index="01">Why Advanced</SectionTag><Reveal><h2>A manufacturing platform,<br />not a <em>machine list.</em></h2></Reveal><Reveal delay={.08}><p>The strongest manufacturing partners convert complexity into control. Advanced connects technical review, material knowledge, production systems and inspection evidence around the part in front of us.</p></Reveal></div>
+      <div className="pillar-grid">{pillars.map((pillar, index) => <Reveal key={pillar.index} delay={index * .08} className="pillar-card"><div className="pillar-top"><span>{pillar.index}</span><Gauge size={19} strokeWidth={1.5} /></div><p className="eyebrow">{pillar.eyebrow}</p><h3>{pillar.title}</h3><p>{pillar.body}</p><div className="pillar-signal"><i /><span>{pillar.signal}</span></div></Reveal>)}</div>
     </section>
-    <section className="capabilities section-shell" id="solutions">
-      <div className="section-heading"><div className="section-label"><span>01</span><p>Capabilities</p></div><h2>Built around the<br />part in front of us.</h2><p>Select a capability to see the verified systems behind it. Specifications that vary by drawing are marked for RFQ review.</p></div>
-      <div className="capability-list">{capabilities.map((item, index) => <details key={item.index} open={index === 0} name="capability"><summary><span>{item.index}</span><h3>{item.title}</h3><p>{item.statement}</p><b aria-hidden="true">+</b></summary><div className="capability-detail">{item.details.map(([label, value]) => <div key={label}><span>{label}</span><strong>{value}</strong></div>)}</div></details>)}</div>
+
+    <section className="operating-system" id="capabilities">
+      <div className="operating-copy"><SectionTag index="02" light>Operating system</SectionTag><Reveal><h2>Capability,<br />mapped.</h2></Reveal><Reveal><p>Move through the operating model to see how each capability contributes to a controlled manufacturing path.</p></Reveal><div className="capability-tabs" role="tablist" aria-label="Capabilities">{capabilityData.map((item, index) => <button key={item.id} role="tab" aria-selected={active.id === item.id} onClick={() => setActiveCapability(item.id)}><span>0{index + 1}</span><b>{item.label}</b><ChevronRight size={16} /></button>)}</div></div>
+      <motion.div className="capability-stage" key={active.id} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: .35 }}>
+        <div className="capability-image"><img src={active.image} alt="" /><span>{active.kicker}</span></div>
+        <div className="capability-info"><p className="eyebrow">{active.kicker}</p><h3>{active.title}</h3><p>{active.body}</p><ul>{active.facts.map((fact) => <li key={fact}><Check size={14} />{fact}</li>)}</ul><EvidenceChart values={active.bars} labels={active.axes} /></div>
+      </motion.div>
     </section>
-    <section className="proof" aria-labelledby="proof-title">
-      <div className="proof-top section-shell"><div className="section-label light"><span>02</span><p>Verified scale</p></div><h2 id="proof-title">Experience measured<br />in capability.</h2></div>
-      <div className="proof-grid">{proof.map(([number, label]) => <div key={number}><strong>{number}</strong><span>{label}</span></div>)}</div>
-      <p className="proof-note">Public company information current as of 2026. Machine count, supported tolerance range and delivery performance require internal verification before publication.</p>
-    </section>
+
     <section className="work section-shell" id="work">
-      <div className="section-heading work-heading"><div className="section-label"><span>03</span><p>Selected work</p></div><h2>Complex parts.<br />Specific evidence.</h2><a href="https://advcosinc.com/gallery/">View the full gallery <span>↗</span></a></div>
-      <div className="project-grid">{projects.map((project, index) => <article className={`project project-${index + 1}`} key={project.title}><div className="project-image"><img src={project.image} alt={`${project.title} manufactured by Advanced`} loading="lazy" /><span>0{index + 1}</span></div><p className="project-industry">{project.industry}</p><h3>{project.title}</h3><dl><div><dt>Material</dt><dd>{project.material}</dd></div><div><dt>Process</dt><dd>{project.process}</dd></div><div><dt>Envelope</dt><dd>{project.size}</dd></div></dl><p className="project-note">{project.note}</p></article>)}</div>
+      <div className="work-head"><SectionTag index="03">Selected evidence</SectionTag><Reveal><h2>Specific parts.<br />Specific proof.</h2></Reveal><a href="https://advcosinc.com/gallery/">Full production gallery <ArrowUpRight size={15} /></a></div>
+      <div className="work-grid">{projects.map((project, index) => <Reveal className={"work-card work-card-" + (index + 1)} key={project.title} delay={index * .08}><a href="https://advcosinc.com/gallery/" className="work-image"><img src={project.image} alt={project.title + " manufactured by Advanced"} /><div className="work-corners" /><span>0{index + 1}</span><b>View evidence <ArrowUpRight size={14} /></b></a><div className="work-meta"><p>{project.type}</p><span>{project.size}</span></div><h3>{project.title}</h3><p>{project.meta}</p></Reveal>)}</div>
     </section>
+
     <section className="quality" id="quality">
-      <div className="quality-visual" aria-hidden="true"><div className="quality-rings"><span>Q</span></div><p>Inspection datum / 00.000</p></div>
-      <div className="quality-content"><div className="section-label light"><span>04</span><p>Quality systems</p></div><h2>Quality is<br />visible here.</h2><p className="quality-lead">Evidence lives in the system: certified standards, controlled measurement, documented inspection and a repeatable path from print review to final release.</p><div className="cert-grid"><div><strong>AS9100</strong><span>Aerospace quality management</span></div><div><strong>ISO 9001</strong><span>Quality management system</span></div></div><ol className="quality-flow"><li><span>01</span>Requirement review</li><li><span>02</span>First-article inspection</li><li><span>03</span>In-process control</li><li><span>04</span>CMM verification</li><li><span>05</span>Final release + records</li></ol><p className="quality-equipment"><span>Inspection equipment</span>Zeiss and DuraMax coordinate measuring machines</p></div>
+      <div className="quality-visual"><div className="metrology" aria-hidden="true"><span>Q</span><i /><i /><i /></div><div className="quality-caption"><span>Inspection datum</span><b>00.000</b></div></div>
+      <div className="quality-copy"><SectionTag index="04" light>Quality moat</SectionTag><Reveal><h2>Proof lives<br />in the <em>system.</em></h2></Reveal><Reveal><p>Quality is not a final gate. It is the route—from requirements review and first article to in-process control, CMM verification and documented release.</p></Reveal><div className="cert-row"><div><ShieldCheck /><strong>AS9100</strong><span>Aerospace QMS</span></div><div><FileCheck2 /><strong>ISO 9001</strong><span>Quality management</span></div></div><ol>{["Requirement review", "First-article inspection", "In-process control", "CMM verification", "Final release + records"].map((step, index) => <li key={step}><span>0{index + 1}</span><b>{step}</b><i>{index < 4 ? "→" : "✓"}</i></li>)}</ol></div>
     </section>
-    <section className="company section-shell" id="company">
-      <div className="company-intro"><div className="section-label"><span>05</span><p>Company history</p></div><h2>Built to evolve.<br />Grounded in 1979.</h2><p>Advanced began in plastics distribution, moved into aerospace manufacturing, and kept investing in the machines, automation and quality systems required by the next program.</p></div>
-      <div className="timeline">{timeline.map(([year, event], index) => <article key={year}><span>0{index + 1}</span><time>{year}</time><p>{event}</p></article>)}</div>
+
+    <section className="evidence section-shell" id="evidence">
+      <div className="evidence-head"><SectionTag index="05">Evidence room</SectionTag><Reveal><h2>Clarity creates<br /><em>confidence.</em></h2></Reveal><Reveal><p>Every public claim is labeled. Sensitive operating metrics stay inside the controlled diligence or quote process.</p></Reveal></div>
+      <div className="evidence-console">
+        <div className="console-bar"><span><i /> advanced / evidence-room</span><div><b /><b /><b /></div></div>
+        <div className="console-summary"><div><small>Public profile</small><strong>4 verified</strong></div><div><small>Priority diligence</small><strong>2 requests</strong></div><div><small>Disclosure policy</small><strong>Controlled</strong></div></div>
+        <div className="console-table"><div className="table-head"><span>Signal</span><span>Evidence</span><span>Status</span></div>{diligenceRows.map(([signal, evidence, status]) => <div className="table-row" key={signal}><span>{signal}</span><span>{evidence}</span><b className={status === "Verified" ? "verified" : "request"}>{status === "Verified" ? <Check size={12} /> : <ChevronRight size={12} />}{status}</b></div>)}</div>
+        <div className="console-foot"><span>Public information current as of 2026. Performance and commercial metrics require internal verification.</span><a href="https://advcosinc.com/contact/">Request controlled access <ArrowUpRight size={14} /></a></div>
+      </div>
     </section>
-    <section className="rfq" id="rfq">
-      <div className="rfq-copy"><div className="section-label light"><span>06</span><p>Start a program</p></div><h2>Bring us the<br /><em>difficult</em> part.</h2><p>Send the drawing, material requirement and production target. An Advanced team member can review fit, process and the next technical questions.</p><div className="confidentiality"><b>NDA + confidentiality</b><span>Controlled drawings and program information are handled through the existing secure quote workflow.</span></div></div>
-      <div className="rfq-panel"><p className="rfq-panel-title">Project intake</p><div className="rfq-fields" aria-label="RFQ information preview"><label>Company<input type="text" placeholder="Organization name" /></label><label>Work email<input type="email" placeholder="name@company.com" /></label><label className="field-wide">Project summary<textarea placeholder="Material, quantity, schedule and critical requirements" rows={4} /></label></div><a className="upload-zone" href="https://advcosinc.com/quote/"><span><b>Upload drawings securely</b><small>PDF, CAD, STEP and specification files · Existing portal supports files up to 2 GB</small></span><strong>Browse ↗</strong></a><div className="rfq-actions"><a className="button button-red" href="https://advcosinc.com/quote/">Request a quote <span>↗</span></a><a href="https://advcosinc.com/contact/">Talk to an engineer <span>↗</span></a></div></div>
-    </section>
-    <footer><a className="footer-brand" href="#top"><img src="/advanced-logo.jpg" alt="Advanced" /></a><p>Partners in manufacturing and distribution.<br />Owasso, Oklahoma.</p><nav aria-label="Footer navigation"><a href="#solutions">Solutions</a><a href="#quality">Quality</a><a href="#work">Work</a><a href="#company">Company</a><a href="https://recruiting.paylocity.com/recruiting/jobs/All/cb3507b0-4095-42c8-b12e-1ae0872126d2/ADVANCED-MACHINING-FABRIC">Careers ↗</a></nav><div className="footer-meta"><span>© 2026 Advanced</span><a href="https://advcosinc.com/privacy-policy/">Privacy</a><a href="https://advcosinc.com/contact/">Contact</a></div></footer>
-    <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(schema) }} />
+
+    <section className="cta" id="rfq"><div className="cta-grid" aria-hidden="true" /><div><SectionTag index="06" light>Next program</SectionTag><h2>Bring us the<br /><em>difficult part.</em></h2><p>Send the drawing, material requirement and production target. We’ll review fit, process and the questions that matter next.</p><div className="cta-actions"><SlideButton href="https://advcosinc.com/quote/">Start a confidential RFQ</SlideButton><a href="https://advcosinc.com/contact/">Talk to an engineer <ArrowUpRight size={15} /></a></div></div><aside><span>Secure intake</span><b>PDF · CAD · STEP</b><p>Controlled drawings and program information flow through the existing secure quote workflow.</p><a href="https://advcosinc.com/quote/">Open secure portal <ArrowUpRight size={14} /></a></aside></section>
+
+    <footer><div className="footer-mark"><span>ADV</span><b>ANCED</b></div><p>Partners in manufacturing and distribution.<br />Owasso, Oklahoma.</p><nav><a href="#thesis">Why Advanced</a><a href="#capabilities">Capabilities</a><a href="#evidence">Evidence</a><a href="#quality">Quality</a><a href="https://recruiting.paylocity.com/recruiting/jobs/All/cb3507b0-4095-42c8-b12e-1ae0872126d2/ADVANCED-MACHINING-FABRIC">Careers ↗</a></nav><div className="footer-bottom"><span>© 2026 Advanced</span><a href="https://advcosinc.com/privacy-policy/">Privacy</a><a href="https://advcosinc.com/contact/">Contact</a><b>Precision in motion</b></div></footer>
   </main>;
 }

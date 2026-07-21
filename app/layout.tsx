@@ -18,7 +18,7 @@ export async function generateMetadata(): Promise<Metadata> {
     applicationName: "Advanced",
     keywords: ["precision machining", "5-axis machining", "AS9100", "ISO 9001", "engineered plastics", "aerospace manufacturing", "Owasso Oklahoma"],
     icons: { icon: "/favicon.svg", shortcut: "/favicon.svg" },
-    openGraph: { type: "website", url: origin, siteName: "Advanced", title, description, images: [{ url: `${origin}/og.png`, width: 1200, height: 630, alt: "Advanced — Precision engineered for demanding industries." }] },
+    openGraph: { type: "website", url: origin, siteName: "Advanced", title, description, images: [{ url: `${origin}/og.png`, width: 1200, height: 630, alt: "Advanced — Built for the parts that cannot fail." }] },
     twitter: { card: "summary_large_image", title, description, images: [`${origin}/og.png`] },
     robots: { index: true, follow: true },
   };
