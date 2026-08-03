@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Copy, Droplets, Gauge, Pause, Play, RotateCcw, Sparkles, StepForward, Trophy, Wrench, Zap } from "lucide-react";
 import { gradeMission, parseProgram, rasterize } from "./gcode-engine";
 import styles from "./gcode.module.css";
@@ -57,6 +56,7 @@ export default function GCodeStage() {
   const [completed, setCompleted] = useState<number[]>([]);
   const [message, setMessage] = useState("Contract loaded. Review setup, then cycle start.");
   const timer = useRef<number | null>(null);
+  const contractsRef = useRef<HTMLElement>(null);
   const awardLock = useRef<string>("");
   const contract = CONTRACTS[contractIndex];
   const parsed = useMemo(() => parseProgram(code), [code]);
@@ -123,6 +123,12 @@ export default function GCodeStage() {
     setMessage("Machine reset to safe Z. Program retained.");
   };
 
+  const focusContracts = () => {
+    contractsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    window.setTimeout(() => contractsRef.current?.querySelector<HTMLButtonElement>("button")?.focus(), 420);
+    setMessage("CONTRACT INDEX - choose a geometry and prove the process.");
+  };
+
   const copyRun = async () => {
     const payload = `G//CODE STAGE - ${contract.name}\n${inspected ? `RANK ${grade.rank} / SCORE ${grade.score}` : `RUN ${progress}%`}\n\n${stock}\n\nI programmed this cut. #ProjectToolpath`;
     try { await navigator.clipboard.writeText(payload); setMessage("RUN CARD COPIED - the stock map is ready to share."); }
@@ -131,7 +137,7 @@ export default function GCodeStage() {
 
   return <main className={styles.shell} style={{ "--accent": contract.accent } as React.CSSProperties}>
     <header className={styles.header}>
-      <Link href="#contracts" className={styles.back}><ArrowLeft/> CONTRACT SELECT</Link>
+      <button type="button" onClick={focusContracts} className={styles.back}><ArrowLeft/> CONTRACT SELECT</button>
       <div className={styles.wordmark}><span>PROJECT TOOLPATH</span><strong>G//CODE STAGE</strong></div>
       <div className={styles.live}><i/> CELL 07 ONLINE</div>
     </header>
@@ -145,7 +151,15 @@ export default function GCodeStage() {
       </div>
     </section>
 
-    <nav id="contracts" className={styles.programs} aria-label="Machining contracts">
+    <section className={styles.theoryRail} aria-label="Simulation design system">
+      <span><b>1 : 1.618</b> PHI GRID</span>
+      <span><b>X / Y / Z</b> CARTESIAN FIELD</span>
+      <span><b>34 MS</b> DETERMINISTIC TICK</span>
+      <span><b>N + 1</b> SOURCE TRACE</span>
+      <p>FORM / SYSTEM / SIGNAL</p>
+    </section>
+
+    <nav ref={contractsRef} id="contracts" className={styles.programs} aria-label="Machining contracts" tabIndex={-1}>
       {CONTRACTS.map((item, index) => <button key={item.name} className={index === contractIndex ? styles.selected : ""} onClick={() => chooseContract(index)}>
         <span>{completed.includes(index) ? <CheckCircle2/> : `0${index + 1}`}</span><div><b>{item.name}</b><small>{item.subtitle}</small></div>
       </button>)}
