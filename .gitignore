@@ -40,3 +40,9 @@ next-env.d.ts
 /.wrangler/
 /outputs/
 /work/
+/node_modules_external_link/
+/.gcode-dev.log
+/.gcode-dev.err
+/.release-git/
+/.site-stage-*/
+/site-version-*.tar.gz

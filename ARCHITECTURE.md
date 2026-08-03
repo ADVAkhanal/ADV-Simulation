@@ -11,3 +11,9 @@ Platform path:
 3. Meta Quest client reuses rules and contracts while replacing interaction and presentation with tracked tools, spatial UI, and VR-safe comfort design.
 
 No Steamworks, multiplayer, accounts, cloud saves, or VR runtime is implemented yet.
+
+## Canonical simulation boundary
+
+The attached next-generation simulator blueprint is adopted as the long-horizon architecture. Source text must pass through parser/modal evaluation into canonical commands with source provenance before trajectory, stock, collision, process, replay, or presentation systems consume it.
+
+The browser now starts that separation with `app/gcode/gcode-engine.ts`: a deterministic, renderer-independent creative-training subset. It is explicitly not a verification engine. See `SIMULATOR_ARCHITECTURE_BLUEPRINT.md` for product levels, native-kernel triggers, deferred scope, and trust requirements.
