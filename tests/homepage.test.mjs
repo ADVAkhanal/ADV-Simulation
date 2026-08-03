@@ -29,10 +29,12 @@ test("G-code route renders the programming campaign as a second mode", async () 
 });
 
 test("global mode dock exposes both game surfaces", async () => {
-  const [template, dock, page] = await Promise.all([
+  const [template, dock, page, router, manual] = await Promise.all([
     readFile(new URL("../app/template.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/mode-dock.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/gcode/page.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/experience-router.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/manual-campaign.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(template, /ModeDock/);
   assert.match(dock, /MANUAL MILL/);
@@ -42,4 +44,8 @@ test("global mode dock exposes both game surfaces", async () => {
   assert.match(page, /scrollIntoView/);
   assert.match(page, /PHI GRID/);
   assert.doesNotMatch(page, /href="#contracts"/);
+  assert.match(template, /ExperienceRouter/);
+  assert.match(router, /ManualCampaign/);
+  assert.match(manual, /THREE MATERIAL SYSTEMS/);
+  assert.match(manual, /INSPECT PART/);
 });
