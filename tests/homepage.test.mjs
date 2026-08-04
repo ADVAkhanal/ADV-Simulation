@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import test from "node:test";
 
 async function render(path = "/") {
@@ -17,11 +17,22 @@ test("root URL renders the hands-on machine floor", async () => {
   assert.match(html, /START FLAGSHIP CONTRACT/);
   assert.match(html, /SAFE PUBLIC DEMO/);
   assert.match(html, /MAKE THE PART/);
+  assert.match(html, /toolpath-cnc-keyart-v1\.webp/);
+  assert.match(html, /SHOP THRESHOLD/);
   assert.match(html, /Emergency drive plate/);
   assert.match(html, /Flight rib prototype/);
   assert.match(html, /Sensor bracket/);
   assert.match(html, /MANUAL MILL/);
   assert.match(html, /G\/\/CODE STAGE/);
+});
+
+test("landing key art is a compact project-owned WebP asset", async () => {
+  const assetUrl = new URL("../public/assets/keyart/toolpath-cnc-keyart-v1.webp", import.meta.url);
+  const [bytes, details] = await Promise.all([readFile(assetUrl), stat(assetUrl)]);
+  assert.equal(bytes.subarray(0, 4).toString("ascii"), "RIFF");
+  assert.equal(bytes.subarray(8, 12).toString("ascii"), "WEBP");
+  assert.ok(details.size > 80_000, "key art should retain useful visual detail");
+  assert.ok(details.size < 350_000, "key art should remain practical for the landing route");
 });
 
 test("G-code route renders the programming campaign as a second mode", async () => {

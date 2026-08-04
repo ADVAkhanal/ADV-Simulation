@@ -88,3 +88,7 @@ Project Toolpath uses measurable industrial and geometric constraints instead of
 ## Public defensibility
 
 The visuals contain no real manufacturer marks, exact machine inventory, customer information, controller procedures, or production parameters. Every process value is fictional or labeled as a simulation estimate. The game is not machine-operating guidance.
+
+## Shop-threshold key art
+
+The landing hero now uses one authored cinematic machining plate as a material anchor. Its role is to communicate mass, surface, fixture discipline, and enclosure depth before the player enters the abstracted simulation. Measured G54 reticles, restrained captions, a four-signal evidence rail, and an explicit representative-game-world label keep the image inside the same technical grammar as the live GLB renderer. Cyan remains a status/datum color; amber appears only as a small fresh-chip accent.
