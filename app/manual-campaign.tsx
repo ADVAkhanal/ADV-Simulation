@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { animate, stagger } from "animejs";
-import { Activity, Award, BookOpen, CircleGauge, CircleHelp, Crosshair, Factory, Gauge, Hexagon, Pause, Play, RotateCcw, ScanLine, Share2, ShieldCheck, Timer, Volume2, VolumeX, Waves, Wrench, X } from "lucide-react";
-import { MANUAL_CONTRACTS, MILL_COLS, MILL_ROWS, MILL_TOOLS, appendShopRunLog, createManualStock, cutManualStock, deriveShopSkillProgress, gradeManualRun, isManualTarget, manualCompletion, type ManualContract, type ShopBestRun, type ShopRunLogEntry } from "./manual-campaign-engine";
+import { Activity, Award, BookOpen, CircleGauge, CircleHelp, Crosshair, Factory, Gamepad2, Gauge, Hexagon, Pause, Play, RotateCcw, ScanLine, Share2, ShieldCheck, Sparkles, Target, Timer, Volume2, VolumeX, Waves, Wrench, X, Zap } from "lucide-react";
+import { MANUAL_CONTRACTS, MILL_COLS, MILL_ROWS, MILL_TOOLS, appendShopRunLog, createManualStock, cutManualStock, deriveFlowPoints, deriveManualMission, deriveShopSkillProgress, gradeManualRun, isManualTarget, manualCompletion, type ManualContract, type ShopBestRun, type ShopRunLogEntry } from "./manual-campaign-engine";
 import { trackAnonymous } from "./anonymous-analytics";
 import FlagshipMachiningKit from "./flagship-machining-kit";
 import { shareResultCard } from "./result-card";
@@ -16,6 +16,7 @@ type BestRun = ShopBestRun;
 type RunLogEntry = ShopRunLogEntry;
 type SaveData = { credits: number; reputation: number; cleared: string[]; bests: Record<string, BestRun>; log: RunLogEntry[] };
 type Chip = { x: number; y: number; dx: number; dy: number; born: number; hot: boolean };
+type GameEvent = { id: number; kind: "objective" | "warning" | "reward"; title: string; detail: string };
 const DEFAULT_SAVE: SaveData = { credits: 250, reputation: 0, cleared: [], bests: {}, log: [] };
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 const STOCK_VIEW = { x: 80, y: 52, width: 960, height: 560 }; // 240 × 140 mm at an exact 4 px/mm drawing scale.
@@ -59,6 +60,11 @@ export default function ManualCampaign() {
   const lastCutTone = useRef(0);
   const chipsRef = useRef<Chip[]>([]);
   const toolpathRef = useRef<Array<{ x: number; y: number }>>([]);
+  const materialRef = useRef(createManualStock());
+  const milestoneRef = useRef(new Set<number>());
+  const eventTimerRef = useRef<number | null>(null);
+  const lastComboCutRef = useRef(0);
+  const comboRef = useRef(0);
   const [screen, setScreen] = useState<Screen>("select");
   const [contractIndex, setContractIndex] = useState(0);
   const [toolIndex, setToolIndex] = useState(1);
@@ -85,6 +91,11 @@ export default function ManualCampaign() {
   const [logOpen, setLogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"map" | "twin">("map");
   const [tourStep, setTourStep] = useState<number | null>(null);
+  const [paused, setPaused] = useState(false);
+  const [combo, setCombo] = useState(0);
+  const [bestCombo, setBestCombo] = useState(0);
+  const [flowScore, setFlowScore] = useState(0);
+  const [gameEvent, setGameEvent] = useState<GameEvent | null>(null);
 
   const contract = MANUAL_CONTRACTS[contractIndex];
   const tool = MILL_TOOLS[toolIndex];
@@ -97,21 +108,34 @@ export default function ManualCampaign() {
   const chipLoad = programmedFeed / Math.max(1, spindleRpm * 3);
   const engagementAngle = Math.round(clamp(load * 1.65, 0, 165));
   const shopProgress = deriveShopProgress(save);
+  const mission = deriveManualMission(completion);
+  const comboMultiplier = deriveFlowPoints(0, combo).multiplier;
 
   useEffect(() => {
     try { setSave({ ...DEFAULT_SAVE, ...JSON.parse(localStorage.getItem("toolpath-manual-campaign-v2") ?? "{}") }); } catch { /* device progress is optional */ }
     trackAnonymous("landing_view", { surface: "manual_campaign" });
+    return () => { if (eventTimerRef.current !== null) window.clearTimeout(eventTimerRef.current); };
   }, []);
 
   useEffect(() => {
-    if (screen !== "play" || !spindle) return;
+    if (screen !== "play" || !spindle || paused) return;
     const timer = window.setInterval(() => {
       setElapsed((value) => value + 1);
       setHeat((value) => clamp(value - 0.35, 18, 100));
       setLoad((value) => Math.max(0, value - 4));
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [screen, spindle]);
+  }, [screen, spindle, paused]);
+
+  useEffect(() => {
+    if (!combo || screen !== "play") return;
+    const decay = window.setInterval(() => {
+      if (performance.now() - lastComboCutRef.current <= 1800) return;
+      comboRef.current = Math.max(0, comboRef.current - 1);
+      setCombo(comboRef.current);
+    }, 450);
+    return () => window.clearInterval(decay);
+  }, [combo, screen]);
 
   useEffect(() => {
     if (tourStep === null) return;
@@ -231,9 +255,17 @@ export default function ManualCampaign() {
     } catch { /* audio is optional and must never interrupt play */ }
   }, [soundOn]);
 
+  const announceGameEvent = useCallback((event: Omit<GameEvent, "id">) => {
+    if (eventTimerRef.current !== null) window.clearTimeout(eventTimerRef.current);
+    setGameEvent({ ...event, id: Date.now() });
+    eventTimerRef.current = window.setTimeout(() => setGameEvent(null), event.kind === "warning" ? 1800 : 2400);
+  }, []);
+
   const resetRun = useCallback((nextContract = contractIndex) => {
-    setContractIndex(nextContract); setMaterial(createManualStock()); setSpindle(false); setHeat(20); setCondition(100);
+    const freshStock = createManualStock(); materialRef.current = freshStock; milestoneRef.current.clear();
+    setContractIndex(nextContract); setMaterial(freshStock); setSpindle(false); setHeat(20); setCondition(100);
     setLoad(0); setOvercut(0); setFinishPenalty(0); setBreaks(0); setElapsed(0); setCursor({ x: 3, y: 3 }); setResult(null); setShareStatus(""); setViewMode("map"); firstCutTracked.current = false; toolpathRef.current = []; chipsRef.current = [];
+    comboRef.current = 0; setCombo(0); setBestCombo(0); setFlowScore(0); setPaused(false); setGameEvent(null);
   }, [contractIndex]);
 
   const retryContract = useCallback(() => {
@@ -262,15 +294,10 @@ export default function ManualCampaign() {
     setTourStep(next); trackAnonymous("guided_tour_step", { step: next + 1, screen });
   };
 
-  const millAt = (clientX: number, clientY: number) => {
-    const canvas = canvasRef.current; if (!canvas) return;
-    const rect = canvas.getBoundingClientRect();
-    const px = (clientX - rect.left) / rect.width * canvas.width, py = (clientY - rect.top) / rect.height * canvas.height;
-    const x = clamp((px - STOCK_VIEW.x) / STOCK_VIEW.width * MILL_COLS - .5, 0, MILL_COLS - 1);
-    const y = clamp((py - STOCK_VIEW.y) / STOCK_VIEW.height * MILL_ROWS - .5, 0, MILL_ROWS - 1);
+  const cutAt = (x: number, y: number) => {
     setCursor({ x, y });
-    if (!spindle || condition <= 0) return;
-    const cut = cutManualStock(material, contract.id, x, y, tool.radius);
+    if (!spindle || condition <= 0 || paused || viewMode === "twin") return;
+    const cut = cutManualStock(materialRef.current, contract.id, x, y, tool.radius);
     if (!cut.engagement) { setLoad(0); return; }
     toolpathRef.current.push({ x, y }); toolpathRef.current = toolpathRef.current.slice(-320);
     if (!firstCutTracked.current) { firstCutTracked.current = true; trackAnonymous("first_cut", { contract: contract.id, tool: tool.id, feed }); }
@@ -281,7 +308,25 @@ export default function ManualCampaign() {
     if (now - lastCutTone.current > 75) { tone(cut.overcut ? 92 : 230 + nextLoad * 2.2, .055, cut.overcut ? "sawtooth" : "square", cut.overcut ? .035 : .012); lastCutTone.current = now; }
     const heatGain = cut.engagement * .45 * tool.load * (feed / 50);
     const wear = cut.engagement * .055 * tool.wear * (1 + Math.max(0, feed - 70) / 35);
-    setMaterial(cut.material); setOvercut((value) => value + cut.overcut); setLoad(nextLoad);
+    materialRef.current = cut.material; setMaterial(cut.material); setOvercut((value) => value + cut.overcut); setLoad(nextLoad);
+    const safeCut = cut.correct > 0 && cut.overcut === 0 && nextLoad <= 84;
+    if (safeCut) {
+      lastComboCutRef.current = now;
+      comboRef.current = Math.min(99, comboRef.current + 1);
+      setCombo(comboRef.current);
+      setBestCombo((best) => Math.max(best, comboRef.current));
+      setFlowScore((value) => value + deriveFlowPoints(cut.correct, comboRef.current).points);
+    } else if (cut.overcut > 0 || nextLoad > 92) {
+      comboRef.current = 0; setCombo(0);
+      announceGameEvent({ kind: "warning", title: cut.overcut > 0 ? "PROFILE STRIKE" : "LOAD LIMIT", detail: cut.overcut > 0 ? "Combo lost. Retract from the glowing edge." : "Combo lost. Reduce engagement or feed." });
+    }
+    const nextCompletion = manualCompletion(cut.material, contract.id);
+    for (const threshold of [35, 70, 90]) if (completion < threshold && nextCompletion >= threshold && !milestoneRef.current.has(threshold)) {
+      milestoneRef.current.add(threshold);
+      const title = threshold === 35 ? "ENTRY PATH OPEN" : threshold === 70 ? "ROUGHING PASS COMPLETE" : "INSPECTION UNLOCKED";
+      announceGameEvent({ kind: threshold === 90 ? "reward" : "objective", title, detail: threshold === 90 ? "Stop the spindle and inspect for release." : `Material removal reached ${threshold}%. Keep the profile protected.` });
+      tone(threshold === 90 ? 740 : 440 + threshold * 2, .16, "sine", .025);
+    }
     setHeat((value) => clamp(value + heatGain, 18, 100));
     setCondition((value) => {
       const next = clamp(value - wear, 0, 100);
@@ -289,6 +334,13 @@ export default function ManualCampaign() {
       return next;
     });
     setFinishPenalty((value) => value + Math.max(0, nextLoad - 82) * .018 * tool.finish + cut.overcut * .25);
+  };
+
+  const millAt = (clientX: number, clientY: number) => {
+    const canvas = canvasRef.current; if (!canvas) return;
+    const rect = canvas.getBoundingClientRect();
+    const px = (clientX - rect.left) / rect.width * canvas.width, py = (clientY - rect.top) / rect.height * canvas.height;
+    cutAt(clamp((px - STOCK_VIEW.x) / STOCK_VIEW.width * MILL_COLS - .5, 0, MILL_COLS - 1), clamp((py - STOCK_VIEW.y) / STOCK_VIEW.height * MILL_ROWS - .5, 0, MILL_ROWS - 1));
   };
 
   const moveCursor = (clientX: number, clientY: number) => {
@@ -324,17 +376,36 @@ export default function ManualCampaign() {
 
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
-      if (screen !== "result") return;
-      if (event.key.toLowerCase() === "r") { event.preventDefault(); retryContract(); }
+      const key = event.key.toLowerCase();
+      if (tourStep !== null || logOpen) return;
+      if (screen === "result") {
+        if (key === "r") { event.preventDefault(); retryContract(); }
+        if (event.code === "Space") {
+          event.preventDefault();
+          if (result?.accepted && contractIndex < MANUAL_CONTRACTS.length - 1) startContract(contractIndex + 1);
+          else retryContract();
+        }
+        return;
+      }
+      if (screen !== "play") return;
+      if (event.key === "Escape") { event.preventDefault(); setSpindle(false); setPaused((value) => !value); return; }
+      if ((event.target as HTMLElement)?.matches("input,button,a")) return;
+      if (paused) return;
       if (event.code === "Space") {
         event.preventDefault();
-        if (result?.accepted && contractIndex < MANUAL_CONTRACTS.length - 1) startContract(contractIndex + 1);
-        else retryContract();
+        if (viewMode === "twin") { setViewMode("map"); setMessage("CUT MAP ACTIVE — verify position, then start the cycle."); }
+        else { setSpindle((value) => !value); setMessage(spindle ? "FEED HOLD — spindle stopped." : "SPINDLE LIVE — trace the waste field."); }
+        return;
       }
+      if (key === "i") { event.preventDefault(); inspect(); return; }
+      if (key === "v") { event.preventDefault(); setSpindle(false); setViewMode((value) => value === "map" ? "twin" : "map"); return; }
+      if (key === "r") { event.preventDefault(); resetRun(); setMessage("Fresh stock loaded. Setup retained."); return; }
+      const motion = key === "a" || event.key === "ArrowLeft" ? [-.7, 0] : key === "d" || event.key === "ArrowRight" ? [.7, 0] : key === "w" || event.key === "ArrowUp" ? [0, -.7] : key === "s" || event.key === "ArrowDown" ? [0, .7] : null;
+      if (motion) { event.preventDefault(); cutAt(clamp(cursor.x + motion[0], 0, MILL_COLS - 1), clamp(cursor.y + motion[1], 0, MILL_ROWS - 1)); }
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [contractIndex, result?.accepted, retryContract, screen]);
+  }, [contractIndex, cursor.x, cursor.y, logOpen, paused, result?.accepted, retryContract, screen, spindle, tourStep, viewMode]);
 
   const restoreTool = () => { setCondition(100); setHeat(25); setSpindle(false); setMessage("Fresh cutter loaded. Verify offset before restart."); };
   const inspectionBands = result ? [
@@ -376,6 +447,9 @@ export default function ManualCampaign() {
             <canvas ref={canvasRef} width={1120} height={640} aria-label="Interactive milling stock" onPointerDown={(event) => { dragging.current = true; event.currentTarget.setPointerCapture(event.pointerId); millAt(event.clientX, event.clientY); }} onPointerMove={(event) => dragging.current ? millAt(event.clientX, event.clientY) : moveCursor(event.clientX, event.clientY)} onPointerUp={() => { dragging.current = false; setLoad(0); }} onPointerCancel={() => { dragging.current = false; setLoad(0); }}/>
             <div className={styles.coordinates}><small>G54 POSITION / MM</small><b>X {machinePosition.x.toFixed(2)}</b><b>Y {machinePosition.y.toFixed(2)}</b><b>Z {spindle ? "-1.80" : "+4.00"}</b></div>
             <div className={styles.processPlate}><small>PROCESS ESTIMATE / SIM</small><span><b>S</b>{spindleRpm.toLocaleString()} RPM</span><span><b>F</b>{programmedFeed} MM/MIN</span><span><b>fz</b>{chipLoad.toFixed(3)} MM</span><span><b>ae</b>{engagementAngle}°</span><span><b>Ra</b>{surfaceRa.toFixed(1)} µm</span><span><b>MRR</b>{removalIndex}</span><span><b>WCS</b>G54</span><span><b>PATH</b>{tool.role.includes("Precision") ? "FINISH" : "ADAPTIVE"}</span></div>
+            <section className={styles.missionHud} aria-label="Active mission objective"><header><Target/><span>PRIMARY OBJECTIVE / 0{mission.step}</span><b>{completion}% / {mission.target}%</b></header><h3>{mission.title}</h3><p>{mission.detail}</p><i><em style={{ width: `${Math.min(100, completion / mission.target * 100)}%` }}/></i></section>
+            <div className={styles.flowHud} data-active={combo > 1}><Zap/><span>FLOW</span><strong>×{comboMultiplier.toFixed(2)}</strong><small>{combo} CHAIN · {flowScore.toLocaleString()} PTS</small></div>
+            {gameEvent && <div key={gameEvent.id} className={styles.gameEvent} data-kind={gameEvent.kind} role="status"><Sparkles/><span>{gameEvent.kind === "warning" ? "PROCESS WARNING" : "MISSION UPDATE"}</span><strong>{gameEvent.title}</strong><small>{gameEvent.detail}</small></div>}
             <div className={styles.legend}><span><i className={styles.keep}/> PART</span><span><i className={styles.waste}/> REMOVE</span><span><i className={styles.damage}/> OVERCUT</span></div>
             {!spindle && <div className={styles.prompt}><Crosshair/><b>{completion ? "SPINDLE PAUSED" : "SET YOUR CUT"}</b><span>Drag across the stock after cycle start.</span></div>}
             {contract.id === "drive" && <FlagshipMachiningKit cursor={cursor} spindle={spindle} completion={completion} load={load}/>}
@@ -387,7 +461,7 @@ export default function ManualCampaign() {
             <div className={styles.timeline}><i style={{ width: `${completion}%` }}/><span>{completion}% REMOVED</span></div>
             <button className={styles.inspect} onClick={inspect}><ScanLine/> INSPECT PART</button>
           </div>
-          <div className={styles.message} role="status"><Activity/>{message}{retryMs !== null && <b className={retryMs < 3000 ? styles.readyFast : styles.readySlow}>RESET READY {retryMs}MS</b>}</div>
+          <div className={styles.message} role="status"><Activity/>{message}<span className={styles.keyHints}><kbd>WASD</kbd> MOVE <kbd>SPACE</kbd> SPINDLE <kbd>I</kbd> INSPECT <kbd>ESC</kbd> PAUSE</span>{retryMs !== null && <b className={retryMs < 3000 ? styles.readyFast : styles.readySlow}>RESET READY {retryMs}MS</b>}</div>
         </article>
 
         <aside className={styles.telemetry}>
@@ -408,6 +482,7 @@ export default function ManualCampaign() {
         <div className={styles.resultHero}><div className={styles.rank}><Award/><span>{result.accepted ? "INSPECTION ACCEPTED" : "INSPECTION HOLD"}</span><strong>{result.rank}</strong><small>{result.score} / 100</small></div><section className={styles.inspectionMap} aria-label="Simulated dimensional inspection visualization"><header><span>CMM PROFILE REPORT / SIM</span><b>{contract.program}</b><i>{result.accepted ? "RELEASE" : "REWORK"}</i></header><div className={styles.inspectionGeometry}><GeometryPreview contract={contract}/><i className={styles.inspectionX}/><i className={styles.inspectionY}/><span>G54</span><b>PROFILE TRACE<br/>240 × 140 MM FIELD</b></div><div className={styles.deviationBands}>{inspectionBands.map((band) => <div key={band.label}><span>{band.label}</span><i><em style={{ width: `${clamp(band.value, 0, 100)}%` }}/></i><b>{band.reading}</b></div>)}</div><footer><span>MAT <b>{contract.material}</b></span><span>WCS <b>G54</b></span><span>TOOL <b>T{tool.id}</b></span><span>TRACE <b>{result.accepted ? "IN BAND" : "OUT OF BAND"}</b></span></footer></section></div>
         <div className={styles.resultData}><div><span>GEOMETRY</span><b>{result.geometry}/46</b><small>{result.completion}% waste cleared</small></div><div><span>PRECISION</span><b>{result.precision}/30</b><small>{overcut}/{contract.tolerance} overcut cells</small></div><div><span>FINISH</span><b>{result.finish}/14</b><small>{finishPenalty.toFixed(1)} risk index</small></div><div><span>CYCLE</span><b>{result.time}/10</b><small>{elapsed}s / {contract.par}s par</small></div></div>
         <div className={styles.scoreProof}><span>SCORE PROOF</span><code>{result.geometry} + {result.precision} + {result.finish} + {result.time} − {result.breakPenalty} = <b>{result.score}</b></code><i>{result.completion >= 90 ? "✓" : "×"} COMPLETION ≥90%</i><i>{overcut <= contract.tolerance ? "✓" : "×"} OVERCUT ≤{contract.tolerance}</i></div>
+        <div className={styles.runSignature}><Gamepad2/><span>RUN SIGNATURE</span><b>{flowScore.toLocaleString()} FLOW PTS</b><i>BEST CHAIN ×{bestCombo}</i><small>Flow rewards controlled consecutive cuts; it never changes the inspection grade.</small></div>
         <p>{result.accepted ? `Released to ${contract.client}. ${result.payout.toLocaleString()} credits earned.` : `Remove at least 90% of the waste and stay within ${contract.tolerance} overcut cells.`}</p>
         <div className={rapidStyles.improvement}><b>{previousBest ? `${result.score >= previousBest.score ? "+" : ""}${result.score - previousBest.score} VS PERSONAL BEST` : "FIRST VALID RESULT SETS YOUR BENCHMARK"}</b><span>{result.accepted ? (result.precision < 26 ? "Next run: protect the glowing part edge more carefully." : result.completion < 98 ? "Next run: clear the remaining silver stock." : "Next run: preserve quality with a shorter path.") : "Fastest recovery: retry fresh stock, then cut only the silver field."}</span></div>
         <div className={styles.careerPulse}><span>SHOP SKILL RECORD</span><b>{shopProgress.current.role}</b><button onClick={() => setLogOpen(true)}>REVIEW LOG <BookOpen/></button><i><em style={{ width: `${shopProgress.progress}%` }}/></i><small>{shopProgress.next ? `${Math.max(0, shopProgress.next.threshold - shopProgress.xp)} BEST-RUN XP TO ${shopProgress.next.role}` : "CURRENT DEMO LADDER COMPLETE"}</small></div>
@@ -416,6 +491,7 @@ export default function ManualCampaign() {
       </article>
     </section>}
     {logOpen && <ShopLog save={save} close={() => setLogOpen(false)}/>}
+    {paused && screen === "play" && <section className={styles.pauseLayer} role="dialog" aria-modal="true" aria-label="Game paused"><article><small>SHIFT 01 / PAUSED</small><h2>MACHINE<br/><em>ON HOLD.</em></h2><p>The spindle is stopped and the run is preserved.</p><button className={styles.pausePrimary} onClick={() => setPaused(false)}><Play/> RESUME RUN</button><button onClick={() => { resetRun(); setMessage("Fresh stock loaded. Setup retained."); }}><RotateCcw/> RESTART CONTRACT</button><button onClick={() => { setPaused(false); setScreen("select"); }}><Factory/> CONTRACT INDEX</button><button onClick={() => { setPaused(false); setTourStep(0); }}><CircleHelp/> HELP / TOUR</button><footer><kbd>ESC</kbd> RESUME · <kbd>WASD</kbd> MOVE · <kbd>SPACE</kbd> SPINDLE · <kbd>I</kbd> INSPECT</footer></article></section>}
     {tourStep !== null && <section className={styles.tourLayer} aria-live="polite"><article className={styles.tourCard} role="dialog" aria-modal="false" aria-label="Guided game tour"><header><span>{TOUR_STEPS[tourStep].code} / 0{TOUR_STEPS.length}</span><button onClick={() => { setTourStep(null); setViewMode("map"); }} aria-label="Close guided tour"><X/></button></header><small>{TOUR_STEPS[tourStep].eyebrow}</small><h2>{TOUR_STEPS[tourStep].title}</h2><p>{TOUR_STEPS[tourStep].body}</p><div className={styles.tourProgress} aria-label={`Tour step ${tourStep + 1} of ${TOUR_STEPS.length}`}>{TOUR_STEPS.map((step, index) => <i key={step.code} data-active={index === tourStep}/>)}</div><footer><button disabled={tourStep === 0} onClick={() => goToTourStep(tourStep - 1)}>PREVIOUS</button><b>ESC TO CLOSE</b><button className={styles.tourNext} onClick={() => goToTourStep(tourStep + 1)}>{tourStep === TOUR_STEPS.length - 1 ? "FINISH TOUR" : "NEXT AREA"}</button></footer></article></section>}
   </main>;
 }

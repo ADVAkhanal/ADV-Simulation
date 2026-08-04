@@ -77,6 +77,18 @@ export function manualCompletion(material: Uint8Array, contract: ManualContract[
   return Math.min(100,Math.round(removed/Math.max(1,required)*100));
 }
 
+export function deriveManualMission(completion: number) {
+  if (completion < 35) return { step: 1, target: 35, title: "OPEN THE STOCK", detail: "Establish a safe removal lane without touching the glowing profile." };
+  if (completion < 70) return { step: 2, target: 70, title: "CONTROL THE ENGAGEMENT", detail: "Clear the open field while keeping simulated load below the red band." };
+  if (completion < 90) return { step: 3, target: 90, title: "PROTECT THE EDGE", detail: "Switch strategy near constrained geometry and preserve the part boundary." };
+  return { step: 4, target: 100, title: "INSPECT THE PART", detail: "The release threshold is met. Stop the spindle and run inspection." };
+}
+
+export function deriveFlowPoints(correctCells: number, chain: number) {
+  const multiplier = 1 + Math.min(Math.max(0, chain), 20) * .05;
+  return { multiplier, points: Math.max(0, Math.round(correctCells * 100 * multiplier)) };
+}
+
 export function gradeManualRun(material: Uint8Array, contract: ManualContract, overcut: number, finishPenalty: number, elapsed: number, breaks: number) {
   const completion=manualCompletion(material,contract.id);
   const geometry=Math.min(46,completion/90*46);

@@ -136,6 +136,13 @@ test("global mode dock exposes both game surfaces", async () => {
   assert.match(manual, /DIGITAL TWIN \/ VISUAL REVIEW/);
   assert.match(manual, /RETURN TO CUT MAP/);
   assert.match(manual, /view_3d_twin/);
+  assert.match(manual, /PRIMARY OBJECTIVE/);
+  assert.match(manual, /FLOW PTS/);
+  assert.match(manual, /RUN SIGNATURE/);
+  assert.match(manual, /SHIFT 01 \/ PAUSED/);
+  assert.match(manual, /WASD/);
+  assert.match(manual, /deriveManualMission/);
+  assert.match(manual, /deriveFlowPoints/);
   assert.match(machiningKit, /variant === "full"/);
   assert.match(machiningKit, /DRAG TO ORBIT/);
   assert.match(machiningKit, /AUTO ORBIT/);

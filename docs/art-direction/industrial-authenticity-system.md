@@ -102,3 +102,12 @@ Contract selection treats each job as a manufactured artifact rather than a gene
 The full-frame 3D Twin now prioritizes physical comprehension over passive presentation. It continuously orbits at a restrained speed, supports direct pointer orbit and wheel zoom, exposes pause/reset controls, honors reduced-motion preferences, and retains the existing safe-hold behavior. Increased ambient contribution, material overrides for stock/fixture/spindle families, stronger edge separation, and a larger projection make the assembly legible against the enclosure rather than disappearing into black.
 
 Primary machine-cell text no longer depends on 6–9 px microtype at desktop widths. Contract, setup, controls, coordinates, process estimates, telemetry, and twin callouts use a larger calibrated scale while secondary metadata remains compact. A persistent Help / Tour control provides six contextual steps and highlights navigation, contract, setup, interactive 3D, telemetry, and inspection without hiding the actual interface.
+
+## Directed game loop
+
+- A four-stage mission director turns stock removal into readable short-term goals: establish the entry path, complete roughing, bring the profile to tolerance, and inspect the part.
+- Milestone callouts at 35, 70, and 90 percent expose progress without pausing the cut, while warnings interrupt the flow chain when simulated load or overcut risk becomes unsafe.
+- WASD or arrow keys drive the cutter, Space controls the spindle, V changes review view, I starts inspection, R resets stock, and Escape opens a full pause layer.
+- Consecutive controlled cuts build a capped flow multiplier and a separate run signature. Flow points provide arcade feedback but never alter the dimensional inspection grade, role progress, or acceptance decision.
+- The machine cell can be paused, restarted, toured, or exited to the contract index without browser refreshes or hidden route changes.
+- Reduced-motion preferences suppress event animation while retaining all objective, warning, and score information.

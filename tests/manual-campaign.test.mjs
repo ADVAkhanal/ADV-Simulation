@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { MANUAL_CONTRACTS, MILL_TOOLS, appendShopRunLog, createManualStock, cutManualStock, deriveShopSkillProgress, gradeManualRun, isManualTarget } from "../app/manual-campaign-engine.ts";
+import { MANUAL_CONTRACTS, MILL_TOOLS, appendShopRunLog, createManualStock, cutManualStock, deriveFlowPoints, deriveManualMission, deriveShopSkillProgress, gradeManualRun, isManualTarget } from "../app/manual-campaign-engine.ts";
 
 test("manual campaign exposes three distinct geometries and tool tradeoffs",()=>{
   assert.equal(MANUAL_CONTRACTS.length,3); assert.equal(MILL_TOOLS.length,3);
@@ -26,4 +26,11 @@ test("shop log keeps newest inspection evidence within its bounded local ledger"
   const entry=(id)=>({id,contract:"drive",program:"NS-0142-A",title:"Emergency drive plate",score:80,rank:"B",accepted:true,completion:94,precision:26,finish:11,elapsed:72,overcut:1,at:Number(id)});
   let log=[]; for(let id=0;id<30;id+=1) log=appendShopRunLog(log,entry(String(id)));
   assert.equal(log.length,24); assert.equal(log[0].id,"29"); assert.equal(log.at(-1).id,"6");
+});
+
+test("mission stages and flow rewards remain deterministic and grading-independent",()=>{
+  assert.deepEqual([0,35,70,90].map(value=>deriveManualMission(value).step),[1,2,3,4]);
+  assert.deepEqual(deriveFlowPoints(4,0),{multiplier:1,points:400});
+  assert.deepEqual(deriveFlowPoints(4,10),{multiplier:1.5,points:600});
+  assert.deepEqual(deriveFlowPoints(4,99),{multiplier:2,points:800});
 });
