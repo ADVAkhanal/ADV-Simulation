@@ -163,6 +163,11 @@ test("global mode dock exposes both game surfaces", async () => {
   assert.match(manual, /CNC OPERATOR ALIGNMENT/);
   assert.match(manual, /MACHINIST \/ SETUP ALIGNMENT/);
   assert.match(manual, /CNC PROGRAMMER ALIGNMENT/);
+  assert.match(manual, /skill_level_selected/);
+  assert.match(manual, /View \$\{role\.level\}/);
+  assert.match(manual, /aria-pressed=\{selectedRoleIndex === index\}/);
+  assert.match(manual, /EXPLORE ANY LEVEL/);
+  assert.match(manual, /roleDetail/);
   assert.match(manual, /does not certify employment readiness/);
   assert.match(manual, /deriveShopProgress/);
   assert.match(manual, /SHOP LOG/);

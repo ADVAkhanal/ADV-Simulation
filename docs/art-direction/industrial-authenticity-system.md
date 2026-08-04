@@ -127,3 +127,4 @@ Primary machine-cell text no longer depends on 6–9 px microtype at desktop wid
 - Selecting Finisher, Rougher, or Hog Mill during an active cycle automatically commands feed hold, clears displayed load, selects the requested tool, and requires offset verification before restart.
 - The guided tour never presents a disabled Previous control. Its first step exposes Exit Tour in the same location, preserving a predictable action target.
 - A repository-wide regression test rejects disabled or unwired button elements across every TSX route.
+- L0 through L3 are interactive path selectors, including levels whose evidence threshold is not yet met. Selection reveals role focus, evidence target, threshold status, and remaining personal-best XP without implying certification or unlocking real-world permissions.
