@@ -34,6 +34,10 @@ Project Toolpath uses measurable industrial and geometric constraints instead of
 - Perspective floor lines, a contact shadow, depth attenuation, and a controlled vignette ground the machine in a coherent volume.
 - Camera motion is limited to a subtle idle inspection orbit and stops while the spindle is active.
 - The renderer avoids noisy full-strength wireframes; edges remain subordinate to form and material value.
+- The flagship VMC now reads as a complete open-front cell: structural plinth and sump, rear Z column, guard frame, roof mass, bellows, T-slot table, vise and stock stack, spindle/tool assembly, coolant manifold, work light, and chip tray.
+- The source asset stays below 8,000 triangles, eight materials, and a 2 MB GLB budget so added authenticity does not compromise browser delivery.
+- Browser GLB traversal applies full hierarchical transform matrices rather than translation-only approximation, keeping parented spindle, coolant, tool, and stock geometry assembled during motion.
+- A repository-owned Blender preview script supplies repeatable camera and lighting QA independently of the browser renderer.
 
 ## Inspection payoff
 

@@ -4,8 +4,8 @@
   "path": "/assets/workholding/toolpath-machining-kit-v1.glb",
   "sourceBlend": "assets-src/blender/toolpath-machining-kit-v1.blend",
   "sourceScript": "tools/blender/build-machining-kit.py",
-  "generatedAt": "2026-08-03T18:32:10.271144+00:00",
-  "sha256": "879B53B28F908A6CEFDEFE31D9A9C01682137C12DC4FBFA1052817630C9322D6",
+  "generatedAt": "2026-08-04T21:16:51.805555+00:00",
+  "sha256": "5C54FFCFA4276F2F0C46E5F70FA7721AA687E9B968ED025689C7EC2FE7D54AE6",
   "coordinateSystem": {
     "units": "millimeters",
     "worldUp": "+Z",
@@ -26,6 +26,15 @@
     "movingJaw": "fixture.vise.jaw_moving"
   },
   "objects": [
+    "machine.enclosure.base",
+    "machine.enclosure.column",
+    "machine.enclosure.left",
+    "machine.enclosure.right",
+    "machine.enclosure.roof",
+    "machine.waycover.z",
+    "machine.worklight",
+    "machine.coolant.manifold",
+    "machine.chiptray",
     "machine.table",
     "machine.spindle.body",
     "machine.spindle.tool_anchor",
@@ -42,26 +51,27 @@
     "MAT_MACHINE_ACCENT",
     "MAT_MACHINE_DARK",
     "MAT_TOOL_STEEL",
-    "MAT_VISE_DARK"
+    "MAT_VISE_DARK",
+    "MAT_WARM_WORKLIGHT"
   ],
-  "triangleCount": 2012,
-  "materialCount": 6,
-  "fileSizeBytes": 141076,
+  "triangleCount": 7740,
+  "materialCount": 7,
+  "fileSizeBytes": 541464,
   "boundingBox": {
     "minMm": [
-      -340.0,
-      -230.0,
-      -70.0
+      -421.0,
+      -300.0,
+      -158.0
     ],
     "maxMm": [
-      340.0,
-      230.0,
-      500.0
+      421.0,
+      300.0,
+      650.0
     ],
     "dimensionsMm": [
-      680.0,
-      460.0,
-      570.0
+      842.0,
+      600.0,
+      808.0
     ]
   },
   "releaseBudgets": {

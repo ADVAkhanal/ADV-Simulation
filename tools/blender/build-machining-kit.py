@@ -1,4 +1,4 @@
-"""Build Project Toolpath Machining Kit v1 for the flagship manual contract."""
+"""Build the Project Toolpath flagship VMC cell for the manual contract."""
 
 from __future__ import annotations
 
@@ -26,6 +26,15 @@ MAX_MATERIALS = 8
 MAX_GLB_BYTES = 2 * 1024 * 1024
 
 EXPECTED_NAMES = [
+    "machine.enclosure.base",
+    "machine.enclosure.column",
+    "machine.enclosure.left",
+    "machine.enclosure.right",
+    "machine.enclosure.roof",
+    "machine.waycover.z",
+    "machine.worklight",
+    "machine.coolant.manifold",
+    "machine.chiptray",
     "machine.table",
     "machine.spindle.body",
     "machine.spindle.tool_anchor",
@@ -38,12 +47,13 @@ EXPECTED_NAMES = [
 ]
 
 MATERIAL_SPECS = {
-    "MAT_MACHINE_DARK": ((0.018, 0.026, 0.031, 1), 0.72, 0.27),
-    "MAT_MACHINE_ACCENT": ((0.015, 0.62, 0.82, 1), 0.64, 0.22),
+    "MAT_MACHINE_DARK": ((0.065, 0.09, 0.105, 1), 0.66, 0.29),
+    "MAT_MACHINE_ACCENT": ((0.015, 0.42, 0.58, 1), 0.64, 0.22),
     "MAT_BRUSHED_STEEL": ((0.28, 0.34, 0.37, 1), 0.92, 0.24),
     "MAT_MACHINED_ALUMINUM": ((0.62, 0.69, 0.71, 1), 0.86, 0.19),
     "MAT_TOOL_STEEL": ((0.15, 0.19, 0.21, 1), 0.96, 0.16),
-    "MAT_VISE_DARK": ((0.07, 0.10, 0.115, 1), 0.78, 0.31),
+    "MAT_VISE_DARK": ((0.105, 0.135, 0.145, 1), 0.72, 0.33),
+    "MAT_WARM_WORKLIGHT": ((1.0, 0.36, 0.055, 1), 0.20, 0.24),
 }
 
 
@@ -190,10 +200,65 @@ bpy.context.view_layer.active_layer_collection = bpy.context.view_layer.layer_co
 
 materials = {name: make_material(name, *spec) for name, spec in MATERIAL_SPECS.items()}
 
+# Open-front VMC enclosure. The frame is deliberately modeled as separate masses
+# so the browser renderer retains a readable silhouette from every orbit angle.
+enclosure_base = join_parts([
+    box("enclosure-plinth", (0, 0, -112), (840, 600, 92), materials["MAT_MACHINE_DARK"], 14),
+    box("enclosure-sump", (0, 12, -65), (720, 500, 32), materials["MAT_VISE_DARK"], 8),
+    box("enclosure-kick", (0, -276, -74), (760, 34, 72), materials["MAT_BRUSHED_STEEL"], 5),
+], "machine.enclosure.base")
+set_origin(enclosure_base, (0, 0, -112)); tag(enclosure_base, "machine_enclosure", False, "machine_base")
+
+column = join_parts([
+    box("column-main", (0, 250, 258), (700, 92, 690), materials["MAT_MACHINE_DARK"], 18),
+    box("column-inset", (0, 198, 270), (490, 28, 520), materials["MAT_VISE_DARK"], 8),
+], "machine.enclosure.column")
+set_origin(column, (0, 250, 0)); tag(column, "machine_enclosure", False, "z_column")
+
+left_wall = join_parts([
+    box("left-pillar", (-390, 138, 218), (62, 260, 600), materials["MAT_MACHINE_DARK"], 12),
+    box("left-door-rail", (-346, -225, 245), (28, 42, 470), materials["MAT_BRUSHED_STEEL"], 5),
+], "machine.enclosure.left")
+set_origin(left_wall, (-390, 0, 0)); tag(left_wall, "machine_enclosure", False, "left_guard")
+
+right_wall = join_parts([
+    box("right-pillar", (390, 138, 218), (62, 260, 600), materials["MAT_MACHINE_DARK"], 12),
+    box("right-console", (347, -195, 255), (42, 100, 360), materials["MAT_VISE_DARK"], 7),
+    box("right-status", (325, -248, 372), (10, 56, 13), materials["MAT_MACHINE_ACCENT"], 2),
+], "machine.enclosure.right")
+set_origin(right_wall, (390, 0, 0)); tag(right_wall, "machine_enclosure", False, "right_guard")
+
+roof = join_parts([
+    box("roof-main", (0, 40, 604), (800, 500, 62), materials["MAT_MACHINE_DARK"], 13),
+    box("roof-cap", (0, 40, 641), (720, 420, 18), materials["MAT_BRUSHED_STEEL"], 6),
+], "machine.enclosure.roof")
+set_origin(roof, (0, 40, 604)); tag(roof, "machine_enclosure", False, "machine_roof")
+
+# Accordion way covers give the machine a mechanically credible Z-axis spine.
+bellows = []
+for index in range(9):
+    bellows.append(box(f"bellow-{index:02d}", (0, 186, 92 + index * 40), (360 - index * 5, 38, 24), materials["MAT_VISE_DARK"], 3))
+waycover = join_parts(bellows, "machine.waycover.z")
+set_origin(waycover, (0, 186, 90)); tag(waycover, "machine_waycover", False, "z_waycover")
+
+worklight = join_parts([
+    box("worklight-arm", (250, 178, 380), (24, 36, 180), materials["MAT_BRUSHED_STEEL"], 4),
+    box("worklight-head", (250, 152, 294), (86, 72, 38), materials["MAT_MACHINE_DARK"], 8),
+    box("worklight-lens", (250, 112, 286), (58, 10, 22), materials["MAT_WARM_WORKLIGHT"], 3),
+], "machine.worklight")
+set_origin(worklight, (250, 178, 380)); tag(worklight, "work_light", False, "work_light")
+
+coolant = join_parts([
+    cylinder("coolant-left", (-48, 70, 247), 7, 92, materials["MAT_MACHINE_ACCENT"], 12),
+    cylinder("coolant-right", (48, 70, 247), 7, 92, materials["MAT_MACHINE_ACCENT"], 12),
+    box("coolant-block", (0, 75, 284), (124, 38, 26), materials["MAT_BRUSHED_STEEL"], 5),
+], "machine.coolant.manifold")
+set_origin(coolant, (0, 75, 284)); tag(coolant, "coolant_hardware", True, "spindle_accessory")
+
 table = box("machine.table", (0, 0, -35), (680, 460, 70), materials["MAT_MACHINE_DARK"], 10)
 accent_rails = [
-    box("rail-left", (-260, 0, 5), (22, 390, 18), materials["MAT_MACHINE_ACCENT"], 3),
-    box("rail-right", (260, 0, 5), (22, 390, 18), materials["MAT_MACHINE_ACCENT"], 3),
+    box(f"table-slot-{index}", (-250 + index * 100, 0, 5), (13, 405, 16), materials["MAT_BRUSHED_STEEL"], 2)
+    for index in range(6)
 ]
 table = join_parts([table, *accent_rails], "machine.table")
 set_origin(table, (0, 0, 0)); tag(table, "machine_table", False, "table_top_center")
@@ -204,6 +269,7 @@ spindle_nose = cylinder("spindle-nose", (0, 75, 246), 34, 42, materials["MAT_BRU
 spindle = join_parts([spindle_main, spindle_band, spindle_nose], "machine.spindle.body")
 set_origin(spindle, (0, 75, 225)); tag(spindle, "spindle", True, "tool_mount")
 tool_anchor = add_anchor("machine.spindle.tool_anchor", (0, 75, 225), spindle, "tool_mount")
+parent_keep_world(coolant, spindle)
 
 vise_body = box("fixture.vise.body", (0, 0, 34), (320, 190, 68), materials["MAT_VISE_DARK"], 8)
 vise_key = box("vise-key", (0, 0, 6), (160, 220, 18), materials["MAT_BRUSHED_STEEL"], 3)
@@ -226,6 +292,12 @@ tool_flute = cylinder("tool-flute", (0, 75, 151), 6.35, 22, materials["MAT_TOOL_
 tool = join_parts([tool_shank, tool_flute], "tool.endmill.flat.010")
 set_origin(tool, (0, 75, 140)); tag(tool, "cutting_tool", True, "cutter_tip")
 parent_keep_world(tool, tool_anchor)
+
+chip_tray = join_parts([
+    box("tray-pan", (0, -208, -32), (610, 62, 26), materials["MAT_VISE_DARK"], 6),
+    *[cylinder(f"chip-{index:02d}", (-245 + index * 70, -212 + (index % 2) * 10, -6), 5 + index % 3, 42 + index * 3, materials["MAT_MACHINED_ALUMINUM"], 10) for index in range(8)],
+], "machine.chiptray")
+set_origin(chip_tray, (0, -208, -32)); tag(chip_tray, "chip_management", False, "chip_tray")
 
 objects = [bpy.data.objects[name] for name in EXPECTED_NAMES]
 for obj in objects:

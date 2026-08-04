@@ -5,6 +5,7 @@ import { trackAnonymous } from "./anonymous-analytics";
 import styles from "./flagship-machining-kit.module.css";
 
 type Vec3 = [number, number, number];
+type Mat4 = [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
 type Face = { vertices: [Vec3, Vec3, Vec3]; color: string; node: string; metallic: number; roughness: number };
 type Scene = { faces: Face[]; bytes: number };
 type Props = { cursor: { x: number; y: number }; spindle: boolean; completion: number; load: number; variant?: "mini" | "full" };
@@ -34,6 +35,27 @@ function reader(componentType: number) {
   throw new Error(`Unsupported GLB component ${componentType}`);
 }
 
+const identity: Mat4 = [1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1];
+function multiply(a: Mat4, b: Mat4): Mat4 {
+  const result = Array(16).fill(0);
+  for (let column = 0; column < 4; column += 1) for (let row = 0; row < 4; row += 1) {
+    for (let axis = 0; axis < 4; axis += 1) result[column * 4 + row] += a[axis * 4 + row] * b[column * 4 + axis];
+  }
+  return result as Mat4;
+}
+function nodeMatrix(node: { matrix?: number[]; translation?: number[]; rotation?: number[]; scale?: number[] }): Mat4 {
+  if (node.matrix) return node.matrix as Mat4;
+  const [x, y, z, w] = node.rotation ?? [0, 0, 0, 1], [sx, sy, sz] = node.scale ?? [1, 1, 1], [tx, ty, tz] = node.translation ?? [0, 0, 0];
+  const xx = x * x, yy = y * y, zz = z * z, xy = x * y, xz = x * z, yz = y * z, wx = w * x, wy = w * y, wz = w * z;
+  return [(1 - 2 * (yy + zz)) * sx, (2 * (xy + wz)) * sx, (2 * (xz - wy)) * sx, 0,
+    (2 * (xy - wz)) * sy, (1 - 2 * (xx + zz)) * sy, (2 * (yz + wx)) * sy, 0,
+    (2 * (xz + wy)) * sz, (2 * (yz - wx)) * sz, (1 - 2 * (xx + yy)) * sz, 0,
+    tx, ty, tz, 1];
+}
+function transform(point: Vec3, matrix: Mat4): Vec3 {
+  return [point[0] * matrix[0] + point[1] * matrix[4] + point[2] * matrix[8] + matrix[12], point[0] * matrix[1] + point[1] * matrix[5] + point[2] * matrix[9] + matrix[13], point[0] * matrix[2] + point[1] * matrix[6] + point[2] * matrix[10] + matrix[14]];
+}
+
 function parseGlb(buffer: ArrayBuffer): Scene {
   const view = new DataView(buffer);
   if (view.getUint32(0, true) !== 0x46546c67 || view.getUint32(4, true) !== 2) throw new Error("Invalid GLB header");
@@ -49,9 +71,8 @@ function parseGlb(buffer: ArrayBuffer): Scene {
     return Array.from({ length: accessor.count }, (_, row) => Array.from({ length: size }, (__, column) => item.get(binary, start + row * stride + column * item.bytes)));
   };
   const faces: Face[] = [];
-  const walk = (nodeIndex: number, parent: Vec3) => {
-    const node = json.nodes[nodeIndex], local = node.translation ?? [0, 0, 0];
-    const origin: Vec3 = [parent[0] + local[0], parent[1] + local[1], parent[2] + local[2]];
+  const walk = (nodeIndex: number, parent: Mat4) => {
+    const node = json.nodes[nodeIndex], world = multiply(parent, nodeMatrix(node));
     if (node.mesh !== undefined) for (const primitive of json.meshes[node.mesh].primitives) {
       const positions = readAccessor(primitive.attributes.POSITION) as Vec3[];
       const indices = primitive.indices === undefined ? positions.map((_, index) => [index]) : readAccessor(primitive.indices);
@@ -60,13 +81,13 @@ function parseGlb(buffer: ArrayBuffer): Scene {
       const color = base ? `rgb(${base.slice(0, 3).map((value: number) => Math.round(value * 255)).join(",")})` : colors[(primitive.material ?? 0) % colors.length];
       for (let index = 0; index + 2 < indices.length; index += 3) {
         const triangle = [indices[index][0], indices[index + 1][0], indices[index + 2][0]];
-        faces.push({ node: node.name, color, metallic: pbr?.metallicFactor ?? .72, roughness: pbr?.roughnessFactor ?? .34, vertices: triangle.map((vertex) => positions[vertex].map((value, axis) => value + origin[axis]) as Vec3) as [Vec3, Vec3, Vec3] });
+        faces.push({ node: node.name, color, metallic: pbr?.metallicFactor ?? .72, roughness: pbr?.roughnessFactor ?? .34, vertices: triangle.map((vertex) => transform(positions[vertex], world)) as [Vec3, Vec3, Vec3] });
       }
     }
-    for (const child of node.children ?? []) walk(child, origin);
+    for (const child of node.children ?? []) walk(child, world);
   };
   const roots = json.scenes?.[json.scene ?? 0]?.nodes ?? json.nodes.map((_: unknown, index: number) => index);
-  roots.forEach((node: number) => walk(node, [0, 0, 0]));
+  roots.forEach((node: number) => walk(node, identity));
   if (!faces.length) throw new Error("GLB contains no drawable faces");
   return { faces, bytes: buffer.byteLength };
 }
@@ -100,7 +121,7 @@ function draw(canvas: HTMLCanvasElement, scene: Scene | null, props: Props, fall
   const orbit = view.autoOrbit && !reducedMotion ? time / (props.variant === "full" ? 15000 : 24000) : 0;
   const project = (point: Vec3, node: string) => {
     let [x, y, z] = point;
-    if (node.startsWith("machine.spindle") || node.startsWith("tool.endmill")) { x += toolX; z += toolZ; y += props.spindle ? -22 : 0; }
+    if (node.startsWith("machine.spindle") || node.startsWith("machine.coolant") || node.startsWith("tool.endmill")) { x += toolX; z += toolZ; y += props.spindle ? -22 : 0; }
     const nx = (x - center[0]) / extent, ny = (y - center[1]) / extent, nz = (z - center[2]) / extent;
     const yaw = view.yaw + orbit, pitch = view.pitch, rx = nx * Math.cos(yaw) + nz * Math.sin(yaw), rz = -nx * Math.sin(yaw) + nz * Math.cos(yaw);
     const ry = ny * Math.cos(pitch) - rz * Math.sin(pitch), depth = ny * Math.sin(pitch) + rz * Math.cos(pitch);
@@ -112,10 +133,10 @@ function draw(canvas: HTMLCanvasElement, scene: Scene | null, props: Props, fall
   projected.forEach(({ face, points }) => {
     context.beginPath(); context.moveTo(points[0].x, points[0].y); context.lineTo(points[1].x, points[1].y); context.lineTo(points[2].x, points[2].y); context.closePath();
     const illumination = faceLight(face.vertices), depthFade = clamp(.78 + points[0].depth * .16, .58, 1);
-    const isStock = face.node.includes("stock"), isTool = face.node.startsWith("tool.endmill"), isSpindle = face.node.includes("spindle"), isFixture = face.node.includes("vise") || face.node.includes("fixture") || face.node.includes("jaw");
-    const materialColor = isStock ? "rgb(174,190,194)" : isFixture ? "rgb(79,101,108)" : isSpindle ? "rgb(65,84,91)" : face.color;
+    const isStock = face.node.includes("stock"), isTool = face.node.startsWith("tool.endmill"), isSpindle = face.node.includes("spindle"), isFixture = face.node.includes("vise") || face.node.includes("fixture") || face.node.includes("jaw"), isWorklight = face.node.includes("worklight"), isEnclosure = face.node.includes("enclosure");
+    const materialColor = isStock ? "rgb(174,190,194)" : isFixture ? "rgb(79,101,108)" : isSpindle ? "rgb(65,84,91)" : isEnclosure ? "rgb(37,49,54)" : face.color;
     context.globalAlpha = (isStock ? Math.max(.34, 1 - props.completion / 135) : .98) * depthFade;
-    context.fillStyle = isTool && props.spindle ? "#7ff1ff" : shade(materialColor, illumination, face.metallic); context.fill();
+    context.fillStyle = isTool && props.spindle ? "#7ff1ff" : isWorklight ? "#ff9b3f" : shade(materialColor, illumination, face.metallic); context.fill();
     context.strokeStyle = isTool ? "#e8fdff" : isStock ? "rgba(235,250,252,.28)" : `rgba(208,232,236,${.08 + (1 - face.roughness) * .11})`; context.lineWidth = isTool ? 1.15 : isStock ? .65 : .45; context.stroke();
   });
   context.globalAlpha = 1;

@@ -8,6 +8,9 @@ const glbPath = new URL("../public/assets/workholding/toolpath-machining-kit-v1.
 const blendPath = new URL("../assets-src/blender/toolpath-machining-kit-v1.blend", import.meta.url);
 
 const expectedObjects = [
+  "machine.enclosure.base", "machine.enclosure.column", "machine.enclosure.left",
+  "machine.enclosure.right", "machine.enclosure.roof", "machine.waycover.z",
+  "machine.worklight", "machine.coolant.manifold", "machine.chiptray",
   "machine.table", "machine.spindle.body", "machine.spindle.tool_anchor",
   "fixture.vise.body", "fixture.vise.jaw_fixed", "fixture.vise.jaw_moving",
   "fixture.vise.stock_anchor", "tool.endmill.flat.010", "stock.block.flagship",
@@ -15,6 +18,7 @@ const expectedObjects = [
 const expectedMaterials = [
   "MAT_BRUSHED_STEEL", "MAT_MACHINED_ALUMINUM", "MAT_MACHINE_ACCENT",
   "MAT_MACHINE_DARK", "MAT_TOOL_STEEL", "MAT_VISE_DARK",
+  "MAT_WARM_WORKLIGHT",
 ];
 
 function parseGlb(buffer) {
