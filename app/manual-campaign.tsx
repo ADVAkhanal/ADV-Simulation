@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { animate, stagger } from "animejs";
 import { Activity, Award, BookOpen, CircleGauge, Crosshair, Factory, Gauge, Hexagon, Pause, Play, RotateCcw, ScanLine, Share2, ShieldCheck, Timer, Volume2, VolumeX, Waves, Wrench, X } from "lucide-react";
 import { MANUAL_CONTRACTS, MILL_COLS, MILL_ROWS, MILL_TOOLS, appendShopRunLog, createManualStock, cutManualStock, deriveShopSkillProgress, gradeManualRun, isManualTarget, manualCompletion, type ManualContract, type ShopBestRun, type ShopRunLogEntry } from "./manual-campaign-engine";
 import { trackAnonymous } from "./anonymous-analytics";
@@ -29,6 +30,11 @@ const ROLE_LADDER = [
   { threshold: 165, level: "L2", role: "MACHINIST / SETUP ALIGNMENT", code: "O*NET 51-4041.00", focus: "Read geometry · select tooling · control tolerance", evidence: "165 best-run XP" },
   { threshold: 250, level: "L3", role: "CNC PROGRAMMER ALIGNMENT", code: "O*NET 51-9162.00", focus: "Plan sequence · define paths · verify simulation", evidence: "250 best-run XP" },
 ] as const;
+const CONTRACT_VISUALS = {
+  drive: { artifact: "DRIVE INTERFACE", route: "PROFILE + BORE", stock: "PLATE / 18 MM", finish: "MILL / BRUSH" },
+  rib: { artifact: "LIGHTWEIGHT RIB", route: "WEBS + CONTOUR", stock: "PLATE / 22 MM", finish: "MILL / BLEND" },
+  bracket: { artifact: "OPTICAL BRACKET", route: "BOSS + DATUM", stock: "BLOCK / 32 MM", finish: "MILL / SATIN" },
+} as const;
 
 function deriveShopProgress(save: SaveData) {
   const base = deriveShopSkillProgress(save.bests, ROLE_LADDER.map((role) => role.threshold));
@@ -391,21 +397,29 @@ export default function ManualCampaign() {
 
 function ContractSelect({ save, startContract, learningLevel, setLearningLevel }: { save: SaveData; startContract: (index: number) => void; learningLevel: LearningLevel; setLearningLevel: (level: LearningLevel) => void }) {
   const lens = LEARNING_LENSES[learningLevel];
-  return <section className={styles.select}>
+  const selectRef = useRef<HTMLElement>(null);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const targets = selectRef.current?.querySelectorAll<HTMLElement>("[data-reveal]");
+    if (!targets?.length) return;
+    const entrance = animate(targets, { opacity: { from: 0 }, y: { from: 22 }, delay: stagger(85), duration: 720, ease: "out(3)" });
+    return () => entrance.cancel();
+  }, []);
+  return <section ref={selectRef} className={styles.select}>
     <div className={styles.selectIntro}>
-      <div className={styles.heroCopy}>
+      <div className={styles.heroCopy} data-reveal>
         <p>DIRECTOR DEMO / 90-SECOND VERTICAL SLICE</p>
         <h1>MAKE THE PART.<br/><em>PROTECT THE EDGE.</em></h1>
         <span>Remove the silver stock. Keep the glowing part untouched. One flagship contract proves the complete learn–cut–inspect–improve loop.</span>
         <div className={styles.heroActions}><button onClick={() => startContract(0)}><Play/> START FLAGSHIP CONTRACT</button><small>NO ACCOUNT · FICTIONAL TRAINING VALUES · KEYBOARD, MOUSE &amp; TOUCH</small></div>
       </div>
-      <figure className={styles.heroVisual}>
+      <figure className={styles.heroVisual} data-reveal>
         <img src="/assets/keyart/toolpath-cnc-keyart-v1.webp" alt="Carbide end mill over a fixtured aluminum plate inside a vertical machining center" fetchPriority="high"/>
         <div className={styles.heroReticle} aria-hidden="true"><i/><i/><b>G54</b></div>
         <div className={styles.heroVisualIndex} aria-hidden="true"><span>01</span><b>THE CUT</b><small>CONTROLLED ENERGY / VISIBLE EVIDENCE</small></div>
         <figcaption><span>SHOP THRESHOLD / VMC CELL</span><b>6061 AL · CARBIDE · FLOOD COOLANT</b><small>KEY ART / REPRESENTATIVE GAME WORLD</small></figcaption>
       </figure>
-      <dl className={styles.heroMetrics} aria-label="Flagship experience signals"><div><dt>GEOMETRY</dt><dd>DATUM-DRIVEN</dd></div><div><dt>PROCESS</dt><dd>LOAD-RESPONSIVE</dd></div><div><dt>INSPECTION</dt><dd>SCORE-PROVEN</dd></div><div><dt>RECOVERY</dt><dd>&lt; 3 SECOND RETRY</dd></div></dl>
+      <dl className={styles.heroMetrics} data-reveal aria-label="Flagship experience signals"><div><dt>GEOMETRY</dt><dd>DATUM-DRIVEN</dd></div><div><dt>PROCESS</dt><dd>LOAD-RESPONSIVE</dd></div><div><dt>INSPECTION</dt><dd>SCORE-PROVEN</dd></div><div><dt>RECOVERY</dt><dd>&lt; 3 SECOND RETRY</dd></div></dl>
     </div>
     <div className={styles.landingCell}><FlagshipMachiningKit cursor={{ x: 13.5, y: 7.5 }} spindle={false} completion={0} load={0}/><section className={styles.stageAnnotations} aria-hidden="true"><span className={styles.calloutSpindle}><b>01</b> Z-AXIS / SPINDLE</span><span className={styles.calloutWork}><b>02</b> G54 / STOCK TOP</span><span className={styles.calloutFixture}><b>03</b> FIXTURE DATUM</span><i className={styles.stageCenterline}/></section><div className={styles.landingCopy}><small>PRODUCTION GEOMETRY / MACHINING KIT V1</small><h2>THE MACHINE IS<br/><em>THE STAGE.</em></h2><p>A modeled spindle, 10 mm flat end mill, vise, moving jaw, stock datum, and T-slot table establish the physical language before the first cut.</p><dl><div><dt>ENVELOPE</dt><dd>680 × 460 × 570 MM</dd></div><div><dt>STOCK</dt><dd>240 × 140 × 18 MM</dd></div><div><dt>REFERENCE</dt><dd>G54 / TOP CENTER</dd></div><div><dt>ASSET</dt><dd>2,012 TRI / 6 MAT</dd></div></dl></div></div>
     <section className={styles.metrologyDeck} aria-label="The geometry behind the machining experience"><header><small>METROLOGY / VISUAL DOCTRINE</small><h2>BEAUTY WITH<br/><em>A TOLERANCE.</em></h2><p>Every line carries a job: locate the work, communicate force, or predict the surface. Decoration is subordinate to process truth.</p></header><article><div className={styles.datumDiagram}><i/><b>G54</b><span>X0 · Y0 · Z0</span></div><small>01 / DATUM STACK</small><h3>Locate before motion.</h3><p>Orthogonal references make the setup legible at a glance and anchor every measured decision.</p><dl><div><dt>FRAME</dt><dd>3-2-1</dd></div><div><dt>ORIGIN</dt><dd>G54</dd></div></dl></article><article><div className={styles.engagementDiagram}><i/><b>ae</b><span>0–165°</span></div><small>02 / CUTTER ENGAGEMENT</small><h3>Show the force, not noise.</h3><p>The amber arc and force vector reveal radial engagement while load changes in real time.</p><dl><div><dt>VECTOR</dt><dd>Ft</dd></div><div><dt>LIMIT</dt><dd>84%</dd></div></dl></article><article><div className={styles.finishDiagram}><i/><b>Ra</b><span>µm / SIM</span></div><small>03 / SURFACE TRACE</small><h3>Make quality visible.</h3><p>Feed, cutter choice, and damage resolve into a finish estimate instead of an arbitrary glow.</p><dl><div><dt>TRACE</dt><dd>Ra</dd></div><div><dt>STATE</dt><dd>LIVE</dd></div></dl></article></section>
@@ -413,12 +427,16 @@ function ContractSelect({ save, startContract, learningLevel, setLearningLevel }
     <section className={styles.learningLens} aria-label="Choose explanation depth"><header><small>LEARNING LENS / SAME GAME, THREE DEPTHS</small><h2>HOW DEEP<br/><em>SHOULD WE GO?</em></h2><p>Change the explanation, never the challenge. Start simple and reveal the engineering when curiosity catches up.</p></header><div className={styles.lensContent}><nav aria-label="Explanation level">{(Object.keys(LEARNING_LENSES) as LearningLevel[]).map((level) => <button key={level} aria-pressed={learningLevel === level} onClick={() => { setLearningLevel(level); trackAnonymous("learning_lens_change", { level, surface: "landing" }); }}><span>{LEARNING_LENSES[level].label}</span><small>{LEARNING_LENSES[level].eyebrow}</small></button>)}</nav><article><small>{lens.eyebrow}</small><h3>{lens.title}</h3><p>{lens.summary}</p><div>{lens.concepts.map(([term, explanation], index) => <section key={term}><i>0{index + 1}</i><b>{term}</b><span>{explanation}</span></section>)}</div><footer>SELECTED LENS <b>{lens.label}</b><span>CHANGE ANYTIME INSIDE THE CELL</span></footer></article></div></section>
     <ShopSkillLadder save={save}/>
     <div className={styles.disciplineRail}><span>PROCESS CAPABILITY / FICTIONAL ARCHETYPES</span><div><i className={styles.millGlyph}/><b>3-AXIS MILLING</b><small>PROFILE · POCKET · DATUM</small></div><div><i className={styles.turnGlyph}/><b>TURNING</b><small>OD · ID · GROOVE</small></div><div><i className={styles.axisGlyph}/><b>5-AXIS</b><small>VECTOR · TILT · BLEND</small></div><div><i className={styles.edmGlyph}/><b>WIRE EDM</b><small>CONTOUR · TAPER · SKIM</small></div></div>
-    <div className={styles.contractGrid}>{MANUAL_CONTRACTS.map((contract, index) => <button key={contract.id} style={{ "--card-accent": contract.color } as React.CSSProperties} onClick={() => startContract(index)}>
-      <header><span>0{index + 1}</span><b>{save.cleared.includes(contract.id) ? "CLEARED" : index === 0 || save.cleared.length >= index ? "AVAILABLE" : "CHALLENGE"}</b></header>
-      <div className={styles.geometry}><GeometryPreview contract={contract}/><div className={styles.geometrySpec}><span>DATUM G54</span><span>240 × 140 MM</span><span>PROFILE ±{contract.tolerance}</span></div></div>
-      <small>{contract.client}</small><h2>{contract.title}</h2><p>{contract.brief}</p>
-      <footer><span>{contract.material}</span><span>{contract.reward.toLocaleString()} CR</span><strong>{index === 0 ? "FLAGSHIP / ENTER CELL" : "ENTER CELL"} &rarr;</strong></footer>
-    </button>)}</div>
+    <div className={styles.contractGrid}>{MANUAL_CONTRACTS.map((contract, index) => {
+      const visual = CONTRACT_VISUALS[contract.id];
+      return <button key={contract.id} data-contract={contract.id} style={{ "--card-accent": contract.color } as React.CSSProperties} onClick={() => startContract(index)}>
+        <header><span>0{index + 1}</span><b>{save.cleared.includes(contract.id) ? "CLEARED" : index === 0 || save.cleared.length >= index ? "AVAILABLE" : "CHALLENGE"}</b></header>
+        <div className={styles.geometry}><div className={styles.artifactPlate}><span>{visual.artifact}</span><b>{contract.program}</b></div><div className={styles.geometryPart}><GeometryPreview contract={contract}/><i aria-hidden="true"/></div><div className={styles.geometryDatum} aria-hidden="true"><i/><b>G54</b><span>X0 Y0</span></div><div className={styles.geometrySpec}><span>{visual.route}</span><span>{visual.stock}</span><span>PROFILE ±{contract.tolerance}</span></div></div>
+        <small>{contract.client}</small><h2>{contract.title}</h2><p>{contract.brief}</p>
+        <div className={styles.processStrip}><span>MAT <b>{contract.material}</b></span><span>SURFACE <b>{visual.finish}</b></span><span>WCS <b>G54</b></span></div>
+        <footer><span>{contract.par}S PAR</span><span>{contract.reward.toLocaleString()} CR</span><strong>{index === 0 ? "FLAGSHIP / ENTER CELL" : "ENTER CELL"} &rarr;</strong></footer>
+      </button>;
+    })}</div>
     <div className={styles.principles}><span><b>01</b> GEOMETRY IS THE BRIEF</span><span><b>02</b> ENGAGEMENT IS THE RISK</span><span><b>03</b> INSPECTION IS THE TRUTH</span></div>
   </section>;
 }

@@ -82,6 +82,14 @@ test("global mode dock exposes both game surfaces", async () => {
   assert.match(manual, /chipsRef/);
   assert.match(manual, /AudioContext/);
   assert.match(manual, /PRODUCTION GEOMETRY/);
+  assert.match(manual, /DRIVE INTERFACE/);
+  assert.match(manual, /LIGHTWEIGHT RIB/);
+  assert.match(manual, /OPTICAL BRACKET/);
+  assert.match(manual, /PROFILE \+ BORE/);
+  assert.match(manual, /WEBS \+ CONTOUR/);
+  assert.match(manual, /BOSS \+ DATUM/);
+  assert.match(manual, /animate\(targets/);
+  assert.match(manual, /prefers-reduced-motion/);
   assert.match(manual, /3-AXIS MILLING/);
   assert.match(manual, /TURNING/);
   assert.match(manual, /5-AXIS/);

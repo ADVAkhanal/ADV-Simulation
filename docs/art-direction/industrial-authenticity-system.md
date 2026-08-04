@@ -92,3 +92,7 @@ The visuals contain no real manufacturer marks, exact machine inventory, custome
 ## Shop-threshold key art
 
 The landing hero now uses one authored cinematic machining plate as a material anchor. Its role is to communicate mass, surface, fixture discipline, and enclosure depth before the player enters the abstracted simulation. Measured G54 reticles, restrained captions, a four-signal evidence rail, and an explicit representative-game-world label keep the image inside the same technical grammar as the live GLB renderer. Cyan remains a status/datum color; amber appears only as a small fresh-chip accent.
+
+## First-article contract plates
+
+Contract selection treats each job as a manufactured artifact rather than a generic game tile. The deterministic target geometry remains authoritative, but layered depth, contact shadow, surface response, datum reticles, stock form, simulated finish, route, and program identity give each part its own physical reading. The 6061 drive plate is cool and bright, the 7075 rib is neutral with a restrained lime process signal, and the titanium bracket is darker with a muted violet response. Anime.js provides a short staged hero reveal only when reduced motion is not requested; hover movement is similarly removed under the reduced-motion preference.
