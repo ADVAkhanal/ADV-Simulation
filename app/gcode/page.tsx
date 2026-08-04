@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, CheckCircle2, Copy, Droplets, Gauge, Layers, ListTree, Pause, Play, Repeat2, RotateCcw, Route, Settings2, Sparkles, StepForward, Trophy, Wrench, Zap } from "lucide-react";
 import { buildMachiningPlan, gradeMission, parseProgram, rasterize, type MachiningSetup } from "./gcode-engine";
 import styles from "./gcode.module.css";
+import readableStyles from "./readability.module.css";
 
 type Contract = {
   name: string;
@@ -147,7 +148,7 @@ export default function GCodeStage() {
     catch { setMessage("Copy unavailable. Select the stock map to share it manually."); }
   };
 
-  return <main className={styles.shell} style={{ "--accent": contract.accent } as React.CSSProperties}>
+  return <main className={`${styles.shell} ${readableStyles.readable}`} style={{ "--accent": contract.accent } as React.CSSProperties}>
     <header className={styles.header}>
       <button type="button" onClick={focusContracts} className={styles.back}><ArrowLeft/> CONTRACT SELECT</button>
       <div className={styles.wordmark}><span>PROJECT TOOLPATH</span><strong>G//CODE STAGE</strong></div>

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { readFile, stat } from "node:fs/promises";
+import { readdir, readFile, stat } from "node:fs/promises";
 import test from "node:test";
 
 async function render(path = "/") {
@@ -8,6 +8,27 @@ async function render(path = "/") {
   const { default: worker } = await import(workerUrl.href);
   return worker.fetch(new Request(`http://localhost${path}`, { headers: { accept: "text/html" } }), { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } }, { waitUntil() {}, passThroughOnException() {} });
 }
+
+async function collectCss(directory) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const nested = await Promise.all(entries.map((entry) => entry.isDirectory()
+    ? collectCss(new URL(`${entry.name}/`, directory))
+    : entry.name.endsWith(".css") ? [new URL(entry.name, directory)] : []));
+  return nested.flat();
+}
+
+test("all product stylesheets enforce a readable explicit type floor", async () => {
+  const files = await collectCss(new URL("../app/", import.meta.url));
+  const offenders = [];
+  for (const file of files) {
+    const css = await readFile(file, "utf8");
+    for (const match of css.matchAll(/font-size:\s*(\d+(?:\.\d+)?)px|font:[^;{}]*?\s(\d+(?:\.\d+)?)px(?=[/\s])/g)) {
+      const size = Number(match[1] ?? match[2]);
+      if (size < 12) offenders.push(`${file.pathname}:${size}px`);
+    }
+  }
+  assert.deepEqual(offenders, []);
+});
 
 test("root URL renders the hands-on machine floor", async () => {
   const response = await render();

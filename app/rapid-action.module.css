@@ -9,7 +9,7 @@
 
 .improvement b {
   color: var(--accent);
-  font: 900 10px/1.4 ui-monospace, monospace;
+  font: 900 12px/1.4 ui-monospace, monospace;
   letter-spacing: .08em;
 }
 

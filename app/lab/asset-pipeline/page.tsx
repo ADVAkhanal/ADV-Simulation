@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import AssetLab from "./asset-lab";
 import styles from "./asset-pipeline.module.css";
+import readableStyles from "./readability.module.css";
 
 export const metadata: Metadata = {
   title: "Asset Pipeline Lab | Project Toolpath",
@@ -8,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 export default function AssetPipelineLab() {
-  return <main className={styles.lab}>
+  return <main className={`${styles.lab} ${readableStyles.readable}`}>
     <header className={styles.header}>
       <div><span>CAPABILITY ATLAS / 005</span><h1>MACHINE FORMS.<br/>NO INVENTORY LEAKS.</h1></div>
       <p>Five fictional process archetypes translate a precision shop into an explorable visual language. They teach capability, motion, and risk without exposing manufacturers, models, controllers, quantities, or locations.</p>

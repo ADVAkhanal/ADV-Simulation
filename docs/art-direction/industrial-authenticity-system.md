@@ -111,3 +111,12 @@ Primary machine-cell text no longer depends on 6–9 px microtype at desktop wid
 - Consecutive controlled cuts build a capped flow multiplier and a separate run signature. Flow points provide arcade feedback but never alter the dimensional inspection grade, role progress, or acceptance decision.
 - The machine cell can be paused, restarted, toured, or exited to the contract index without browser refreshes or hidden route changes.
 - Reduced-motion preferences suppress event animation while retaining all objective, warning, and score information.
+
+## Readability and Tool-Crib boundary
+
+- Every explicit CSS type declaration has a 12 px minimum; body copy starts at 14 px, controls at 13 px, and critical values remain larger. Density comes from hierarchy and layout, never 6–10 px microtype.
+- The mode dock, machine rails, G-code editor, asset diagnostics, 3D annotations, and inspection result all reserve additional physical space for the larger scale.
+- Textual hold verdicts use a width-aware display scale so `REWORK` cannot collide with dimensional evidence at compact desktop widths.
+- Tool-Crib credentials are never embedded in the public client, copied into source, or used as a substitute for a scoped integration design.
+- Project Toolpath remains accountless and advisory. Tool-Crib permissions, calibration blocks, reservations, and human review remain authoritative in Tool-Crib.
+- Any future idle-tool or cost-reality feature must receive a privacy-safe server-generated snapshot or scoped service response. Until a real record is connected, the game must show no shop metric rather than fabricate one.
