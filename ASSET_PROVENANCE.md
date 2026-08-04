@@ -1,5 +1,7 @@
 # Asset provenance
 
-Current game prototype uses only code-rendered canvas/UI visuals, bundled fonts resolved by the existing framework, and synthesized Web Audio. Lucide icons remain available under their package license but the first slice does not require external visual assets.
+The gameplay surfaces use code-rendered canvas/UI visuals, bundled fonts resolved by the existing framework, synthesized Web Audio, and Lucide icons under their package license.
 
-No prior company photographs are used by the playable surface. The existing repository files remain but are not part of the game presentation and should be removed after the game art direction is approved.
+The Asset Lab also uses original procedural geometry generated in Blender 5.2 by repository-owned Python scripts. The source `.blend`, exported GLBs, SHA-256 hashes, and runtime manifest are checked into the project together. No downloaded machine models, manufacturer CAD, product photography, controller likenesses, or third-party textures are included.
+
+No prior company photographs are used by the playable surface. The machine capability kit is deliberately fictional and communicates process categories without claiming or revealing actual company inventory.

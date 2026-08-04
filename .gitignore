@@ -46,3 +46,9 @@ next-env.d.ts
 /.release-git/
 /.site-stage-*/
 /site-version-*.tar.gz
+
+# project-local Blender MCP runtime (generated preferences, extension cache, logs)
+/tools/blender/runtime/
+/assets-src/blender/*.blend1
+/.asset-lab-dev.log
+/.asset-lab-dev.err

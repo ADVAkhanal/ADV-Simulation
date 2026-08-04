@@ -1,0 +1,72 @@
+{
+  "id": "toolpath.machining-kit.v1",
+  "version": 1,
+  "path": "/assets/workholding/toolpath-machining-kit-v1.glb",
+  "sourceBlend": "assets-src/blender/toolpath-machining-kit-v1.blend",
+  "sourceScript": "tools/blender/build-machining-kit.py",
+  "generatedAt": "2026-08-03T18:32:10.271144+00:00",
+  "sha256": "879B53B28F908A6CEFDEFE31D9A9C01682137C12DC4FBFA1052817630C9322D6",
+  "coordinateSystem": {
+    "units": "millimeters",
+    "worldUp": "+Z",
+    "machineX": "left/right",
+    "machineY": "front/back",
+    "machineZ": "vertical",
+    "stockReference": "top center",
+    "toolReference": "cutter tip",
+    "spindleReference": "tool anchor",
+    "fixtureReference": "stock anchor"
+  },
+  "anchors": {
+    "spindle": "machine.spindle.body",
+    "tool": "tool.endmill.flat.010",
+    "toolAnchor": "machine.spindle.tool_anchor",
+    "stock": "stock.block.flagship",
+    "stockAnchor": "fixture.vise.stock_anchor",
+    "movingJaw": "fixture.vise.jaw_moving"
+  },
+  "objects": [
+    "machine.table",
+    "machine.spindle.body",
+    "machine.spindle.tool_anchor",
+    "fixture.vise.body",
+    "fixture.vise.jaw_fixed",
+    "fixture.vise.jaw_moving",
+    "fixture.vise.stock_anchor",
+    "tool.endmill.flat.010",
+    "stock.block.flagship"
+  ],
+  "materials": [
+    "MAT_BRUSHED_STEEL",
+    "MAT_MACHINED_ALUMINUM",
+    "MAT_MACHINE_ACCENT",
+    "MAT_MACHINE_DARK",
+    "MAT_TOOL_STEEL",
+    "MAT_VISE_DARK"
+  ],
+  "triangleCount": 2012,
+  "materialCount": 6,
+  "fileSizeBytes": 141076,
+  "boundingBox": {
+    "minMm": [
+      -340.0,
+      -230.0,
+      -70.0
+    ],
+    "maxMm": [
+      340.0,
+      230.0,
+      500.0
+    ],
+    "dimensionsMm": [
+      680.0,
+      460.0,
+      570.0
+    ]
+  },
+  "releaseBudgets": {
+    "trianglesMax": 40000,
+    "materialsMax": 8,
+    "glbBytesMax": 2097152
+  }
+}

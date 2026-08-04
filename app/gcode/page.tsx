@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, CheckCircle2, Copy, Droplets, Gauge, Pause, Play, RotateCcw, Sparkles, StepForward, Trophy, Wrench, Zap } from "lucide-react";
-import { gradeMission, parseProgram, rasterize } from "./gcode-engine";
+import { ArrowLeft, CheckCircle2, Copy, Droplets, Gauge, Layers, ListTree, Pause, Play, Repeat2, RotateCcw, Route, Settings2, Sparkles, StepForward, Trophy, Wrench, Zap } from "lucide-react";
+import { buildMachiningPlan, gradeMission, parseProgram, rasterize, type MachiningSetup } from "./gcode-engine";
 import styles from "./gcode.module.css";
 
 type Contract = {
@@ -46,6 +46,7 @@ const CONTRACTS: Contract[] = [
 ];
 
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+const DEFAULT_SETUP: MachiningSetup = { compensation: "center", finalDepth: -1.8, path: "as-programmed", passes: 1, reverse: false };
 
 export default function GCodeStage() {
   const [contractIndex, setContractIndex] = useState(0);
@@ -55,16 +56,22 @@ export default function GCodeStage() {
   const [inspected, setInspected] = useState(false);
   const [completed, setCompleted] = useState<number[]>([]);
   const [message, setMessage] = useState("Contract loaded. Review setup, then cycle start.");
+  const [setup, setSetup] = useState<MachiningSetup>(DEFAULT_SETUP);
   const timer = useRef<number | null>(null);
   const contractsRef = useRef<HTMLElement>(null);
   const awardLock = useRef<string>("");
   const contract = CONTRACTS[contractIndex];
   const parsed = useMemo(() => parseProgram(code), [code]);
   const target = useMemo(() => parseProgram(contract.code), [contract.code]);
-  const grade = useMemo(() => gradeMission(parsed, target), [parsed, target]);
-  const stock = useMemo(() => rasterize(parsed.points, frame), [parsed.points, frame]);
-  const active = parsed.points[Math.min(frame - 1, parsed.points.length - 1)] ?? parsed.points[0];
-  const progress = clamp(Math.round((frame / Math.max(1, parsed.points.length)) * 100), 0, 100);
+  const plan = useMemo(() => buildMachiningPlan(parsed, setup), [parsed, setup]);
+  const plannedProgram = useMemo(() => ({ ...parsed, points: plan.points }), [parsed, plan.points]);
+  const grade = useMemo(() => gradeMission(plannedProgram, target), [plannedProgram, target]);
+  const stock = useMemo(() => rasterize(plan.points, frame), [plan.points, frame]);
+  const active = plan.points[Math.min(frame - 1, plan.points.length - 1)] ?? plan.points[0];
+  const progress = clamp(Math.round((frame / Math.max(1, plan.points.length)) * 100), 0, 100);
+  const activeGroup = plan.groups.find((group) => frame >= group.startFrame && frame <= group.endFrame) ?? plan.groups.at(-1);
+  const controllerStatus = parsed.errors.length ? "ALARM" : playing ? "RUNNING" : inspected ? "COMPLETE" : frame > 1 ? "FEED HOLD" : "READY";
+  const cycleSeconds = grade.cycleSeconds * setup.passes;
   const earnedXp = completed.reduce((sum, index) => sum + CONTRACTS[index].xp, 0);
 
   useEffect(() => {
@@ -75,7 +82,7 @@ export default function GCodeStage() {
     if (!playing) return;
     timer.current = window.setInterval(() => {
       setFrame((current) => {
-        if (current >= parsed.points.length) {
+        if (current >= plan.points.length) {
           setPlaying(false);
           setInspected(true);
           setMessage(grade.rank === "REWORK" ? "INSPECTION FAILED - revise the program and run again." : `INSPECTION PASSED - ${grade.rank} rank / +${contract.xp} XP.`);
@@ -94,7 +101,11 @@ export default function GCodeStage() {
       });
     }, 34);
     return () => { if (timer.current) window.clearInterval(timer.current); };
-  }, [code, contract.xp, contractIndex, grade.rank, parsed.points.length, playing]);
+  }, [code, contract.xp, contractIndex, grade.rank, plan.points.length, playing]);
+
+  const updateSetup = (changes: Partial<MachiningSetup>, note: string) => {
+    setSetup((current) => ({ ...current, ...changes })); setPlaying(false); setFrame(1); setInspected(false); setMessage(note);
+  };
 
   const chooseContract = (index: number) => {
     setContractIndex(index);
@@ -102,6 +113,7 @@ export default function GCodeStage() {
     setPlaying(false);
     setFrame(1);
     setInspected(false);
+    setSetup({ ...DEFAULT_SETUP, finalDepth: index === 1 ? -2.2 : index === 2 ? -2.8 : -1.8, passes: index === 2 ? 2 : 1 });
     setMessage(`${CONTRACTS[index].name} loaded. Prove the process.`);
   };
 
@@ -111,7 +123,7 @@ export default function GCodeStage() {
       setMessage("CONTROLLER ALARM - clear the flagged blocks before cycle start.");
       return;
     }
-    if (frame >= parsed.points.length) { setFrame(1); setInspected(false); }
+    if (frame >= plan.points.length) { setFrame(1); setInspected(false); }
     setPlaying((current) => !current);
     setMessage(playing ? "FEED HOLD - motion paused." : "CYCLE START - material removal live.");
   };
@@ -130,7 +142,7 @@ export default function GCodeStage() {
   };
 
   const copyRun = async () => {
-    const payload = `G//CODE STAGE - ${contract.name}\n${inspected ? `RANK ${grade.rank} / SCORE ${grade.score}` : `RUN ${progress}%`}\n\n${stock}\n\nI programmed this cut. #ProjectToolpath`;
+    const payload = `G//CODE STAGE - ${contract.name}\n${inspected ? `RANK ${grade.rank} / SCORE ${grade.score}` : `RUN ${progress}%`}\n${setup.compensation.toUpperCase()} COMP / Z${setup.finalDepth.toFixed(2)} / ${setup.passes} PASS / ${plan.direction}\n\n${stock}\n\nI programmed this cut. #ProjectToolpath`;
     try { await navigator.clipboard.writeText(payload); setMessage("RUN CARD COPIED - the stock map is ready to share."); }
     catch { setMessage("Copy unavailable. Select the stock map to share it manually."); }
   };
@@ -165,6 +177,19 @@ export default function GCodeStage() {
       </button>)}
     </nav>
 
+    <section className={styles.processDesk} aria-label="Machining setup and operation groups">
+      <header><span><Settings2/> PROCESS SETUP</span><b>{controllerStatus}</b></header>
+      <div className={styles.setupControls}>
+        <fieldset><legend>CUTTER COMP</legend><div className={styles.segmented}>{(["left", "center", "right"] as const).map((value) => <button key={value} className={setup.compensation === value ? styles.controlActive : ""} onClick={() => updateSetup({ compensation: value }, `${value.toUpperCase()} COMP - ${value === "center" ? "tool center follows programmed geometry" : `.60 mm creative offset applied`}.`)}>{value === "left" ? "G41 / LEFT" : value === "right" ? "G42 / RIGHT" : "G40 / CENTER"}</button>)}</div></fieldset>
+        <label className={styles.depthControl}><span>FINAL DEPTH <b>Z{setup.finalDepth.toFixed(2)} MM</b></span><input type="range" min="-5" max="-.4" step=".1" value={setup.finalDepth} onChange={(event) => updateSetup({ finalDepth: Number(event.target.value) }, `FINAL DEPTH - Z${Number(event.target.value).toFixed(2)} mm across ${setup.passes} pass${setup.passes === 1 ? "" : "es"}.`)}/></label>
+        <label className={styles.selectControl}><span>MACHINING PATH</span><select value={setup.path} onChange={(event) => updateSetup({ path: event.target.value as MachiningSetup["path"] }, `${event.target.value.toUpperCase()} path strategy selected.`)}><option value="as-programmed">AS PROGRAMMED</option><option value="climb">CLIMB MILLING</option><option value="conventional">CONVENTIONAL</option></select></label>
+        <fieldset><legend>MULTIPASS</legend><div className={styles.passButtons}>{[1,2,3,4,5].map((count) => <button key={count} className={setup.passes === count ? styles.controlActive : ""} onClick={() => updateSetup({ passes: count }, `${count} PASS PLAN - ${count === 1 ? "single depth" : "equal depth increments"}.`)}>{count}</button>)}</div></fieldset>
+        <button className={`${styles.reverseControl} ${setup.reverse ? styles.reverseActive : ""}`} onClick={() => updateSetup({ reverse: !setup.reverse }, `${setup.reverse ? "FORWARD" : "REVERSE"} override applied to the machining path.`)}><Repeat2/><span>REVERSE PATH<b>{setup.reverse ? "OVERRIDE ON" : "FORWARD"}</b></span></button>
+      </div>
+      <div className={styles.groupRail}><span><ListTree/> OPERATION GROUPS</span>{plan.groups.map((group) => <button key={group.id} className={activeGroup?.id === group.id ? styles.activeGroup : ""} onClick={() => { setPlaying(false); setFrame(group.startFrame); setInspected(false); setMessage(`${group.label} - blocks ${group.sourceLines.filter(Boolean).join(", ") || "setup"}.`); }}><i>{group.kind === "cut" ? `P${group.pass}` : group.kind === "setup" ? "S" : "E"}</i><b>{group.label}</b><small>{group.endFrame - group.startFrame + 1} PTS</small></button>)}</div>
+      <div className={styles.processStatus}><span><Route/> STATUS</span><dl><div><dt>MODE</dt><dd className={controllerStatus === "ALARM" ? styles.alarmStatus : ""}>{controllerStatus}</dd></div><div><dt>GROUP</dt><dd>{activeGroup?.label ?? "--"}</dd></div><div><dt>PASS</dt><dd>{activeGroup?.pass ? `${activeGroup.pass} / ${setup.passes}` : "--"}</dd></div><div><dt>DEPTHS</dt><dd>{plan.passDepths.length ? plan.passDepths.map((depth) => `Z${depth}`).join(" / ") : "--"}</dd></div><div><dt>COMP</dt><dd>{setup.compensation.toUpperCase()} / {plan.compensationMm >= 0 ? "+" : ""}{plan.compensationMm.toFixed(2)}</dd></div><div><dt>DIRECTION</dt><dd>{plan.direction}</dd></div></dl></div>
+    </section>
+
     <section className={styles.workspace}>
       <article className={styles.editorPanel}>
         <div className={styles.panelHead}><span>FANUC-INSPIRED CREATIVE CONTROLLER / O000{contractIndex + 1}</span><span>{code.split("\n").length} BLOCKS</span></div>
@@ -190,7 +215,7 @@ export default function GCodeStage() {
         <div className={styles.panelHead}><span>QUALITY LAB</span><Trophy/></div>
         <div className={`${styles.score} ${inspected ? styles.inspected : ""}`}><span>{inspected ? "FINAL RANK" : "PROJECTED"}</span><strong>{inspected ? grade.rank : "--"}</strong><small>{inspected ? `${grade.score} / 1000` : "RUN INSPECTION"}</small></div>
         <div className={styles.meter}><span>CYCLE PROGRESS</span><b>{progress}%</b><i><em style={{ width: `${progress}%` }}/></i></div>
-        <dl><div><dt>GEOMETRY</dt><dd>{grade.coverage}%</dd></div><div><dt>PRECISION</dt><dd>{grade.precision}%</dd></div><div><dt>WASTE</dt><dd className={grade.waste > 12 ? styles.error : ""}>{grade.waste}%</dd></div><div><dt>CYCLE</dt><dd>{grade.cycleSeconds.toFixed(1)}s</dd></div></dl>
+        <dl><div><dt>GEOMETRY</dt><dd>{grade.coverage}%</dd></div><div><dt>PRECISION</dt><dd>{grade.precision}%</dd></div><div><dt>WASTE</dt><dd className={grade.waste > 12 ? styles.error : ""}>{grade.waste}%</dd></div><div><dt>CYCLE</dt><dd>{cycleSeconds.toFixed(1)}s</dd></div></dl>
         {parsed.errors.length > 0 && <div className={styles.errors}>{parsed.errors.slice(0, 4).map((error) => <p key={error}>{error}</p>)}</div>}
         <button className={styles.copy} onClick={copyRun}><Copy/> COPY RUN CARD</button>
       </aside>
@@ -199,9 +224,9 @@ export default function GCodeStage() {
     <section className={styles.transport}>
       <button onClick={reset} aria-label="Reset simulation"><RotateCcw/></button>
       <button className={styles.run} onClick={run}>{playing ? <Pause/> : <Play/>}<span>{playing ? "FEED HOLD" : "CYCLE START"}</span></button>
-      <button onClick={() => { setPlaying(false); setFrame((value) => Math.min(parsed.points.length, value + 1)); setMessage("SINGLE BLOCK - one motion, one consequence."); }} aria-label="Advance one simulation frame"><StepForward/></button>
+      <button onClick={() => { setPlaying(false); setFrame((value) => Math.min(plan.points.length, value + 1)); setMessage("SINGLE BLOCK - one motion, one consequence."); }} aria-label="Advance one simulation frame"><StepForward/></button>
       <div className={styles.timeline}><i style={{ width: `${progress}%` }}/></div>
-      <span><Zap/> 34 MS / SIM TICK</span>
+      <span><Zap/> {activeGroup?.label ?? "SETUP"} / {plan.direction}</span>
     </section>
 
     <footer className={styles.footer}><p>CREATIVE TRAINING SIMULATION - NOT MACHINE-READY CODE OR OPERATING GUIDANCE</p><p>DETERMINISTIC KERNEL / SOURCE-LINE PROVENANCE / DEVICE-LOCAL PROGRESS</p></footer>

@@ -1,0 +1,99 @@
+{
+  "schemaVersion": 1,
+  "kitId": "privacy-safe-machine-capability-kit",
+  "source": "assets-src/blender/toolpath-machine-kit.blend",
+  "generator": "Blender 5.2.0 LTS",
+  "privacyBoundary": "Fictional capability archetypes only. No manufacturers, models, controllers, quantities, locations, identifiers, network details, or inventory claims.",
+  "assets": [
+    {
+      "id": "manual-mill",
+      "name": "Foundation Manual Mill",
+      "shortName": "Manual Mill",
+      "process": "Manual milling",
+      "axes": "3 hand-fed axes",
+      "tier": "Foundation",
+      "accent": "#38d7f2",
+      "file": "/assets/machines/manual-mill.glb",
+      "bytes": 122372,
+      "sha256": "85F278D2CCF579477BAAD059648934C52B01B68663BBC04290EA5C7A000C2BA7",
+      "trainingFocus": [
+        "workholding",
+        "edge finding",
+        "feed feel",
+        "manual coordination"
+      ]
+    },
+    {
+      "id": "vertical-3-axis",
+      "name": "Vertical 3-Axis Cell",
+      "shortName": "3-Axis VMC",
+      "process": "Vertical machining",
+      "axes": "X / Y / Z",
+      "tier": "Production",
+      "accent": "#55d88f",
+      "file": "/assets/machines/vertical-3-axis.glb",
+      "bytes": 77224,
+      "sha256": "E4F924D17705D7723A45854F85B03B578BB9070523E5E957996BE59B90D73218",
+      "trainingFocus": [
+        "datum strategy",
+        "tool offsets",
+        "cycle planning",
+        "inspection loops"
+      ]
+    },
+    {
+      "id": "trunnion-5-axis",
+      "name": "Trunnion 5-Axis Cell",
+      "shortName": "5-Axis Cell",
+      "process": "Simultaneous milling",
+      "axes": "X / Y / Z / A / C",
+      "tier": "Advanced",
+      "accent": "#d8ec3d",
+      "file": "/assets/machines/trunnion-5-axis.glb",
+      "bytes": 116156,
+      "sha256": "49A12D848B2FFD9B249C60EE01374722B43D29E005EE9BEBA9EA5B833341919A",
+      "trainingFocus": [
+        "rotary transforms",
+        "reachability",
+        "collision envelopes",
+        "setup reduction"
+      ]
+    },
+    {
+      "id": "turning-center",
+      "name": "Horizontal Turning Cell",
+      "shortName": "Turning Cell",
+      "process": "CNC turning",
+      "axes": "X / Z + spindle",
+      "tier": "Production",
+      "accent": "#ff7a38",
+      "file": "/assets/machines/turning-center.glb",
+      "bytes": 118128,
+      "sha256": "492D622BBEF0EB22EC23E09FF231B7E30913859772E469354F289FAB331B01FB",
+      "trainingFocus": [
+        "work zero",
+        "diameter control",
+        "chuck clearance",
+        "tool sequencing"
+      ]
+    },
+    {
+      "id": "wire-edm",
+      "name": "Wire Edm Cell",
+      "shortName": "Wire EDM",
+      "process": "Wire electrical discharge",
+      "axes": "X / Y / U / V",
+      "tier": "Special Process",
+      "accent": "#a977f0",
+      "file": "/assets/machines/wire-edm.glb",
+      "bytes": 109548,
+      "sha256": "BE94EBCAE72D3B28B61B62D8E7E0DE291122EA6C8B3C7FC833E9DB3E8763156E",
+      "trainingFocus": [
+        "wire path",
+        "flush strategy",
+        "taper control",
+        "delicate geometry"
+      ]
+    }
+  ]
+}

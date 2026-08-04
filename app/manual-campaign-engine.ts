@@ -16,6 +16,8 @@ export type ManualContract = {
 };
 
 export type MillTool = { id: number; name: string; diameter: string; radius: number; load: number; wear: number; finish: number; role: string };
+export type ShopBestRun = { score: number; precision: number; completion: number; elapsed: number; geometry?: number; finish?: number; time?: number };
+export type ShopRunLogEntry = { id: string; contract: ManualContract["id"]; program: string; title: string; score: number; rank: string; accepted: boolean; completion: number; precision: number; finish: number; elapsed: number; overcut: number; at: number };
 
 export const MANUAL_CONTRACTS: ManualContract[] = [
   { id: "drive", program: "NS-0142-A", client: "NORTHSTAR MOBILITY", title: "Emergency drive plate", brief: "Profile the drivetrain interface before the sunrise rig test.", material: "6061 AL", reward: 1700, par: 75, tolerance: 3, color: "#50e6ff" },
@@ -76,7 +78,7 @@ export function manualCompletion(material: Uint8Array, contract: ManualContract[
 }
 
 export function gradeManualRun(material: Uint8Array, contract: ManualContract, overcut: number, finishPenalty: number, elapsed: number, breaks: number) {
-  const completion=manualCompletion(material,contract);
+  const completion=manualCompletion(material,contract.id);
   const geometry=Math.min(46,completion/90*46);
   const precision=Math.max(0,30-overcut*(contract.id==="bracket"?5:3.2));
   const finish=Math.max(0,14-finishPenalty*1.3);
@@ -84,5 +86,24 @@ export function gradeManualRun(material: Uint8Array, contract: ManualContract, o
   const score=Math.max(0,Math.min(100,Math.round(geometry+precision+finish+time-breaks*5)));
   const accepted=completion>=90&&overcut<=contract.tolerance;
   const rank=!accepted?"REWORK":score>=96?"S":score>=88?"A":score>=76?"B":"C";
-  return {completion,precision:Math.round(precision),finish:Math.round(finish),time:Math.round(time),score,accepted,rank,payout:accepted?Math.round(contract.reward*(.55+score/220)):120};
+  return {completion,geometry:Math.round(geometry),precision:Math.round(precision),finish:Math.round(finish),time:Math.round(time),breakPenalty:breaks*5,score,accepted,rank,payout:accepted?Math.round(contract.reward*(.55+score/220)):120};
+}
+
+export function deriveShopSkillProgress(bests: Record<string, ShopBestRun>, thresholds = [0, 70, 165, 250]) {
+  const runs = Object.values(bests), xp = runs.reduce((sum, run) => sum + run.score, 0);
+  const average = (read: (run: ShopBestRun) => number) => runs.length ? Math.round(runs.reduce((sum, run) => sum + read(run), 0) / runs.length) : 0;
+  const skills = [
+    { label: "GEOMETRY CONTROL", value: average((run) => run.geometry !== undefined ? run.geometry / 46 * 100 : run.completion) },
+    { label: "INSPECTION DISCIPLINE", value: average((run) => run.precision / 30 * 100) },
+    { label: "PROCESS CONTROL", value: average((run) => run.finish !== undefined ? run.finish / 14 * 100 : 0) },
+    { label: "CYCLE DISCIPLINE", value: average((run) => run.time !== undefined ? run.time / 10 * 100 : 0) },
+  ];
+  const currentIndex = thresholds.reduce((found, threshold, index) => xp >= threshold ? index : found, 0);
+  const currentThreshold = thresholds[currentIndex] ?? 0, nextThreshold = thresholds[currentIndex + 1] ?? null;
+  const progress = nextThreshold === null ? 100 : Math.max(0, Math.min(100, (xp - currentThreshold) / (nextThreshold - currentThreshold) * 100));
+  return { xp, skills, currentIndex, nextThreshold, progress };
+}
+
+export function appendShopRunLog(log: ShopRunLogEntry[], entry: ShopRunLogEntry, limit = 24) {
+  return [entry, ...log].slice(0, Math.max(1, limit));
 }

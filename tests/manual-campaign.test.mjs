@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { MANUAL_CONTRACTS, MILL_TOOLS, createManualStock, cutManualStock, gradeManualRun, isManualTarget } from "../app/manual-campaign-engine.ts";
+import { MANUAL_CONTRACTS, MILL_TOOLS, appendShopRunLog, createManualStock, cutManualStock, deriveShopSkillProgress, gradeManualRun, isManualTarget } from "../app/manual-campaign-engine.ts";
 
 test("manual campaign exposes three distinct geometries and tool tradeoffs",()=>{
   assert.equal(MANUAL_CONTRACTS.length,3); assert.equal(MILL_TOOLS.length,3);
@@ -12,4 +12,18 @@ test("manual campaign cutting and grading are deterministic",()=>{
   const contract=MANUAL_CONTRACTS[0]; const stock=createManualStock();
   const a=cutManualStock(stock,contract.id,0,0,MILL_TOOLS[1].radius); const b=cutManualStock(stock,contract.id,0,0,MILL_TOOLS[1].radius);
   assert.deepEqual(a,b); assert.deepEqual(gradeManualRun(a.material,contract,a.overcut,0,12,0),gradeManualRun(b.material,contract,b.overcut,0,12,0));
+});
+
+test("shop progression uses personal-best evidence and deterministic role thresholds",()=>{
+  const empty=deriveShopSkillProgress({}); assert.equal(empty.xp,0); assert.equal(empty.currentIndex,0); assert.equal(empty.progress,0);
+  const one=deriveShopSkillProgress({drive:{score:88,precision:27,completion:96,elapsed:70,geometry:44,finish:12,time:9}});
+  assert.equal(one.xp,88); assert.equal(one.currentIndex,1); assert.equal(one.skills[0].label,"GEOMETRY CONTROL"); assert.equal(one.skills[1].value,90);
+  const three=deriveShopSkillProgress({drive:{score:88,precision:27,completion:96,elapsed:70,geometry:44,finish:12,time:9},rib:{score:84,precision:25,completion:94,elapsed:88,geometry:43,finish:11,time:8},bracket:{score:91,precision:29,completion:98,elapsed:104,geometry:45,finish:13,time:9}});
+  assert.equal(three.xp,263); assert.equal(three.currentIndex,3); assert.equal(three.progress,100);
+});
+
+test("shop log keeps newest inspection evidence within its bounded local ledger",()=>{
+  const entry=(id)=>({id,contract:"drive",program:"NS-0142-A",title:"Emergency drive plate",score:80,rank:"B",accepted:true,completion:94,precision:26,finish:11,elapsed:72,overcut:1,at:Number(id)});
+  let log=[]; for(let id=0;id<30;id+=1) log=appendShopRunLog(log,entry(String(id)));
+  assert.equal(log.length,24); assert.equal(log[0].id,"29"); assert.equal(log.at(-1).id,"6");
 });

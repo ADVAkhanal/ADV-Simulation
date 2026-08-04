@@ -13,7 +13,10 @@ test("root URL renders the hands-on machine floor", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /THREE MATERIAL SYSTEMS/);
+  assert.match(html, /90-SECOND VERTICAL SLICE/);
+  assert.match(html, /START FLAGSHIP CONTRACT/);
+  assert.match(html, /SAFE PUBLIC DEMO/);
+  assert.match(html, /MAKE THE PART/);
   assert.match(html, /Emergency drive plate/);
   assert.match(html, /Flight rib prototype/);
   assert.match(html, /Sensor bracket/);
@@ -30,17 +33,30 @@ test("G-code route renders the programming campaign as a second mode", async () 
   assert.doesNotMatch(html, /ACCEPT CONTRACT/);
 });
 
+test("asset pipeline route exposes the privacy-safe machine capability atlas", async () => {
+  const response = await render("/lab/asset-pipeline");
+  assert.equal(response.status, 200);
+  const html = await response.text();
+  assert.match(html, /CAPABILITY ATLAS/);
+  assert.match(html, /fictional process archetypes/);
+  assert.match(html, /MACHINE FORMS/);
+  assert.match(html, /NO INVENTORY LEAKS/);
+  assert.match(html, /machine-capability-kit\.json/);
+});
+
 test("global mode dock exposes both game surfaces", async () => {
-  const [template, dock, page, home, manual] = await Promise.all([
+  const [template, dock, page, home, manual, machiningKit] = await Promise.all([
     readFile(new URL("../app/template.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/mode-dock.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/gcode/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/manual-campaign.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/flagship-machining-kit.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(template, /ModeDock/);
   assert.match(dock, /MANUAL MILL/);
   assert.match(dock, /G\/\/CODE STAGE/);
+  assert.match(dock, /ASSET LAB/);
   assert.match(page, /INSPECTION FAILED/);
   assert.match(page, /toolpath-contracts/);
   assert.match(page, /scrollIntoView/);
@@ -48,6 +64,53 @@ test("global mode dock exposes both game surfaces", async () => {
   assert.doesNotMatch(page, /href="#contracts"/);
   assert.doesNotMatch(template, /ExperienceRouter/);
   assert.match(home, /ManualCampaign/);
-  assert.match(manual, /THREE MATERIAL SYSTEMS/);
+  assert.match(manual, /START FLAGSHIP CONTRACT/);
+  assert.match(manual, /FlagshipMachiningKit/);
+  assert.match(manual, /SHARE RESULT CARD/);
+  assert.match(manual, /COOLANT FIELD/);
+  assert.match(manual, /chipsRef/);
+  assert.match(manual, /AudioContext/);
+  assert.match(manual, /PRODUCTION GEOMETRY/);
+  assert.match(manual, /3-AXIS MILLING/);
+  assert.match(manual, /TURNING/);
+  assert.match(manual, /5-AXIS/);
+  assert.match(manual, /WIRE EDM/);
+  assert.match(manual, /STOCK_VIEW/);
+  assert.match(manual, /PROCESS ESTIMATE/);
+  assert.match(manual, /METROLOGY \/ VISUAL DOCTRINE/);
+  assert.match(manual, /DATUM STACK/);
+  assert.match(manual, /CUTTER ENGAGEMENT/);
+  assert.match(manual, /SURFACE TRACE/);
+  assert.match(manual, /CHIP LOAD \/ SIM/);
+  assert.match(machiningKit, /faceLight/);
+  assert.match(machiningKit, /PHYSICAL LIGHT/);
+  assert.match(machiningKit, /METAL PBR/);
+  assert.match(manual, /RETRY FOR BETTER SCORE/);
+  assert.match(manual, /PERSONAL BEST/);
   assert.match(manual, /INSPECT PART/);
+  assert.match(manual, /CMM PROFILE REPORT \/ SIM/);
+  assert.match(manual, /deviationBands/);
+  assert.match(manual, /PROFILE TRACE/);
+  assert.match(manual, /LEARNING LENS/);
+  assert.match(manual, /EXPLANATION DEPTH/);
+  assert.match(manual, /FIRST CUT/);
+  assert.match(manual, /APPRENTICE VIEW/);
+  assert.match(manual, /ENGINEERING VIEW/);
+  assert.match(manual, /fz = F/);
+  assert.match(manual, /SHOP SKILL RECORD/);
+  assert.match(manual, /CNC OPERATOR ALIGNMENT/);
+  assert.match(manual, /MACHINIST \/ SETUP ALIGNMENT/);
+  assert.match(manual, /CNC PROGRAMMER ALIGNMENT/);
+  assert.match(manual, /does not certify employment readiness/);
+  assert.match(manual, /deriveShopProgress/);
+  assert.match(manual, /SHOP LOG/);
+  assert.match(manual, /INSPECTION LEDGER/);
+  assert.match(manual, /MILESTONE PLATES/);
+  assert.match(manual, /LAST 24 RUNS/);
+  assert.match(manual, /shop_log_open/);
+  assert.match(manual, /3D TWIN/);
+  assert.match(manual, /DIGITAL TWIN \/ VISUAL REVIEW/);
+  assert.match(manual, /RETURN TO CUT MAP/);
+  assert.match(manual, /view_3d_twin/);
+  assert.match(machiningKit, /variant === "full"/);
 });
