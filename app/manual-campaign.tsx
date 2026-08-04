@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { animate, stagger } from "animejs";
-import { Activity, Award, BookOpen, CircleGauge, Crosshair, Factory, Gauge, Hexagon, Pause, Play, RotateCcw, ScanLine, Share2, ShieldCheck, Timer, Volume2, VolumeX, Waves, Wrench, X } from "lucide-react";
+import { Activity, Award, BookOpen, CircleGauge, CircleHelp, Crosshair, Factory, Gauge, Hexagon, Pause, Play, RotateCcw, ScanLine, Share2, ShieldCheck, Timer, Volume2, VolumeX, Waves, Wrench, X } from "lucide-react";
 import { MANUAL_CONTRACTS, MILL_COLS, MILL_ROWS, MILL_TOOLS, appendShopRunLog, createManualStock, cutManualStock, deriveShopSkillProgress, gradeManualRun, isManualTarget, manualCompletion, type ManualContract, type ShopBestRun, type ShopRunLogEntry } from "./manual-campaign-engine";
 import { trackAnonymous } from "./anonymous-analytics";
 import FlagshipMachiningKit from "./flagship-machining-kit";
@@ -35,6 +35,14 @@ const CONTRACT_VISUALS = {
   rib: { artifact: "LIGHTWEIGHT RIB", route: "WEBS + CONTOUR", stock: "PLATE / 22 MM", finish: "MILL / BLEND" },
   bracket: { artifact: "OPTICAL BRACKET", route: "BOSS + DATUM", stock: "BLOCK / 32 MM", finish: "MILL / SATIN" },
 } as const;
+const TOUR_STEPS = [
+  { code: "01", eyebrow: "NAVIGATION", title: "Three surfaces. One shop.", body: "Use the bottom dock to move between hands-on milling, G-code programming, and the 3D asset lab. Your current mode is always highlighted." },
+  { code: "02", eyebrow: "CONTRACT", title: "Read the job before the cut.", body: "The contract bar names the material, program, par time, and tolerance. Return to the contract index whenever you want a different geometry." },
+  { code: "03", eyebrow: "PROCESS SETUP", title: "Choose the edge and the risk.", body: "Tool diameter and feed override change removal speed, engagement, finish, and overcut risk. Start large in open stock; protect the glowing profile." },
+  { code: "04", eyebrow: "INTERACTIVE 3D", title: "Orbit the physical setup.", body: "The 3D Twin is now a movable assembly. Drag to orbit, use the wheel to zoom, pause automatic rotation, or reset the camera." },
+  { code: "05", eyebrow: "LIVE TELEMETRY", title: "Read the process window.", body: "Load, heat, tool condition, chip load, engagement, and finish stay separate so one attractive number cannot hide a damaged process." },
+  { code: "06", eyebrow: "INSPECTION LOOP", title: "Measure, learn, retry.", body: "Inspect after clearing at least 90% of waste. The score explains geometry, precision, finish, and cycle time; retry returns you to fresh stock in under three seconds." },
+] as const;
 
 function deriveShopProgress(save: SaveData) {
   const base = deriveShopSkillProgress(save.bests, ROLE_LADDER.map((role) => role.threshold));
@@ -76,6 +84,7 @@ export default function ManualCampaign() {
   const [learningLevel, setLearningLevel] = useState<LearningLevel>("easy");
   const [logOpen, setLogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"map" | "twin">("map");
+  const [tourStep, setTourStep] = useState<number | null>(null);
 
   const contract = MANUAL_CONTRACTS[contractIndex];
   const tool = MILL_TOOLS[toolIndex];
@@ -103,6 +112,13 @@ export default function ManualCampaign() {
     }, 1000);
     return () => window.clearInterval(timer);
   }, [screen, spindle]);
+
+  useEffect(() => {
+    if (tourStep === null) return;
+    const closeTour = (event: KeyboardEvent) => { if (event.key === "Escape") setTourStep(null); };
+    window.addEventListener("keydown", closeTour);
+    return () => window.removeEventListener("keydown", closeTour);
+  }, [tourStep]);
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current;
@@ -238,6 +254,14 @@ export default function ManualCampaign() {
     trackAnonymous(index === 0 ? "flagship_start" : "cycle_start", { contract: MANUAL_CONTRACTS[index].id, entry: "contract" });
   };
 
+  const goToTourStep = (next: number) => {
+    if (next < 0 || next >= TOUR_STEPS.length) { setTourStep(null); setViewMode("map"); return; }
+    if (next >= 2 && screen === "select") { startContract(contractIndex); setShowCoach(false); }
+    if (next === 3) { setSpindle(false); setLoad(0); setViewMode("twin"); }
+    else if (viewMode === "twin") setViewMode("map");
+    setTourStep(next); trackAnonymous("guided_tour_step", { step: next + 1, screen });
+  };
+
   const millAt = (clientX: number, clientY: number) => {
     const canvas = canvasRef.current; if (!canvas) return;
     const rect = canvas.getBoundingClientRect();
@@ -320,11 +344,11 @@ export default function ManualCampaign() {
     { label: "CYCLE", value: result.time / 10 * 100, reading: `${elapsed}/${contract.par} SEC` },
   ] : [];
 
-  return <main className={styles.shell} style={{ "--accent": contract.color } as React.CSSProperties}>
+  return <main className={styles.shell} data-tour-step={tourStep ?? undefined} style={{ "--accent": contract.color } as React.CSSProperties}>
     <header className={styles.header}>
       <div className={styles.brand}><Factory/><span>PROJECT TOOLPATH</span><strong>MANUAL MILL // CELL 01</strong></div>
       <div className={styles.shift}><i/> CREATIVE MACHINING LAB <b>SHIFT 01</b></div>
-      <div className={styles.profile}><span>REP <b>{save.reputation}</b></span><span>CREDITS <b>{save.credits.toLocaleString()}</b></span><button className={styles.shopLogButton} onClick={() => { setLogOpen(true); trackAnonymous("shop_log_open", { surface: screen }); }}><BookOpen/> SHOP LOG</button><button className={styles.soundToggle} onClick={() => setSoundOn((value) => !value)} aria-label={soundOn ? "Mute game audio" : "Enable game audio"}>{soundOn ? <Volume2/> : <VolumeX/>}</button></div>
+      <div className={styles.profile}><span>REP <b>{save.reputation}</b></span><span>CREDITS <b>{save.credits.toLocaleString()}</b></span><button className={styles.helpButton} onClick={() => { setTourStep(0); trackAnonymous("guided_tour_open", { surface: screen }); }}><CircleHelp/> HELP / TOUR</button><button className={styles.shopLogButton} onClick={() => { setLogOpen(true); trackAnonymous("shop_log_open", { surface: screen }); }}><BookOpen/> SHOP LOG</button><button className={styles.soundToggle} onClick={() => setSoundOn((value) => !value)} aria-label={soundOn ? "Mute game audio" : "Enable game audio"}>{soundOn ? <Volume2/> : <VolumeX/>}</button></div>
     </header>
 
     {screen === "select" ? <ContractSelect save={save} startContract={startContract} learningLevel={learningLevel} setLearningLevel={setLearningLevel}/> : <>
@@ -392,6 +416,7 @@ export default function ManualCampaign() {
       </article>
     </section>}
     {logOpen && <ShopLog save={save} close={() => setLogOpen(false)}/>}
+    {tourStep !== null && <section className={styles.tourLayer} aria-live="polite"><article className={styles.tourCard} role="dialog" aria-modal="false" aria-label="Guided game tour"><header><span>{TOUR_STEPS[tourStep].code} / 0{TOUR_STEPS.length}</span><button onClick={() => { setTourStep(null); setViewMode("map"); }} aria-label="Close guided tour"><X/></button></header><small>{TOUR_STEPS[tourStep].eyebrow}</small><h2>{TOUR_STEPS[tourStep].title}</h2><p>{TOUR_STEPS[tourStep].body}</p><div className={styles.tourProgress} aria-label={`Tour step ${tourStep + 1} of ${TOUR_STEPS.length}`}>{TOUR_STEPS.map((step, index) => <i key={step.code} data-active={index === tourStep}/>)}</div><footer><button disabled={tourStep === 0} onClick={() => goToTourStep(tourStep - 1)}>PREVIOUS</button><b>ESC TO CLOSE</b><button className={styles.tourNext} onClick={() => goToTourStep(tourStep + 1)}>{tourStep === TOUR_STEPS.length - 1 ? "FINISH TOUR" : "NEXT AREA"}</button></footer></article></section>}
   </main>;
 }
 

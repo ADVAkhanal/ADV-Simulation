@@ -123,6 +123,11 @@ test("global mode dock exposes both game surfaces", async () => {
   assert.match(manual, /does not certify employment readiness/);
   assert.match(manual, /deriveShopProgress/);
   assert.match(manual, /SHOP LOG/);
+  assert.match(manual, /HELP \/ TOUR/);
+  assert.match(manual, /TOUR_STEPS/);
+  assert.match(manual, /guided_tour_step/);
+  assert.match(manual, /Three surfaces\. One shop/);
+  assert.match(manual, /Orbit the physical setup/);
   assert.match(manual, /INSPECTION LEDGER/);
   assert.match(manual, /MILESTONE PLATES/);
   assert.match(manual, /LAST 24 RUNS/);
@@ -132,4 +137,10 @@ test("global mode dock exposes both game surfaces", async () => {
   assert.match(manual, /RETURN TO CUT MAP/);
   assert.match(manual, /view_3d_twin/);
   assert.match(machiningKit, /variant === "full"/);
+  assert.match(machiningKit, /DRAG TO ORBIT/);
+  assert.match(machiningKit, /AUTO ORBIT/);
+  assert.match(machiningKit, /onPointerMove/);
+  assert.match(machiningKit, /onWheel/);
+  assert.match(machiningKit, /view\.zoom/);
+  assert.match(machiningKit, /prefers-reduced-motion/);
 });

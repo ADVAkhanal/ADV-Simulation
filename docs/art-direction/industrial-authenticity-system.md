@@ -96,3 +96,9 @@ The landing hero now uses one authored cinematic machining plate as a material a
 ## First-article contract plates
 
 Contract selection treats each job as a manufactured artifact rather than a generic game tile. The deterministic target geometry remains authoritative, but layered depth, contact shadow, surface response, datum reticles, stock form, simulated finish, route, and program identity give each part its own physical reading. The 6061 drive plate is cool and bright, the 7075 rib is neutral with a restrained lime process signal, and the titanium bracket is darker with a muted violet response. Anime.js provides a short staged hero reveal only when reduced motion is not requested; hover movement is similarly removed under the reduced-motion preference.
+
+## Interactive 3D and readable instrumentation
+
+The full-frame 3D Twin now prioritizes physical comprehension over passive presentation. It continuously orbits at a restrained speed, supports direct pointer orbit and wheel zoom, exposes pause/reset controls, honors reduced-motion preferences, and retains the existing safe-hold behavior. Increased ambient contribution, material overrides for stock/fixture/spindle families, stronger edge separation, and a larger projection make the assembly legible against the enclosure rather than disappearing into black.
+
+Primary machine-cell text no longer depends on 6–9 px microtype at desktop widths. Contract, setup, controls, coordinates, process estimates, telemetry, and twin callouts use a larger calibrated scale while secondary metadata remains compact. A persistent Help / Tour control provides six contextual steps and highlights navigation, contract, setup, interactive 3D, telemetry, and inspection without hiding the actual interface.

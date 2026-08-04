@@ -8,20 +8,21 @@ type Vec3 = [number, number, number];
 type Face = { vertices: [Vec3, Vec3, Vec3]; color: string; node: string; metallic: number; roughness: number };
 type Scene = { faces: Face[]; bytes: number };
 type Props = { cursor: { x: number; y: number }; spindle: boolean; completion: number; load: number; variant?: "mini" | "full" };
+type ViewState = { yaw: number; pitch: number; zoom: number; autoOrbit: boolean };
 
 const colors = ["#24353a", "#4ae2fa", "#778b90", "#c6d4d6", "#6a7c81", "#18252a"];
 
 function clamp(value: number, min = 0, max = 1) { return Math.max(min, Math.min(max, value)); }
 function shade(color: string, light: number, metallic: number) {
   const values = color.match(/[\d.]+/g)?.slice(0, 3).map(Number) ?? [92, 112, 118];
-  const specular = Math.pow(clamp(light), 7) * metallic * 74;
-  return `rgb(${values.map((value) => Math.round(clamp(value * (.24 + light * .82) + specular, 0, 255))).join(",")})`;
+  const specular = Math.pow(clamp(light), 6) * metallic * 92;
+  return `rgb(${values.map((value) => Math.round(clamp(value * (.42 + light * .9) + specular, 0, 255))).join(",")})`;
 }
 function faceLight(vertices: [Vec3, Vec3, Vec3]) {
   const [a, b, c] = vertices, ab = b.map((value, axis) => value - a[axis]) as Vec3, ac = c.map((value, axis) => value - a[axis]) as Vec3;
   const normal: Vec3 = [ab[1] * ac[2] - ab[2] * ac[1], ab[2] * ac[0] - ab[0] * ac[2], ab[0] * ac[1] - ab[1] * ac[0]];
   const magnitude = Math.hypot(...normal) || 1, light: Vec3 = [-.35, .82, .45];
-  return clamp(.16 + Math.abs((normal[0] * light[0] + normal[1] * light[1] + normal[2] * light[2]) / magnitude) * .84);
+  return clamp(.28 + Math.abs((normal[0] * light[0] + normal[1] * light[1] + normal[2] * light[2]) / magnitude) * .72);
 }
 
 function components(type: string) { return type === "VEC2" ? 2 : type === "VEC3" ? 3 : type === "VEC4" ? 4 : 1; }
@@ -70,15 +71,15 @@ function parseGlb(buffer: ArrayBuffer): Scene {
   return { faces, bytes: buffer.byteLength };
 }
 
-function draw(canvas: HTMLCanvasElement, scene: Scene | null, props: Props, fallback: boolean) {
+function draw(canvas: HTMLCanvasElement, scene: Scene | null, props: Props, fallback: boolean, view: ViewState, time: number, reducedMotion: boolean) {
   const bounds = canvas.getBoundingClientRect(), ratio = Math.min(devicePixelRatio || 1, 2);
   canvas.width = Math.max(1, Math.round(bounds.width * ratio)); canvas.height = Math.max(1, Math.round(bounds.height * ratio));
   const context = canvas.getContext("2d"); if (!context) return;
   context.setTransform(ratio, 0, 0, ratio, 0, 0); context.clearRect(0, 0, bounds.width, bounds.height);
-  const bg = context.createLinearGradient(0, 0, bounds.width, bounds.height); bg.addColorStop(0, "#122126"); bg.addColorStop(1, "#05090b");
+  const bg = context.createLinearGradient(0, 0, bounds.width, bounds.height); bg.addColorStop(0, "#1c3036"); bg.addColorStop(.52, "#0a1519"); bg.addColorStop(1, "#030709");
   context.fillStyle = bg; context.fillRect(0, 0, bounds.width, bounds.height);
   const inspectionLight = context.createRadialGradient(bounds.width * .24, bounds.height * .12, 0, bounds.width * .24, bounds.height * .12, bounds.width * .78);
-  inspectionLight.addColorStop(0, "#d8f7ff1c"); inspectionLight.addColorStop(.5, "#50d8ee08"); inspectionLight.addColorStop(1, "#00000000"); context.fillStyle = inspectionLight; context.fillRect(0, 0, bounds.width, bounds.height);
+  inspectionLight.addColorStop(0, "#e7fbff38"); inspectionLight.addColorStop(.5, "#50d8ee12"); inspectionLight.addColorStop(1, "#00000000"); context.fillStyle = inspectionLight; context.fillRect(0, 0, bounds.width, bounds.height);
   const horizon = bounds.height * .71, vanishingX = bounds.width * .46;
   context.strokeStyle = "#8bb2ba16"; context.lineWidth = 1;
   for (let lane = -7; lane <= 7; lane += 1) { context.beginPath(); context.moveTo(vanishingX, horizon); context.lineTo(vanishingX + lane * bounds.width * .12, bounds.height); context.stroke(); }
@@ -96,14 +97,14 @@ function draw(canvas: HTMLCanvasElement, scene: Scene | null, props: Props, fall
   all.forEach((point) => point.forEach((value, axis) => { min[axis] = Math.min(min[axis], value); max[axis] = Math.max(max[axis], value); }));
   const center = min.map((value, axis) => (value + max[axis]) / 2) as Vec3, extent = Math.max(...max.map((value, axis) => value - min[axis])) || 1;
   const toolX = (props.cursor.x / 27 - .5) * 230, toolZ = (props.cursor.y / 15 - .5) * 120;
-  const orbit = props.spindle ? 0 : Math.sin(performance.now() / 6200) * .025;
+  const orbit = view.autoOrbit && !reducedMotion ? time / (props.variant === "full" ? 15000 : 24000) : 0;
   const project = (point: Vec3, node: string) => {
     let [x, y, z] = point;
     if (node.startsWith("machine.spindle") || node.startsWith("tool.endmill")) { x += toolX; z += toolZ; y += props.spindle ? -22 : 0; }
     const nx = (x - center[0]) / extent, ny = (y - center[1]) / extent, nz = (z - center[2]) / extent;
-    const yaw = -.72 + orbit, pitch = -.42, rx = nx * Math.cos(yaw) + nz * Math.sin(yaw), rz = -nx * Math.sin(yaw) + nz * Math.cos(yaw);
+    const yaw = view.yaw + orbit, pitch = view.pitch, rx = nx * Math.cos(yaw) + nz * Math.sin(yaw), rz = -nx * Math.sin(yaw) + nz * Math.cos(yaw);
     const ry = ny * Math.cos(pitch) - rz * Math.sin(pitch), depth = ny * Math.sin(pitch) + rz * Math.cos(pitch);
-    const perspective = 1 / (1.7 - depth * .42), scale = Math.min(bounds.width, bounds.height) * .88;
+    const perspective = 1 / (1.7 - depth * .42), scale = Math.min(bounds.width, bounds.height) * .96 * view.zoom;
     return { x: bounds.width / 2 + rx * scale * perspective, y: bounds.height * .54 - ry * scale * perspective, depth };
   };
   context.save(); context.filter = "blur(10px)"; context.globalAlpha = .62; context.fillStyle = "#000"; context.beginPath(); context.ellipse(bounds.width * .49, bounds.height * .77, bounds.width * .34, bounds.height * .075, -.02, 0, Math.PI * 2); context.fill(); context.restore();
@@ -111,9 +112,11 @@ function draw(canvas: HTMLCanvasElement, scene: Scene | null, props: Props, fall
   projected.forEach(({ face, points }) => {
     context.beginPath(); context.moveTo(points[0].x, points[0].y); context.lineTo(points[1].x, points[1].y); context.lineTo(points[2].x, points[2].y); context.closePath();
     const illumination = faceLight(face.vertices), depthFade = clamp(.78 + points[0].depth * .16, .58, 1);
-    context.globalAlpha = (face.node === "stock.block.flagship" ? Math.max(.3, 1 - props.completion / 135) : .94) * depthFade;
-    context.fillStyle = face.node.startsWith("tool.endmill") && props.spindle ? "#55e8ff" : shade(face.color, illumination, face.metallic); context.fill();
-    context.strokeStyle = face.node.startsWith("tool.endmill") ? "#d7fbff" : `rgba(208,232,236,${.035 + (1 - face.roughness) * .075})`; context.lineWidth = face.node.startsWith("tool.endmill") ? .9 : .35; context.stroke();
+    const isStock = face.node.includes("stock"), isTool = face.node.startsWith("tool.endmill"), isSpindle = face.node.includes("spindle"), isFixture = face.node.includes("vise") || face.node.includes("fixture") || face.node.includes("jaw");
+    const materialColor = isStock ? "rgb(174,190,194)" : isFixture ? "rgb(79,101,108)" : isSpindle ? "rgb(65,84,91)" : face.color;
+    context.globalAlpha = (isStock ? Math.max(.34, 1 - props.completion / 135) : .98) * depthFade;
+    context.fillStyle = isTool && props.spindle ? "#7ff1ff" : shade(materialColor, illumination, face.metallic); context.fill();
+    context.strokeStyle = isTool ? "#e8fdff" : isStock ? "rgba(235,250,252,.28)" : `rgba(208,232,236,${.08 + (1 - face.roughness) * .11})`; context.lineWidth = isTool ? 1.15 : isStock ? .65 : .45; context.stroke();
   });
   context.globalAlpha = 1;
   if (props.spindle) {
@@ -126,8 +129,14 @@ function draw(canvas: HTMLCanvasElement, scene: Scene | null, props: Props, fall
 
 export default function FlagshipMachiningKit(props: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null), sceneRef = useRef<Scene | null>(null), propsRef = useRef(props);
+  const viewRef = useRef<ViewState>({ yaw: -.72, pitch: -.42, zoom: 1, autoOrbit: true });
+  const dragRef = useRef<{ x: number; y: number } | null>(null);
+  const reducedMotionRef = useRef(false);
   const [status, setStatus] = useState<"loading" | "ready" | "fallback">("loading");
+  const [autoOrbit, setAutoOrbit] = useState(true);
   propsRef.current = props;
+  viewRef.current.autoOrbit = autoOrbit;
+  useEffect(() => { reducedMotionRef.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches; }, []);
   useEffect(() => {
     const controller = new AbortController();
     const forced = new URLSearchParams(location.search).has("assetFallback");
@@ -143,11 +152,13 @@ export default function FlagshipMachiningKit(props: Props) {
   }, []);
   useEffect(() => {
     let frame = 0;
-    const render = () => { const canvas = canvasRef.current; if (canvas) draw(canvas, sceneRef.current, propsRef.current, status === "fallback"); frame = requestAnimationFrame(render); };
+    const render = (time: number) => { const canvas = canvasRef.current; if (canvas) draw(canvas, sceneRef.current, propsRef.current, status === "fallback", viewRef.current, time, reducedMotionRef.current); frame = requestAnimationFrame(render); };
     frame = requestAnimationFrame(render); return () => cancelAnimationFrame(frame);
   }, [status]);
+  const resetView = () => { viewRef.current = { yaw: -.72, pitch: -.42, zoom: 1, autoOrbit: true }; setAutoOrbit(true); trackAnonymous("twin_view_reset", { surface: props.variant ?? "mini" }); };
   return <aside className={`${styles.kit} ${props.variant === "full" ? styles.full : ""}`} aria-label="Live 3D machining kit visualization">
-    <canvas ref={canvasRef}/><div className={styles.label}><i className={status === "ready" ? styles.live : ""}/><span>MACHINING KIT V1</span><b>{status === "loading" ? "DECODING" : status === "ready" ? "LIVE GLB" : "SAFE FALLBACK"}</b></div>
+    <canvas ref={canvasRef} tabIndex={props.variant === "full" ? 0 : -1} aria-label={props.variant === "full" ? "Interactive 3D machine assembly. Drag to orbit and use the mouse wheel to zoom." : "Live 3D machine assembly preview"} onPointerDown={(event) => { if (props.variant !== "full") return; dragRef.current = { x: event.clientX, y: event.clientY }; event.currentTarget.setPointerCapture(event.pointerId); setAutoOrbit(false); }} onPointerMove={(event) => { const start = dragRef.current; if (!start || props.variant !== "full") return; viewRef.current.yaw += (event.clientX - start.x) * .008; viewRef.current.pitch = clamp(viewRef.current.pitch + (event.clientY - start.y) * .006, -.95, .2); dragRef.current = { x: event.clientX, y: event.clientY }; }} onPointerUp={() => { dragRef.current = null; }} onPointerCancel={() => { dragRef.current = null; }} onWheel={(event) => { if (props.variant !== "full") return; event.preventDefault(); viewRef.current.zoom = clamp(viewRef.current.zoom - event.deltaY * .001, .72, 1.55); }} onDoubleClick={resetView}/><div className={styles.label}><i className={status === "ready" ? styles.live : ""}/><span>MACHINING KIT V1</span><b>{status === "loading" ? "DECODING" : status === "ready" ? "LIVE GLB" : "SAFE FALLBACK"}</b></div>
     <div className={styles.signal}><span>XYZ BIND</span><b>{props.spindle ? "CUTTING" : "SAFE Z"}</b><em>{props.load}% LOAD</em></div><div className={styles.renderSpec}><span>PHYSICAL LIGHT</span><i/> <span>DEPTH SORT</span><i/> <span>METAL PBR</span></div>
+    {props.variant === "full" && <div className={styles.orbitControls}><span>DRAG TO ORBIT · WHEEL TO ZOOM</span><button aria-pressed={autoOrbit} onClick={() => setAutoOrbit((value) => !value)}>{autoOrbit ? "PAUSE ORBIT" : "AUTO ORBIT"}</button><button onClick={resetView}>RESET VIEW</button></div>}
   </aside>;
 }
