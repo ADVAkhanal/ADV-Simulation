@@ -268,6 +268,15 @@ export default function ManualCampaign() {
     comboRef.current = 0; setCombo(0); setBestCombo(0); setFlowScore(0); setPaused(false); setGameEvent(null);
   }, [contractIndex]);
 
+  const selectTool = (index: number) => {
+    const nextTool = MILL_TOOLS[index];
+    setSpindle(false);
+    setLoad(0);
+    setToolIndex(index);
+    setMessage(`SAFE TOOL CHANGE — T${nextTool.id} ${nextTool.name} selected. Spindle held for offset verification.`);
+    trackAnonymous("manual_tool_change", { contract: contract.id, tool: nextTool.id, duringCycle: spindle });
+  };
+
   const retryContract = useCallback(() => {
     retryStartedAt.current = performance.now(); trackAnonymous("retry_start", { contract: contract.id });
     tone(145, .12, "triangle", .018);
@@ -432,7 +441,7 @@ export default function ManualCampaign() {
       <section className={styles.workspace}>
         <aside className={styles.setup}>
           <div className={styles.panelTitle}><span>01</span><div><small>PROCESS SETUP</small><b>Choose your edge</b></div></div>
-          <div className={styles.toolList}>{MILL_TOOLS.map((item, index) => <button key={item.id} disabled={spindle} className={index === toolIndex ? styles.activeTool : ""} onClick={() => { setToolIndex(index); setMessage(`${item.name} selected — ${item.role.toLowerCase()}.`); }}>
+          <div className={styles.toolList}>{MILL_TOOLS.map((item, index) => <button key={item.id} type="button" aria-pressed={index === toolIndex} className={index === toolIndex ? styles.activeTool : ""} onClick={() => selectTool(index)}>
             <span>T{item.id}</span><div><b>{item.name}</b><small>{item.diameter} / {item.role}</small></div><em>{item.radius.toFixed(2)}R</em>
           </button>)}</div>
           <label className={styles.feed}><span>FEED OVERRIDE <b>{feed}%</b></span><input type="range" min="25" max="115" value={feed} onChange={(event) => setFeed(Number(event.target.value))}/></label>
@@ -492,7 +501,7 @@ export default function ManualCampaign() {
     </section>}
     {logOpen && <ShopLog save={save} close={() => setLogOpen(false)}/>}
     {paused && screen === "play" && <section className={styles.pauseLayer} role="dialog" aria-modal="true" aria-label="Game paused"><article><small>SHIFT 01 / PAUSED</small><h2>MACHINE<br/><em>ON HOLD.</em></h2><p>The spindle is stopped and the run is preserved.</p><button className={styles.pausePrimary} onClick={() => setPaused(false)}><Play/> RESUME RUN</button><button onClick={() => { resetRun(); setMessage("Fresh stock loaded. Setup retained."); }}><RotateCcw/> RESTART CONTRACT</button><button onClick={() => { setPaused(false); setScreen("select"); }}><Factory/> CONTRACT INDEX</button><button onClick={() => { setPaused(false); setTourStep(0); }}><CircleHelp/> HELP / TOUR</button><footer><kbd>ESC</kbd> RESUME · <kbd>WASD</kbd> MOVE · <kbd>SPACE</kbd> SPINDLE · <kbd>I</kbd> INSPECT</footer></article></section>}
-    {tourStep !== null && <section className={styles.tourLayer} aria-live="polite"><article className={styles.tourCard} role="dialog" aria-modal="false" aria-label="Guided game tour"><header><span>{TOUR_STEPS[tourStep].code} / 0{TOUR_STEPS.length}</span><button onClick={() => { setTourStep(null); setViewMode("map"); }} aria-label="Close guided tour"><X/></button></header><small>{TOUR_STEPS[tourStep].eyebrow}</small><h2>{TOUR_STEPS[tourStep].title}</h2><p>{TOUR_STEPS[tourStep].body}</p><div className={styles.tourProgress} aria-label={`Tour step ${tourStep + 1} of ${TOUR_STEPS.length}`}>{TOUR_STEPS.map((step, index) => <i key={step.code} data-active={index === tourStep}/>)}</div><footer><button disabled={tourStep === 0} onClick={() => goToTourStep(tourStep - 1)}>PREVIOUS</button><b>ESC TO CLOSE</b><button className={styles.tourNext} onClick={() => goToTourStep(tourStep + 1)}>{tourStep === TOUR_STEPS.length - 1 ? "FINISH TOUR" : "NEXT AREA"}</button></footer></article></section>}
+    {tourStep !== null && <section className={styles.tourLayer} aria-live="polite"><article className={styles.tourCard} role="dialog" aria-modal="false" aria-label="Guided game tour"><header><span>{TOUR_STEPS[tourStep].code} / 0{TOUR_STEPS.length}</span><button onClick={() => { setTourStep(null); setViewMode("map"); }} aria-label="Close guided tour"><X/></button></header><small>{TOUR_STEPS[tourStep].eyebrow}</small><h2>{TOUR_STEPS[tourStep].title}</h2><p>{TOUR_STEPS[tourStep].body}</p><div className={styles.tourProgress} aria-label={`Tour step ${tourStep + 1} of ${TOUR_STEPS.length}`}>{TOUR_STEPS.map((step, index) => <i key={step.code} data-active={index === tourStep}/>)}</div><footer><button onClick={() => { if (tourStep === 0) { setTourStep(null); setViewMode("map"); } else goToTourStep(tourStep - 1); }}>{tourStep === 0 ? "EXIT TOUR" : "PREVIOUS"}</button><b>ESC TO CLOSE</b><button className={styles.tourNext} onClick={() => goToTourStep(tourStep + 1)}>{tourStep === TOUR_STEPS.length - 1 ? "FINISH TOUR" : "NEXT AREA"}</button></footer></article></section>}
   </main>;
 }
 

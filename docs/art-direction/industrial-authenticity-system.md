@@ -120,3 +120,10 @@ Primary machine-cell text no longer depends on 6–9 px microtype at desktop wid
 - Tool-Crib credentials are never embedded in the public client, copied into source, or used as a substitute for a scoped integration design.
 - Project Toolpath remains accountless and advisory. Tool-Crib permissions, calibration blocks, reservations, and human review remain authoritative in Tool-Crib.
 - Any future idle-tool or cost-reality feature must receive a privacy-safe server-generated snapshot or scoped service response. Until a real record is connected, the game must show no shop metric rather than fabricate one.
+
+## Interaction contract
+
+- Every visible button must remain enabled and resolve to an explicit action; unavailable operations are explained through safe state transitions instead of dead controls.
+- Selecting Finisher, Rougher, or Hog Mill during an active cycle automatically commands feed hold, clears displayed load, selects the requested tool, and requires offset verification before restart.
+- The guided tour never presents a disabled Previous control. Its first step exposes Exit Tour in the same location, preserving a predictable action target.
+- A repository-wide regression test rejects disabled or unwired button elements across every TSX route.

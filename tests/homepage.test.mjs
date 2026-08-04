@@ -17,6 +17,28 @@ async function collectCss(directory) {
   return nested.flat();
 }
 
+async function collectTsx(directory) {
+  const entries = await readdir(directory, { withFileTypes: true });
+  const nested = await Promise.all(entries.map((entry) => entry.isDirectory()
+    ? collectTsx(new URL(`${entry.name}/`, directory))
+    : entry.name.endsWith(".tsx") ? [new URL(entry.name, directory)] : []));
+  return nested.flat();
+}
+
+test("every visible button is enabled and wired to an action", async () => {
+  const files = await collectTsx(new URL("../app/", import.meta.url));
+  const disabled = [], unwired = [];
+  for (const file of files) {
+    const source = await readFile(file, "utf8");
+    for (const tag of source.match(/<button\b[^>]*>/g) ?? []) {
+      if (/\bdisabled(?:=|\s|>)/.test(tag)) disabled.push(`${file.pathname}:${tag}`);
+      if (!tag.includes("onClick=") && !tag.includes('type="submit"')) unwired.push(`${file.pathname}:${tag}`);
+    }
+  }
+  assert.deepEqual(disabled, []);
+  assert.deepEqual(unwired, []);
+});
+
 test("all product stylesheets enforce a readable explicit type floor", async () => {
   const files = await collectCss(new URL("../app/", import.meta.url));
   const offenders = [];
@@ -164,6 +186,9 @@ test("global mode dock exposes both game surfaces", async () => {
   assert.match(manual, /WASD/);
   assert.match(manual, /deriveManualMission/);
   assert.match(manual, /deriveFlowPoints/);
+  assert.match(manual, /SAFE TOOL CHANGE/);
+  assert.match(manual, /aria-pressed=\{index === toolIndex\}/);
+  assert.doesNotMatch(manual, /disabled=\{spindle\}/);
   assert.match(machiningKit, /variant === "full"/);
   assert.match(machiningKit, /DRAG TO ORBIT/);
   assert.match(machiningKit, /AUTO ORBIT/);
