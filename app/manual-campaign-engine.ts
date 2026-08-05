@@ -26,9 +26,9 @@ export const MANUAL_CONTRACTS: ManualContract[] = [
 ];
 
 export const MILL_TOOLS: MillTool[] = [
-  { id: 1, name: "FINISHER", diameter: "6 MM", radius: .78, load: .62, wear: .7, finish: .35, role: "Precision edges" },
-  { id: 2, name: "ROUGHER", diameter: "12 MM", radius: 1.35, load: 1, wear: 1, finish: .8, role: "Balanced removal" },
-  { id: 3, name: "HOG MILL", diameter: "20 MM", radius: 2.1, load: 1.48, wear: 1.55, finish: 1.5, role: "Fast, high risk" },
+  { id: 1, name: "Finisher", diameter: "6 MM", radius: .78, load: .62, wear: .7, finish: .35, role: "Precision edges" },
+  { id: 2, name: "Rougher", diameter: "12 MM", radius: 1.35, load: 1, wear: 1, finish: .8, role: "Balanced removal" },
+  { id: 3, name: "Hog Mill", diameter: "20 MM", radius: 2.1, load: 1.48, wear: 1.55, finish: 1.5, role: "Fast, high risk" },
 ];
 
 export function isManualTarget(contract: ManualContract["id"], col: number, row: number) {

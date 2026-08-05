@@ -156,9 +156,9 @@ test("global mode dock exposes both game surfaces", async () => {
   assert.match(manual, /PROFILE TRACE/);
   assert.match(manual, /LEARNING LENS/);
   assert.match(manual, /EXPLANATION DEPTH/);
-  assert.match(manual, /FIRST CUT/);
-  assert.match(manual, /APPRENTICE VIEW/);
-  assert.match(manual, /ENGINEERING VIEW/);
+  assert.match(manual, /First Cut/i);
+  assert.match(manual, /Apprentice View/i);
+  assert.match(manual, /Engineering View/i);
   assert.match(manual, /fz = F/);
   assert.match(manual, /SHOP SKILL RECORD/);
   assert.match(manual, /CNC OPERATOR ALIGNMENT/);
