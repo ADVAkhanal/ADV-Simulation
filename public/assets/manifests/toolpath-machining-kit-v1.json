@@ -4,8 +4,8 @@
   "path": "/assets/workholding/toolpath-machining-kit-v1.glb",
   "sourceBlend": "assets-src/blender/toolpath-machining-kit-v1.blend",
   "sourceScript": "tools/blender/build-machining-kit.py",
-  "generatedAt": "2026-08-04T21:16:51.805555+00:00",
-  "sha256": "5C54FFCFA4276F2F0C46E5F70FA7721AA687E9B968ED025689C7EC2FE7D54AE6",
+  "generatedAt": "2026-08-05T12:14:25.995178+00:00",
+  "sha256": "B5E596707746715F21D2B3DE9E6E1A915FB62E21F8487F79C01E7BE9A4D35D10",
   "coordinateSystem": {
     "units": "millimeters",
     "worldUp": "+Z",
@@ -35,8 +35,12 @@
     "machine.worklight",
     "machine.coolant.manifold",
     "machine.chiptray",
+    "machine.cablechain.x",
+    "machine.guard.doors",
+    "machine.control.pendant",
     "machine.table",
     "machine.spindle.body",
+    "machine.spindle.toolholder",
     "machine.spindle.tool_anchor",
     "fixture.vise.body",
     "fixture.vise.jaw_fixed",
@@ -54,22 +58,22 @@
     "MAT_VISE_DARK",
     "MAT_WARM_WORKLIGHT"
   ],
-  "triangleCount": 7740,
+  "triangleCount": 11516,
   "materialCount": 7,
-  "fileSizeBytes": 541464,
+  "fileSizeBytes": 801384,
   "boundingBox": {
     "minMm": [
-      -421.0,
+      -491.0,
       -300.0,
       -158.0
     ],
     "maxMm": [
-      421.0,
+      507.0,
       300.0,
       650.0
     ],
     "dimensionsMm": [
-      842.0,
+      998.0,
       600.0,
       808.0
     ]

@@ -128,7 +128,24 @@ function draw(canvas: HTMLCanvasElement, scene: Scene | null, props: Props, fall
     const perspective = 1 / (1.7 - depth * .42), scale = Math.min(bounds.width, bounds.height) * .96 * view.zoom;
     return { x: bounds.width / 2 + rx * scale * perspective, y: bounds.height * .54 - ry * scale * perspective, depth };
   };
+  const averagePoint = (node: string): Vec3 => {
+    const points = scene.faces.filter((face) => face.node === node).flatMap((face) => face.vertices);
+    if (!points.length) return [0, 0, 0];
+    return points.reduce<Vec3>((sum, point) => [sum[0] + point[0] / points.length, sum[1] + point[1] / points.length, sum[2] + point[2] / points.length], [0, 0, 0]);
+  };
+  const cutter = project(averagePoint("tool.endmill.flat.010"), "tool.endmill.flat.010");
+  const coolant = project(averagePoint("machine.coolant.manifold"), "machine.coolant.manifold");
+  const stockPoints = scene.faces.filter((face) => face.node === "stock.block.flagship").flatMap((face) => face.vertices).map((point) => project(point, "stock.block.flagship"));
+  const stockScreen = stockPoints.length ? {
+    left: Math.min(...stockPoints.map((point) => point.x)), right: Math.max(...stockPoints.map((point) => point.x)),
+    top: Math.min(...stockPoints.map((point) => point.y)), bottom: Math.max(...stockPoints.map((point) => point.y)),
+  } : null;
   context.save(); context.filter = "blur(10px)"; context.globalAlpha = .62; context.fillStyle = "#000"; context.beginPath(); context.ellipse(bounds.width * .49, bounds.height * .77, bounds.width * .34, bounds.height * .075, -.02, 0, Math.PI * 2); context.fill(); context.restore();
+  if (props.spindle) {
+    const workGlow = context.createRadialGradient(cutter.x, cutter.y, 0, cutter.x, cutter.y, Math.max(54, bounds.width * .09));
+    workGlow.addColorStop(0, `rgba(255,175,78,${.3 + props.load / 330})`); workGlow.addColorStop(.25, "rgba(80,230,255,.16)"); workGlow.addColorStop(1, "rgba(0,0,0,0)");
+    context.save(); context.globalCompositeOperation = "screen"; context.fillStyle = workGlow; context.fillRect(0, 0, bounds.width, bounds.height); context.restore();
+  }
   const projected = scene.faces.map((face) => ({ face, points: face.vertices.map((point) => project(point, face.node)), depth: face.vertices.reduce((sum, point) => sum + project(point, face.node).depth, 0) / 3 })).sort((a, b) => a.depth - b.depth);
   projected.forEach(({ face, points }) => {
     context.beginPath(); context.moveTo(points[0].x, points[0].y); context.lineTo(points[1].x, points[1].y); context.lineTo(points[2].x, points[2].y); context.closePath();
@@ -140,9 +157,24 @@ function draw(canvas: HTMLCanvasElement, scene: Scene | null, props: Props, fall
     context.strokeStyle = isTool ? "#e8fdff" : isStock ? "rgba(235,250,252,.28)" : `rgba(208,232,236,${.08 + (1 - face.roughness) * .11})`; context.lineWidth = isTool ? 1.15 : isStock ? .65 : .45; context.stroke();
   });
   context.globalAlpha = 1;
+  if (stockScreen && props.completion > 0) {
+    const width = stockScreen.right - stockScreen.left, depth = Math.max(4, (stockScreen.bottom - stockScreen.top) * .34);
+    context.save(); context.beginPath(); context.rect(stockScreen.left, stockScreen.bottom - depth, width * clamp(props.completion / 100), depth); context.clip();
+    const floor = context.createLinearGradient(stockScreen.left, 0, stockScreen.right, 0); floor.addColorStop(0, "#294b54"); floor.addColorStop(.45, "#92a9ad"); floor.addColorStop(1, "#233b42");
+    context.fillStyle = floor; context.fillRect(stockScreen.left, stockScreen.bottom - depth, width, depth);
+    context.strokeStyle = "rgba(218,245,248,.22)"; context.lineWidth = .7;
+    for (let x = stockScreen.left - depth; x < stockScreen.right + depth; x += 7) { context.beginPath(); context.moveTo(x, stockScreen.bottom); context.lineTo(x + depth, stockScreen.bottom - depth); context.stroke(); }
+    context.restore();
+  }
   if (props.spindle) {
-    const pulse = .45 + Math.sin(performance.now() / 65) * .12;
-    context.strokeStyle = `rgba(80,230,255,${pulse})`; context.lineWidth = 1; context.beginPath(); context.ellipse(bounds.width * .5, bounds.height * .35, bounds.width * .055, bounds.height * .018, 0, 0, Math.PI * 2); context.stroke();
+    const pulse = .48 + Math.sin(time / 65) * .14, phase = reducedMotion ? 0 : time * .032;
+    context.save(); context.globalCompositeOperation = "screen";
+    context.strokeStyle = `rgba(128,241,255,${pulse})`; context.lineWidth = 1.2; context.beginPath(); context.ellipse(cutter.x, cutter.y, 15 + props.load * .05, 5 + props.load * .018, 0, 0, Math.PI * 2); context.stroke();
+    for (let blade = 0; blade < 3; blade += 1) { const angle = phase + blade * Math.PI * 2 / 3; context.strokeStyle = "rgba(226,253,255,.72)"; context.beginPath(); context.moveTo(cutter.x, cutter.y); context.lineTo(cutter.x + Math.cos(angle) * 14, cutter.y + Math.sin(angle) * 5); context.stroke(); }
+    for (const side of [-1, 1]) { context.strokeStyle = "rgba(93,225,244,.34)"; context.lineWidth = 1.1; context.beginPath(); context.moveTo(coolant.x + side * 8, coolant.y); context.quadraticCurveTo((coolant.x + cutter.x) / 2 + side * 15, cutter.y - 12, cutter.x + side * 5, cutter.y); context.stroke(); }
+    const chips = props.variant === "full" ? 20 : 9;
+    for (let index = 0; index < chips; index += 1) { const age = ((time / 720 + index * .173) % 1), angle = -2.7 + (index % 7) * .23; const reach = (18 + (index % 5) * 7) * age; const x = cutter.x + Math.cos(angle) * reach, y = cutter.y + Math.sin(angle) * reach + age * age * 26; context.fillStyle = index % 4 ? `rgba(205,230,232,${1 - age})` : `rgba(255,178,80,${.8 - age * .7})`; context.fillRect(x, y, 1.5 + (index % 2), .8); }
+    context.restore();
   }
   const vignette = context.createRadialGradient(bounds.width / 2, bounds.height / 2, Math.min(bounds.width, bounds.height) * .25, bounds.width / 2, bounds.height / 2, Math.max(bounds.width, bounds.height) * .7);
   vignette.addColorStop(0, "#00000000"); vignette.addColorStop(1, "#00000080"); context.fillStyle = vignette; context.fillRect(0, 0, bounds.width, bounds.height);
@@ -179,7 +211,7 @@ export default function FlagshipMachiningKit(props: Props) {
   const resetView = () => { viewRef.current = { yaw: -.72, pitch: -.42, zoom: 1, autoOrbit: true }; setAutoOrbit(true); trackAnonymous("twin_view_reset", { surface: props.variant ?? "mini" }); };
   return <aside className={`${styles.kit} ${props.variant === "full" ? styles.full : ""}`} aria-label="Live 3D machining kit visualization">
     <canvas ref={canvasRef} tabIndex={props.variant === "full" ? 0 : -1} aria-label={props.variant === "full" ? "Interactive 3D machine assembly. Drag to orbit and use the mouse wheel to zoom." : "Live 3D machine assembly preview"} onPointerDown={(event) => { if (props.variant !== "full") return; dragRef.current = { x: event.clientX, y: event.clientY }; event.currentTarget.setPointerCapture(event.pointerId); setAutoOrbit(false); }} onPointerMove={(event) => { const start = dragRef.current; if (!start || props.variant !== "full") return; viewRef.current.yaw += (event.clientX - start.x) * .008; viewRef.current.pitch = clamp(viewRef.current.pitch + (event.clientY - start.y) * .006, -.95, .2); dragRef.current = { x: event.clientX, y: event.clientY }; }} onPointerUp={() => { dragRef.current = null; }} onPointerCancel={() => { dragRef.current = null; }} onWheel={(event) => { if (props.variant !== "full") return; event.preventDefault(); viewRef.current.zoom = clamp(viewRef.current.zoom - event.deltaY * .001, .72, 1.55); }} onDoubleClick={resetView}/><div className={styles.label}><i className={status === "ready" ? styles.live : ""}/><span>MACHINING KIT V1</span><b>{status === "loading" ? "DECODING" : status === "ready" ? "LIVE GLB" : "SAFE FALLBACK"}</b></div>
-    <div className={styles.signal}><span>XYZ BIND</span><b>{props.spindle ? "CUTTING" : "SAFE Z"}</b><em>{props.load}% LOAD</em></div><div className={styles.renderSpec}><span>PHYSICAL LIGHT</span><i/> <span>DEPTH SORT</span><i/> <span>METAL PBR</span></div>
+    <div className={styles.signal}><span>XYZ BIND</span><b>{props.spindle ? "CUTTING" : "SAFE Z"}</b><em>{props.load}% LOAD</em></div><div className={styles.renderSpec}><span>HIERARCHY</span><i/> <span>LIVE CUT FX</span><i/> <span>METAL PBR</span></div>
     {props.variant === "full" && <div className={styles.orbitControls}><span>DRAG TO ORBIT · WHEEL TO ZOOM</span><button aria-pressed={autoOrbit} onClick={() => setAutoOrbit((value) => !value)}>{autoOrbit ? "PAUSE ORBIT" : "AUTO ORBIT"}</button><button onClick={resetView}>RESET VIEW</button></div>}
   </aside>;
 }

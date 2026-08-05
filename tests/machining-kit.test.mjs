@@ -11,7 +11,8 @@ const expectedObjects = [
   "machine.enclosure.base", "machine.enclosure.column", "machine.enclosure.left",
   "machine.enclosure.right", "machine.enclosure.roof", "machine.waycover.z",
   "machine.worklight", "machine.coolant.manifold", "machine.chiptray",
-  "machine.table", "machine.spindle.body", "machine.spindle.tool_anchor",
+  "machine.cablechain.x", "machine.guard.doors", "machine.control.pendant",
+  "machine.table", "machine.spindle.body", "machine.spindle.toolholder", "machine.spindle.tool_anchor",
   "fixture.vise.body", "fixture.vise.jaw_fixed", "fixture.vise.jaw_moving",
   "fixture.vise.stock_anchor", "tool.endmill.flat.010", "stock.block.flagship",
 ];

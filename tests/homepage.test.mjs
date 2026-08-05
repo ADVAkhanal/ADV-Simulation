@@ -145,7 +145,8 @@ test("global mode dock exposes both game surfaces", async () => {
   assert.match(manual, /SURFACE TRACE/);
   assert.match(manual, /CHIP LOAD \/ SIM/);
   assert.match(machiningKit, /faceLight/);
-  assert.match(machiningKit, /PHYSICAL LIGHT/);
+  assert.match(machiningKit, /HIERARCHY/);
+  assert.match(machiningKit, /LIVE CUT FX/);
   assert.match(machiningKit, /METAL PBR/);
   assert.match(manual, /RETRY FOR BETTER SCORE/);
   assert.match(manual, /PERSONAL BEST/);

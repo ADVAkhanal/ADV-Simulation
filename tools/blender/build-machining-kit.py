@@ -35,8 +35,12 @@ EXPECTED_NAMES = [
     "machine.worklight",
     "machine.coolant.manifold",
     "machine.chiptray",
+    "machine.cablechain.x",
+    "machine.guard.doors",
+    "machine.control.pendant",
     "machine.table",
     "machine.spindle.body",
+    "machine.spindle.toolholder",
     "machine.spindle.tool_anchor",
     "fixture.vise.body",
     "fixture.vise.jaw_fixed",
@@ -248,6 +252,28 @@ worklight = join_parts([
 ], "machine.worklight")
 set_origin(worklight, (250, 178, 380)); tag(worklight, "work_light", False, "work_light")
 
+cable_chain = join_parts([
+    box(f"cable-link-{index:02d}", (-285 + index * 37, 205, 522 + int(18 * ((index / 9) ** 2))), (28, 40, 22), materials["MAT_VISE_DARK"], 4)
+    for index in range(10)
+], "machine.cablechain.x")
+set_origin(cable_chain, (-285, 205, 522)); tag(cable_chain, "machine_services", False, "x_cable_chain")
+
+guard_doors = join_parts([
+    box("door-left-upright", (-474, -196, 228), (34, 160, 500), materials["MAT_MACHINE_DARK"], 8),
+    box("door-left-handle", (-452, -286, 230), (16, 24, 220), materials["MAT_BRUSHED_STEEL"], 6),
+    box("door-right-upright", (474, -196, 228), (34, 160, 500), materials["MAT_MACHINE_DARK"], 8),
+    box("door-right-handle", (452, -286, 230), (16, 24, 220), materials["MAT_BRUSHED_STEEL"], 6),
+], "machine.guard.doors")
+set_origin(guard_doors, (0, -196, 0)); tag(guard_doors, "machine_guard", False, "open_guard_doors")
+
+pendant = join_parts([
+    box("pendant-body", (448, -214, 350), (118, 76, 278), materials["MAT_VISE_DARK"], 11),
+    box("pendant-screen", (448, -255, 410), (82, 10, 72), materials["MAT_MACHINE_ACCENT"], 4),
+    *[cylinder(f"pendant-key-{index:02d}", (420 + (index % 3) * 28, -258, 344 - (index // 3) * 28), 7, 8, materials["MAT_BRUSHED_STEEL"], 12) for index in range(6)],
+    cylinder("pendant-estop", (448, -262, 272), 18, 14, materials["MAT_WARM_WORKLIGHT"], 18),
+], "machine.control.pendant")
+set_origin(pendant, (448, -214, 350)); tag(pendant, "machine_control", False, "operator_pendant")
+
 coolant = join_parts([
     cylinder("coolant-left", (-48, 70, 247), 7, 92, materials["MAT_MACHINE_ACCENT"], 12),
     cylinder("coolant-right", (48, 70, 247), 7, 92, materials["MAT_MACHINE_ACCENT"], 12),
@@ -270,6 +296,14 @@ spindle = join_parts([spindle_main, spindle_band, spindle_nose], "machine.spindl
 set_origin(spindle, (0, 75, 225)); tag(spindle, "spindle", True, "tool_mount")
 tool_anchor = add_anchor("machine.spindle.tool_anchor", (0, 75, 225), spindle, "tool_mount")
 parent_keep_world(coolant, spindle)
+
+toolholder = join_parts([
+    cylinder("holder-gauge", (0, 75, 224), 31, 24, materials["MAT_BRUSHED_STEEL"], 32),
+    cylinder("holder-taper", (0, 75, 205), 22, 30, materials["MAT_TOOL_STEEL"], 28),
+    cylinder("holder-collet", (0, 75, 187), 13, 18, materials["MAT_BRUSHED_STEEL"], 24),
+], "machine.spindle.toolholder")
+set_origin(toolholder, (0, 75, 225)); tag(toolholder, "tool_holder", True, "tool_holder")
+parent_keep_world(toolholder, spindle)
 
 vise_body = box("fixture.vise.body", (0, 0, 34), (320, 190, 68), materials["MAT_VISE_DARK"], 8)
 vise_key = box("vise-key", (0, 0, 6), (160, 220, 18), materials["MAT_BRUSHED_STEEL"], 3)
