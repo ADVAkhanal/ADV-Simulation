@@ -2,13 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { trackAnonymous } from "./anonymous-analytics";
+import { MILL_COLS, MILL_ROWS, isManualTarget, type ManualContract } from "./manual-campaign-engine";
 import styles from "./flagship-machining-kit.module.css";
 
 type Vec3 = [number, number, number];
 type Mat4 = [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
 type Face = { vertices: [Vec3, Vec3, Vec3]; color: string; node: string; metallic: number; roughness: number };
 type Scene = { faces: Face[]; bytes: number };
-type Props = { cursor: { x: number; y: number }; spindle: boolean; completion: number; load: number; variant?: "mini" | "full"; material?: string; accent?: string; verbose?: boolean };
+type Props = { cursor: { x: number; y: number }; spindle: boolean; completion: number; load: number; variant?: "mini" | "full"; material?: string; accent?: string; verbose?: boolean; cells?: Uint8Array; contractId?: ManualContract["id"] };
 type ViewState = { yaw: number; pitch: number; zoom: number; autoOrbit: boolean };
 
 const colors = ["#24353a", "#4ae2fa", "#778b90", "#c6d4d6", "#6a7c81", "#18252a"];
@@ -20,6 +21,35 @@ function shade(color: string, light: number, metallic: number) {
   const values = color.match(/[\d.]+/g)?.slice(0, 3).map(Number) ?? [92, 112, 118];
   const specular = Math.pow(clamp(light), 6) * metallic * 92;
   return `rgb(${values.map((value) => Math.round(clamp(value * (.42 + light * .9) + specular, 0, 255))).join(",")})`;
+}
+// The GLB is exported Y-up (export_yup=True), so Blender's vertical Z axis
+// lands in glTF's Y component. Width stays on X; depth (Blender Y, machine
+// front/back) lands on glTF Z. Do not swap these back without re-checking
+// the exporter flag.
+function stockBounds(faces: Face[]): { minX: number; maxX: number; minDepth: number; maxDepth: number; topY: number } | null {
+  const points = faces.filter((face) => face.node === "stock.block.flagship").flatMap((face) => face.vertices);
+  if (!points.length) return null;
+  return {
+    minX: Math.min(...points.map((point) => point[0])), maxX: Math.max(...points.map((point) => point[0])),
+    minDepth: Math.min(...points.map((point) => point[2])), maxDepth: Math.max(...points.map((point) => point[2])),
+    topY: Math.max(...points.map((point) => point[1])),
+  };
+}
+function pocketFaces(scene: Scene, cells: Uint8Array, contractId: ManualContract["id"]): Face[] {
+  const bounds = stockBounds(scene.faces); if (!bounds) return [];
+  const { minX, maxX, minDepth, maxDepth, topY } = bounds, spanX = maxX - minX, spanDepth = maxDepth - minDepth, recess = topY - Math.max(3, spanX * .02);
+  const faces: Face[] = [];
+  for (let row = 0; row < MILL_ROWS; row += 1) for (let col = 0; col < MILL_COLS; col += 1) {
+    const index = row * MILL_COLS + col;
+    if (cells[index] !== 0) continue;
+    const x0 = minX + (col / MILL_COLS) * spanX, x1 = minX + ((col + 1) / MILL_COLS) * spanX;
+    const z0 = minDepth + (row / MILL_ROWS) * spanDepth, z1 = minDepth + ((row + 1) / MILL_ROWS) * spanDepth;
+    const color = isManualTarget(contractId, col, row) ? "rgb(255,86,110)" : "rgb(132,158,163)";
+    const a: Vec3 = [x0, recess, z0], b: Vec3 = [x1, recess, z0], c: Vec3 = [x1, recess, z1], d: Vec3 = [x0, recess, z1];
+    faces.push({ node: "stock.pocket", color, metallic: .25, roughness: .55, vertices: [a, b, c] });
+    faces.push({ node: "stock.pocket", color, metallic: .25, roughness: .55, vertices: [a, c, d] });
+  }
+  return faces;
 }
 function faceLight(vertices: [Vec3, Vec3, Vec3]) {
   const [a, b, c] = vertices, ab = b.map((value, axis) => value - a[axis]) as Vec3, ac = c.map((value, axis) => value - a[axis]) as Vec3;
@@ -137,37 +167,24 @@ function draw(canvas: HTMLCanvasElement, scene: Scene | null, props: Props, fall
   };
   const cutter = project(averagePoint("tool.endmill.flat.010"), "tool.endmill.flat.010");
   const coolant = project(averagePoint("machine.coolant.manifold"), "machine.coolant.manifold");
-  const stockPoints = scene.faces.filter((face) => face.node === "stock.block.flagship").flatMap((face) => face.vertices).map((point) => project(point, "stock.block.flagship"));
-  const stockScreen = stockPoints.length ? {
-    left: Math.min(...stockPoints.map((point) => point.x)), right: Math.max(...stockPoints.map((point) => point.x)),
-    top: Math.min(...stockPoints.map((point) => point.y)), bottom: Math.max(...stockPoints.map((point) => point.y)),
-  } : null;
   context.save(); context.filter = "blur(10px)"; context.globalAlpha = .62; context.fillStyle = "#000"; context.beginPath(); context.ellipse(bounds.width * .49, bounds.height * .77, bounds.width * .34, bounds.height * .075, -.02, 0, Math.PI * 2); context.fill(); context.restore();
   if (props.spindle) {
     const workGlow = context.createRadialGradient(cutter.x, cutter.y, 0, cutter.x, cutter.y, Math.max(54, bounds.width * .09));
     workGlow.addColorStop(0, `rgba(255,175,78,${.3 + props.load / 330})`); workGlow.addColorStop(.25, "rgba(80,230,255,.16)"); workGlow.addColorStop(1, "rgba(0,0,0,0)");
     context.save(); context.globalCompositeOperation = "screen"; context.fillStyle = workGlow; context.fillRect(0, 0, bounds.width, bounds.height); context.restore();
   }
-  const projected = scene.faces.map((face) => ({ face, points: face.vertices.map((point) => project(point, face.node)), depth: face.vertices.reduce((sum, point) => sum + project(point, face.node).depth, 0) / 3 })).sort((a, b) => a.depth - b.depth);
+  const pockets = props.cells && props.contractId ? pocketFaces(scene, props.cells, props.contractId) : [];
+  const projected = [...scene.faces, ...pockets].map((face) => ({ face, points: face.vertices.map((point) => project(point, face.node)), depth: face.vertices.reduce((sum, point) => sum + project(point, face.node).depth, 0) / 3 })).sort((a, b) => a.depth - b.depth);
   projected.forEach(({ face, points }) => {
     context.beginPath(); context.moveTo(points[0].x, points[0].y); context.lineTo(points[1].x, points[1].y); context.lineTo(points[2].x, points[2].y); context.closePath();
     const illumination = faceLight(face.vertices), depthFade = clamp(.78 + points[0].depth * .16, .58, 1);
-    const isStock = face.node.includes("stock"), isTool = face.node.startsWith("tool.endmill"), isSpindle = face.node.includes("spindle"), isFixture = face.node.includes("vise") || face.node.includes("fixture") || face.node.includes("jaw"), isWorklight = face.node.includes("worklight"), isEnclosure = face.node.includes("enclosure");
-    const materialColor = isStock ? stockMaterialColor(props.material) : isFixture ? "rgb(79,101,108)" : isSpindle ? "rgb(65,84,91)" : isEnclosure ? "rgb(37,49,54)" : face.color;
-    context.globalAlpha = (isStock ? Math.max(.34, 1 - props.completion / 135) : .98) * depthFade;
+    const isStock = face.node.includes("stock"), isPocket = face.node === "stock.pocket", isTool = face.node.startsWith("tool.endmill"), isSpindle = face.node.includes("spindle"), isFixture = face.node.includes("vise") || face.node.includes("fixture") || face.node.includes("jaw"), isWorklight = face.node.includes("worklight"), isEnclosure = face.node.includes("enclosure");
+    const materialColor = isPocket ? face.color : isStock ? stockMaterialColor(props.material) : isFixture ? "rgb(79,101,108)" : isSpindle ? "rgb(65,84,91)" : isEnclosure ? "rgb(37,49,54)" : face.color;
+    context.globalAlpha = .98 * depthFade;
     context.fillStyle = isTool && props.spindle ? "#7ff1ff" : isWorklight ? "#ff9b3f" : shade(materialColor, illumination, face.metallic); context.fill();
-    context.strokeStyle = isTool ? "#e8fdff" : isStock ? "rgba(235,250,252,.28)" : `rgba(208,232,236,${.08 + (1 - face.roughness) * .11})`; context.lineWidth = isTool ? 1.15 : isStock ? .65 : .45; context.stroke();
+    context.strokeStyle = isTool ? "#e8fdff" : isPocket ? "rgba(8,14,16,.4)" : isStock ? "rgba(235,250,252,.28)" : `rgba(208,232,236,${.08 + (1 - face.roughness) * .11})`; context.lineWidth = isTool ? 1.15 : isPocket ? .35 : isStock ? .65 : .45; context.stroke();
   });
   context.globalAlpha = 1;
-  if (stockScreen && props.completion > 0) {
-    const width = stockScreen.right - stockScreen.left, depth = Math.max(4, (stockScreen.bottom - stockScreen.top) * .34);
-    context.save(); context.beginPath(); context.rect(stockScreen.left, stockScreen.bottom - depth, width * clamp(props.completion / 100), depth); context.clip();
-    const floor = context.createLinearGradient(stockScreen.left, 0, stockScreen.right, 0); floor.addColorStop(0, "#294b54"); floor.addColorStop(.45, "#92a9ad"); floor.addColorStop(1, "#233b42");
-    context.fillStyle = floor; context.fillRect(stockScreen.left, stockScreen.bottom - depth, width, depth);
-    context.strokeStyle = "rgba(218,245,248,.22)"; context.lineWidth = .7;
-    for (let x = stockScreen.left - depth; x < stockScreen.right + depth; x += 7) { context.beginPath(); context.moveTo(x, stockScreen.bottom); context.lineTo(x + depth, stockScreen.bottom - depth); context.stroke(); }
-    context.restore();
-  }
   if (props.spindle) {
     const pulse = .48 + Math.sin(time / 65) * .14, phase = reducedMotion ? 0 : time * .032;
     context.save(); context.globalCompositeOperation = "screen";
