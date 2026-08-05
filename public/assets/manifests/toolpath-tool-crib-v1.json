@@ -1,0 +1,83 @@
+{
+  "id": "toolpath.tool-crib.v1",
+  "version": 1,
+  "path": "/assets/workholding/toolpath-tool-crib-v1.glb",
+  "sourceBlend": "assets-src/blender/toolpath-tool-crib-v1.blend",
+  "sourceScript": "tools/blender/build-tool-crib.py",
+  "generatedAt": "2026-08-05T14:40:31.098729+00:00",
+  "sha256": "4D91D7408602DDDE0F11920395416DC14606538D0EB0FBA8687843C4BD6FEAEC",
+  "coordinateSystem": {
+    "units": "millimeters",
+    "worldUp": "+Z",
+    "machineX": "left/right",
+    "machineY": "front/back",
+    "machineZ": "vertical"
+  },
+  "slotCount": 6,
+  "slots": [
+    "toolcrib.slot.01",
+    "toolcrib.slot.02",
+    "toolcrib.slot.03",
+    "toolcrib.slot.04",
+    "toolcrib.slot.05",
+    "toolcrib.slot.06"
+  ],
+  "tools": [
+    "tool.endmill.crib.01",
+    "tool.endmill.crib.02",
+    "tool.endmill.crib.03",
+    "tool.endmill.crib.04",
+    "tool.endmill.crib.05",
+    "tool.endmill.crib.06"
+  ],
+  "objects": [
+    "toolcrib.cabinet.frame",
+    "toolcrib.cabinet.backplate",
+    "toolcrib.placard",
+    "toolcrib.slot.01",
+    "toolcrib.slot.02",
+    "toolcrib.slot.03",
+    "toolcrib.slot.04",
+    "toolcrib.slot.05",
+    "toolcrib.slot.06",
+    "tool.endmill.crib.01",
+    "tool.endmill.crib.02",
+    "tool.endmill.crib.03",
+    "tool.endmill.crib.04",
+    "tool.endmill.crib.05",
+    "tool.endmill.crib.06"
+  ],
+  "materials": [
+    "MAT_CRIB_ACCENT",
+    "MAT_CRIB_BACK",
+    "MAT_CRIB_FRAME",
+    "MAT_SLOT_CUP",
+    "MAT_TOOL_BAND",
+    "MAT_TOOL_STEEL"
+  ],
+  "triangleCount": 6648,
+  "materialCount": 6,
+  "fileSizeBytes": 428144,
+  "boundingBox": {
+    "minMm": [
+      -360.0,
+      -39.0,
+      0.0
+    ],
+    "maxMm": [
+      360.0,
+      34.0,
+      303.0
+    ],
+    "dimensionsMm": [
+      720.0,
+      73.0,
+      303.0
+    ]
+  },
+  "releaseBudgets": {
+    "trianglesMax": 40000,
+    "materialsMax": 8,
+    "glbBytesMax": 2097152
+  }
+}

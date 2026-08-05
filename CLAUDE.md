@@ -30,6 +30,7 @@ npm test
 | Live 3D Twin | `app/flagship-machining-kit.tsx` | GLB parsing, hierarchy transforms, projection, lighting, cut effects |
 | 3D presentation | `app/flagship-machining-kit.module.css` | Twin labels and orbit controls |
 | G-code game | `app/gcode/*`, `app/gcode-engine.ts` | Creative programming campaign |
+| Tool Crib 3D view | `app/gcode/tool-crib-viewer.tsx` | GLB parsing/projection for the G//CODE Stage tool reference (reuses the Live 3D Twin's renderer approach, trimmed for a static inset) |
 | Asset Lab | `app/lab/asset-pipeline/*` | Asset diagnostics and capability atlas |
 | Global navigation | `app/mode-dock.tsx` | Manual mill, G-code, and Asset Lab routes |
 
@@ -130,6 +131,32 @@ Stay under the hard ceilings. A larger budget requires a measured performance ju
 ```
 
 Review silhouette, enclosure visibility, fixture hierarchy, tool alignment, material separation, clipping, and accidental obstruction. This preview supplements the browser build; it does not replace runtime QA.
+
+### Tool Crib v1 (G//CODE Stage)
+
+A second, independent 3D asset with its own budget and manifest, modeled after real shop tool-crib management: a wall-mounted rack of six numbered sockets, each holding one cutter with a status band, rendered live in the G//CODE Stage workspace and highlighting whichever `T` number the active program has checked in.
+
+- Procedural source: `tools/blender/build-tool-crib.py`
+- Editable Blender source: `assets-src/blender/toolpath-tool-crib-v1.blend`
+- Runtime GLB: `public/assets/workholding/toolpath-tool-crib-v1.glb`
+- Integrity manifest: `public/assets/manifests/toolpath-tool-crib-v1.json`
+- Asset contract test: `tests/tool-crib.test.mjs`
+- Visual-QA renderer: `tools/blender/render-tool-crib-preview.py`
+- Runtime viewer: `app/gcode/tool-crib-viewer.tsx` (fetches the GLB, projects it with the same face-lighting math as the Live 3D Twin, and glows whichever `toolcrib.slot.NN` / `tool.endmill.crib.NN` pair matches `parsed.state.tool`)
+
+Naming contract: `toolcrib.cabinet.frame`, `toolcrib.cabinet.backplate`, `toolcrib.placard`, `toolcrib.slot.01`..`06`, `tool.endmill.crib.01`..`06`. Current budget: 15 named objects, 6,648 triangles, 6 materials, ~428 KB GLB — well under the shared hard ceiling (40,000 triangles / 8 materials / 2 MB).
+
+```powershell
+tools/blender/export-tool-crib.ps1
+```
+
+```powershell
+& "C:\Program Files\Blender Foundation\Blender 5.2\blender.exe" `
+  --background "assets-src/blender/toolpath-tool-crib-v1.blend" `
+  --python-exit-code 1 `
+  --python tools/blender/render-tool-crib-preview.py `
+  -- build/tool-crib-preview.png
+```
 
 ## Live 3D effects contract
 

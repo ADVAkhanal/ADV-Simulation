@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Bug, CheckCircle2, Copy, Droplets, Gauge, Layers, ListTree, Pause, Play, Repeat2, RotateCcw, Route, Settings2, Sparkles, StepForward, Trophy, Wrench, Zap } from "lucide-react";
 import { buildMachiningPlan, gradeMission, parseProgram, rasterize, type MachiningSetup } from "./gcode-engine";
+import ToolCribViewer from "./tool-crib-viewer";
 import styles from "./gcode.module.css";
 import readableStyles from "./readability.module.css";
 
@@ -222,7 +223,7 @@ export default function GCodeStage() {
           <div className={styles.datum} aria-hidden="true"><i/><b>G54</b><span>X0 Y0</span></div><pre aria-label="ASCII stock-removal visualization">{stock}</pre>
           <div className={styles.depthReadout}><span>TOOL POSITION</span><b>X {active?.x.toFixed(2)}</b><b>Y {active?.y.toFixed(2)}</b><b className={active?.z < 0 ? styles.cuttingDepth : ""}>Z {active?.z.toFixed(2)}</b></div>
           <div className={styles.machineState}><span className={parsed.state.spindle ? styles.stateOn : ""}><Gauge/> SPINDLE</span><span className={parsed.state.coolant ? styles.stateOn : ""}><Droplets/> COOLANT</span><span><Wrench/> T{parsed.state.tool}</span></div>
-          <div className={styles.beat} aria-hidden="true">{Array.from({ length: 12 }, (_, index) => <i key={index} style={{ height: `${18 + ((index * 19 + frame * 7) % 72)}%` }}/>)}</div>
+          <div className={styles.toolCribInset}><ToolCribViewer activeTool={parsed.state.tool}/></div>
         </div>
         <div className={styles.status} role="status"><Sparkles/>{message}</div>
       </article>
