@@ -156,6 +156,7 @@ export default function GCodeStage() {
     </header>
 
     <section className={styles.hero}>
+      <img className={styles.heroPhoto} src="/assets/2d/environment/night-shift-vmc-cell-v1.webp" alt="" aria-hidden="true" fetchPriority="high"/>
       <div><p className={styles.eyebrow}>CREATIVE CNC CAMPAIGN / SHIFT 01</p><h1>WRITE<br/><em>THE CUT.</em></h1></div>
       <div className={styles.missionCard}>
         <div><span>ACTIVE CONTRACT</span><b>{contract.client}</b></div>
@@ -204,7 +205,7 @@ export default function GCodeStage() {
       <article className={`${styles.stagePanel} ${playing ? styles.performing : ""}`}>
         <div className={styles.panelHead}><span>STOCK REMOVAL MAP / ALUMINUM 6061</span><span>SIM {progress}%</span></div>
         <div className={styles.stage}>
-          <div className={styles.halo}/><pre aria-label="ASCII stock-removal visualization">{stock}</pre>
+          <div className={styles.datum} aria-hidden="true"><i/><b>G54</b><span>X0 Y0</span></div><pre aria-label="ASCII stock-removal visualization">{stock}</pre>
           <div className={styles.depthReadout}><span>TOOL POSITION</span><b>X {active?.x.toFixed(2)}</b><b>Y {active?.y.toFixed(2)}</b><b className={active?.z < 0 ? styles.cuttingDepth : ""}>Z {active?.z.toFixed(2)}</b></div>
           <div className={styles.machineState}><span className={parsed.state.spindle ? styles.stateOn : ""}><Gauge/> SPINDLE</span><span className={parsed.state.coolant ? styles.stateOn : ""}><Droplets/> COOLANT</span><span><Wrench/> T{parsed.state.tool}</span></div>
           <div className={styles.beat} aria-hidden="true">{Array.from({ length: 12 }, (_, index) => <i key={index} style={{ height: `${18 + ((index * 19 + frame * 7) % 72)}%` }}/>)}</div>
