@@ -8,10 +8,12 @@ type Vec3 = [number, number, number];
 type Mat4 = [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
 type Face = { vertices: [Vec3, Vec3, Vec3]; color: string; node: string; metallic: number; roughness: number };
 type Scene = { faces: Face[]; bytes: number };
-type Props = { cursor: { x: number; y: number }; spindle: boolean; completion: number; load: number; variant?: "mini" | "full" };
+type Props = { cursor: { x: number; y: number }; spindle: boolean; completion: number; load: number; variant?: "mini" | "full"; material?: string; accent?: string };
 type ViewState = { yaw: number; pitch: number; zoom: number; autoOrbit: boolean };
 
 const colors = ["#24353a", "#4ae2fa", "#778b90", "#c6d4d6", "#6a7c81", "#18252a"];
+const STOCK_MATERIAL_COLORS: Record<string, string> = { "6061 AL": "rgb(174,190,194)", "7075-T6": "rgb(182,196,168)", "Ti-6Al-4V": "rgb(146,156,168)" };
+function stockMaterialColor(material?: string) { return (material && STOCK_MATERIAL_COLORS[material]) || STOCK_MATERIAL_COLORS["6061 AL"]; }
 
 function clamp(value: number, min = 0, max = 1) { return Math.max(min, Math.min(max, value)); }
 function shade(color: string, light: number, metallic: number) {
@@ -151,7 +153,7 @@ function draw(canvas: HTMLCanvasElement, scene: Scene | null, props: Props, fall
     context.beginPath(); context.moveTo(points[0].x, points[0].y); context.lineTo(points[1].x, points[1].y); context.lineTo(points[2].x, points[2].y); context.closePath();
     const illumination = faceLight(face.vertices), depthFade = clamp(.78 + points[0].depth * .16, .58, 1);
     const isStock = face.node.includes("stock"), isTool = face.node.startsWith("tool.endmill"), isSpindle = face.node.includes("spindle"), isFixture = face.node.includes("vise") || face.node.includes("fixture") || face.node.includes("jaw"), isWorklight = face.node.includes("worklight"), isEnclosure = face.node.includes("enclosure");
-    const materialColor = isStock ? "rgb(174,190,194)" : isFixture ? "rgb(79,101,108)" : isSpindle ? "rgb(65,84,91)" : isEnclosure ? "rgb(37,49,54)" : face.color;
+    const materialColor = isStock ? stockMaterialColor(props.material) : isFixture ? "rgb(79,101,108)" : isSpindle ? "rgb(65,84,91)" : isEnclosure ? "rgb(37,49,54)" : face.color;
     context.globalAlpha = (isStock ? Math.max(.34, 1 - props.completion / 135) : .98) * depthFade;
     context.fillStyle = isTool && props.spindle ? "#7ff1ff" : isWorklight ? "#ff9b3f" : shade(materialColor, illumination, face.metallic); context.fill();
     context.strokeStyle = isTool ? "#e8fdff" : isStock ? "rgba(235,250,252,.28)" : `rgba(208,232,236,${.08 + (1 - face.roughness) * .11})`; context.lineWidth = isTool ? 1.15 : isStock ? .65 : .45; context.stroke();
@@ -210,8 +212,8 @@ export default function FlagshipMachiningKit(props: Props) {
   }, [status]);
   const resetView = () => { viewRef.current = { yaw: -.72, pitch: -.42, zoom: 1, autoOrbit: true }; setAutoOrbit(true); trackAnonymous("twin_view_reset", { surface: props.variant ?? "mini" }); };
   return <aside className={`${styles.kit} ${props.variant === "full" ? styles.full : ""}`} aria-label="Live 3D machining kit visualization">
-    <canvas ref={canvasRef} tabIndex={props.variant === "full" ? 0 : -1} aria-label={props.variant === "full" ? "Interactive 3D machine assembly. Drag to orbit and use the mouse wheel to zoom." : "Live 3D machine assembly preview"} onPointerDown={(event) => { if (props.variant !== "full") return; dragRef.current = { x: event.clientX, y: event.clientY }; event.currentTarget.setPointerCapture(event.pointerId); setAutoOrbit(false); }} onPointerMove={(event) => { const start = dragRef.current; if (!start || props.variant !== "full") return; viewRef.current.yaw += (event.clientX - start.x) * .008; viewRef.current.pitch = clamp(viewRef.current.pitch + (event.clientY - start.y) * .006, -.95, .2); dragRef.current = { x: event.clientX, y: event.clientY }; }} onPointerUp={() => { dragRef.current = null; }} onPointerCancel={() => { dragRef.current = null; }} onWheel={(event) => { if (props.variant !== "full") return; event.preventDefault(); viewRef.current.zoom = clamp(viewRef.current.zoom - event.deltaY * .001, .72, 1.55); }} onDoubleClick={resetView}/><div className={styles.label}><i className={status === "ready" ? styles.live : ""}/><span>MACHINING KIT V1</span><b>{status === "loading" ? "DECODING" : status === "ready" ? "LIVE GLB" : "SAFE FALLBACK"}</b></div>
-    <div className={styles.signal}><span>XYZ BIND</span><b>{props.spindle ? "CUTTING" : "SAFE Z"}</b><em>{props.load}% LOAD</em></div><div className={styles.renderSpec}><span>HIERARCHY</span><i/> <span>LIVE CUT FX</span><i/> <span>METAL PBR</span></div>
+    <canvas ref={canvasRef} tabIndex={props.variant === "full" ? 0 : -1} aria-label={props.variant === "full" ? "Interactive 3D machine assembly. Drag to orbit and use the mouse wheel to zoom." : "Live 3D machine assembly preview"} onPointerDown={(event) => { if (props.variant !== "full") return; dragRef.current = { x: event.clientX, y: event.clientY }; event.currentTarget.setPointerCapture(event.pointerId); setAutoOrbit(false); }} onPointerMove={(event) => { const start = dragRef.current; if (!start || props.variant !== "full") return; viewRef.current.yaw += (event.clientX - start.x) * .008; viewRef.current.pitch = clamp(viewRef.current.pitch + (event.clientY - start.y) * .006, -.95, .2); dragRef.current = { x: event.clientX, y: event.clientY }; }} onPointerUp={() => { dragRef.current = null; }} onPointerCancel={() => { dragRef.current = null; }} onWheel={(event) => { if (props.variant !== "full") return; event.preventDefault(); viewRef.current.zoom = clamp(viewRef.current.zoom - event.deltaY * .001, .72, 1.55); }} onDoubleClick={resetView}/><div className={styles.label}><i className={status === "ready" ? styles.live : ""} style={status === "ready" && props.accent ? { background: props.accent, boxShadow: `0 0 12px ${props.accent}` } : undefined}/><span>MACHINING KIT V1</span><b>{status === "loading" ? "DECODING" : status === "ready" ? "LIVE GLB" : "SAFE FALLBACK"}</b></div>
+    <div className={styles.signal}><span>{props.material ?? "XYZ BIND"}</span><b>{props.spindle ? "CUTTING" : "SAFE Z"}</b><em>{props.load}% LOAD</em></div><div className={styles.renderSpec}><span>HIERARCHY</span><i/> <span>LIVE CUT FX</span><i/> <span>METAL PBR</span></div>
     {props.variant === "full" && <div className={styles.orbitControls}><span>DRAG TO ORBIT · WHEEL TO ZOOM</span><button aria-pressed={autoOrbit} onClick={() => setAutoOrbit((value) => !value)}>{autoOrbit ? "PAUSE ORBIT" : "AUTO ORBIT"}</button><button onClick={resetView}>RESET VIEW</button></div>}
   </aside>;
 }
