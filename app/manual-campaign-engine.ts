@@ -89,6 +89,8 @@ export function deriveFlowPoints(correctCells: number, chain: number) {
   return { multiplier, points: Math.max(0, Math.round(correctCells * 100 * multiplier)) };
 }
 
+export function deriveMasteryRank(score: number) { return score>=96?"S":score>=88?"A":score>=76?"B":"C"; }
+
 export function gradeManualRun(material: Uint8Array, contract: ManualContract, overcut: number, finishPenalty: number, elapsed: number, breaks: number) {
   const completion=manualCompletion(material,contract.id);
   const geometry=Math.min(46,completion/90*46);
@@ -97,7 +99,7 @@ export function gradeManualRun(material: Uint8Array, contract: ManualContract, o
   const time=Math.max(0,10-Math.max(0,elapsed-contract.par)*.1);
   const score=Math.max(0,Math.min(100,Math.round(geometry+precision+finish+time-breaks*5)));
   const accepted=completion>=90&&overcut<=contract.tolerance;
-  const rank=!accepted?"REWORK":score>=96?"S":score>=88?"A":score>=76?"B":"C";
+  const rank=!accepted?"REWORK":deriveMasteryRank(score);
   return {completion,geometry:Math.round(geometry),precision:Math.round(precision),finish:Math.round(finish),time:Math.round(time),breakPenalty:breaks*5,score,accepted,rank,payout:accepted?Math.round(contract.reward*(.55+score/220)):120};
 }
 

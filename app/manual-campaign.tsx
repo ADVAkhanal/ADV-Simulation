@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { animate, stagger } from "animejs";
 import { Activity, Award, BookOpen, CircleGauge, CircleHelp, Crosshair, Factory, Gamepad2, Gauge, Hexagon, Pause, Play, RotateCcw, ScanLine, Share2, ShieldCheck, Sparkles, Target, Timer, Volume2, VolumeX, Waves, Wrench, X, Zap } from "lucide-react";
-import { MANUAL_CONTRACTS, MILL_COLS, MILL_ROWS, MILL_TOOLS, appendShopRunLog, createManualStock, cutManualStock, deriveFlowPoints, deriveManualMission, deriveShopSkillProgress, gradeManualRun, isManualTarget, manualCompletion, type ManualContract, type ShopBestRun, type ShopRunLogEntry } from "./manual-campaign-engine";
+import { MANUAL_CONTRACTS, MILL_COLS, MILL_ROWS, MILL_TOOLS, appendShopRunLog, createManualStock, cutManualStock, deriveFlowPoints, deriveManualMission, deriveMasteryRank, deriveShopSkillProgress, gradeManualRun, isManualTarget, manualCompletion, type ManualContract, type ShopBestRun, type ShopRunLogEntry } from "./manual-campaign-engine";
 import { trackAnonymous } from "./anonymous-analytics";
 import FlagshipMachiningKit from "./flagship-machining-kit";
 import { shareResultCard } from "./result-card";
@@ -539,8 +539,9 @@ function ContractSelect({ save, startContract, learningLevel, setLearningLevel }
     <div className={styles.disciplineRail}><span>PROCESS CAPABILITY / FICTIONAL ARCHETYPES</span><div><i className={styles.millGlyph}/><b>3-AXIS MILLING</b><small>PROFILE · POCKET · DATUM</small></div><div><i className={styles.turnGlyph}/><b>TURNING</b><small>OD · ID · GROOVE</small></div><div><i className={styles.axisGlyph}/><b>5-AXIS</b><small>VECTOR · TILT · BLEND</small></div><div><i className={styles.edmGlyph}/><b>WIRE EDM</b><small>CONTOUR · TAPER · SKIM</small></div></div>
     <div className={styles.contractGrid}>{MANUAL_CONTRACTS.map((contract, index) => {
       const visual = CONTRACT_VISUALS[contract.id];
+      const best = save.bests[contract.id];
       return <button key={contract.id} data-contract={contract.id} style={{ "--card-accent": contract.color } as React.CSSProperties} onClick={() => startContract(index)}>
-        <header><span>0{index + 1}</span><b>{save.cleared.includes(contract.id) ? "CLEARED" : index === 0 || save.cleared.length >= index ? "AVAILABLE" : "CHALLENGE"}</b></header>
+        <header><span>0{index + 1}</span><b>{save.cleared.includes(contract.id) ? "CLEARED" : index === 0 || save.cleared.length >= index ? "AVAILABLE" : "CHALLENGE"}</b>{best && <em style={{ color: contract.color }}>{deriveMasteryRank(best.score)} MASTERY · {best.score}</em>}</header>
         <div className={styles.geometry}><div className={styles.artifactPlate}><span>{visual.artifact}</span><b>{contract.program}</b></div><div className={styles.geometryPart}><img src={visual.image} alt="" loading="lazy"/><GeometryPreview contract={contract}/><i aria-hidden="true"/></div><div className={styles.geometryDatum} aria-hidden="true"><i/><b>G54</b><span>X0 Y0</span></div><div className={styles.geometrySpec}><span>{visual.route}</span><span>{visual.stock}</span><span>PROFILE ±{contract.tolerance}</span></div></div>
         <small>{contract.client}</small><h2>{contract.title}</h2><p>{contract.brief}</p>
         <div className={styles.processStrip}><span>MAT <b>{contract.material}</b></span><span>SURFACE <b>{visual.finish}</b></span><span>WCS <b>G54</b></span></div>
