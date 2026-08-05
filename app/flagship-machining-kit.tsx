@@ -9,12 +9,21 @@ type Vec3 = [number, number, number];
 type Mat4 = [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
 type Face = { vertices: [Vec3, Vec3, Vec3]; color: string; node: string; metallic: number; roughness: number };
 type Scene = { faces: Face[]; bytes: number };
-type Props = { cursor: { x: number; y: number }; spindle: boolean; completion: number; load: number; variant?: "mini" | "full"; material?: string; accent?: string; verbose?: boolean; cells?: Uint8Array; contractId?: ManualContract["id"] };
+type Props = { cursor: { x: number; y: number }; spindle: boolean; completion: number; load: number; variant?: "mini" | "full"; material?: string; accent?: string; verbose?: boolean; cells?: Uint8Array; contractId?: ManualContract["id"]; toolpath?: Array<{ x: number; y: number }> };
 type ViewState = { yaw: number; pitch: number; zoom: number; autoOrbit: boolean };
 
 const colors = ["#24353a", "#4ae2fa", "#778b90", "#c6d4d6", "#6a7c81", "#18252a"];
 const STOCK_MATERIAL_COLORS: Record<string, string> = { "6061 AL": "rgb(174,190,194)", "7075-T6": "rgb(182,196,168)", "Ti-6Al-4V": "rgb(146,156,168)" };
 function stockMaterialColor(material?: string) { return (material && STOCK_MATERIAL_COLORS[material]) || STOCK_MATERIAL_COLORS["6061 AL"]; }
+// Aluminum swarf stays bright and silvery. Titanium runs hot and poorly
+// conducts heat away from the edge, so its chips discolor blue/violet -
+// the classic "blue chip" tell of a titanium cut.
+const CHIP_MATERIAL_COLORS: Record<string, { cool: string; hot: string; hotRate: number }> = {
+  "6061 AL": { cool: "205,230,232", hot: "255,178,80", hotRate: .25 },
+  "7075-T6": { cool: "222,224,196", hot: "255,196,90", hotRate: .3 },
+  "Ti-6Al-4V": { cool: "150,178,232", hot: "120,90,220", hotRate: .55 },
+};
+function chipMaterialColors(material?: string) { return (material && CHIP_MATERIAL_COLORS[material]) || CHIP_MATERIAL_COLORS["6061 AL"]; }
 
 function clamp(value: number, min = 0, max = 1) { return Math.max(min, Math.min(max, value)); }
 function shade(color: string, light: number, metallic: number) {
@@ -35,8 +44,8 @@ function stockBounds(faces: Face[]): { minX: number; maxX: number; minDepth: num
     topY: Math.max(...points.map((point) => point[1])),
   };
 }
-function pocketFaces(scene: Scene, cells: Uint8Array, contractId: ManualContract["id"]): Face[] {
-  const bounds = stockBounds(scene.faces); if (!bounds) return [];
+type StockBounds = NonNullable<ReturnType<typeof stockBounds>>;
+function pocketFaces(bounds: StockBounds, cells: Uint8Array, contractId: ManualContract["id"]): Face[] {
   const { minX, maxX, minDepth, maxDepth, topY } = bounds, spanX = maxX - minX, spanDepth = maxDepth - minDepth, recess = topY - Math.max(3, spanX * .02);
   const faces: Face[] = [];
   for (let row = 0; row < MILL_ROWS; row += 1) for (let col = 0; col < MILL_COLS; col += 1) {
@@ -173,7 +182,8 @@ function draw(canvas: HTMLCanvasElement, scene: Scene | null, props: Props, fall
     workGlow.addColorStop(0, `rgba(255,175,78,${.3 + props.load / 330})`); workGlow.addColorStop(.25, "rgba(80,230,255,.16)"); workGlow.addColorStop(1, "rgba(0,0,0,0)");
     context.save(); context.globalCompositeOperation = "screen"; context.fillStyle = workGlow; context.fillRect(0, 0, bounds.width, bounds.height); context.restore();
   }
-  const pockets = props.cells && props.contractId ? pocketFaces(scene, props.cells, props.contractId) : [];
+  const bounds3d = stockBounds(scene.faces);
+  const pockets = props.cells && props.contractId && bounds3d ? pocketFaces(bounds3d, props.cells, props.contractId) : [];
   const projected = [...scene.faces, ...pockets].map((face) => ({ face, points: face.vertices.map((point) => project(point, face.node)), depth: face.vertices.reduce((sum, point) => sum + project(point, face.node).depth, 0) / 3 })).sort((a, b) => a.depth - b.depth);
   projected.forEach(({ face, points }) => {
     context.beginPath(); context.moveTo(points[0].x, points[0].y); context.lineTo(points[1].x, points[1].y); context.lineTo(points[2].x, points[2].y); context.closePath();
@@ -185,14 +195,25 @@ function draw(canvas: HTMLCanvasElement, scene: Scene | null, props: Props, fall
     context.strokeStyle = isTool ? "#e8fdff" : isPocket ? "rgba(8,14,16,.4)" : isStock ? "rgba(235,250,252,.28)" : `rgba(208,232,236,${.08 + (1 - face.roughness) * .11})`; context.lineWidth = isTool ? 1.15 : isPocket ? .35 : isStock ? .65 : .45; context.stroke();
   });
   context.globalAlpha = 1;
+  if (bounds3d && props.toolpath && props.toolpath.length > 1) {
+    const { minX, maxX, minDepth, maxDepth, topY } = bounds3d, spanX = maxX - minX, spanDepth = maxDepth - minDepth;
+    const trailPoints = props.toolpath.map((point) => project([minX + (point.x / (MILL_COLS - 1)) * spanX, topY + 2, minDepth + (point.y / (MILL_ROWS - 1)) * spanDepth], "toolpath.trail"));
+    context.save(); context.lineJoin = "round"; context.lineCap = "round";
+    for (let index = 1; index < trailPoints.length; index += 1) {
+      const age = index / trailPoints.length, from = trailPoints[index - 1], to = trailPoints[index];
+      context.strokeStyle = `${props.accent ?? "#7ff1ff"}${Math.round(age * 200 + 40).toString(16).padStart(2, "0")}`;
+      context.lineWidth = 1.4; context.beginPath(); context.moveTo(from.x, from.y); context.lineTo(to.x, to.y); context.stroke();
+    }
+    context.restore();
+  }
   if (props.spindle) {
     const pulse = .48 + Math.sin(time / 65) * .14, phase = reducedMotion ? 0 : time * .032;
     context.save(); context.globalCompositeOperation = "screen";
     context.strokeStyle = `rgba(128,241,255,${pulse})`; context.lineWidth = 1.2; context.beginPath(); context.ellipse(cutter.x, cutter.y, 15 + props.load * .05, 5 + props.load * .018, 0, 0, Math.PI * 2); context.stroke();
     for (let blade = 0; blade < 3; blade += 1) { const angle = phase + blade * Math.PI * 2 / 3; context.strokeStyle = "rgba(226,253,255,.72)"; context.beginPath(); context.moveTo(cutter.x, cutter.y); context.lineTo(cutter.x + Math.cos(angle) * 14, cutter.y + Math.sin(angle) * 5); context.stroke(); }
     for (const side of [-1, 1]) { context.strokeStyle = "rgba(93,225,244,.34)"; context.lineWidth = 1.1; context.beginPath(); context.moveTo(coolant.x + side * 8, coolant.y); context.quadraticCurveTo((coolant.x + cutter.x) / 2 + side * 15, cutter.y - 12, cutter.x + side * 5, cutter.y); context.stroke(); }
-    const chips = props.variant === "full" ? 20 : 9;
-    for (let index = 0; index < chips; index += 1) { const age = ((time / 720 + index * .173) % 1), angle = -2.7 + (index % 7) * .23; const reach = (18 + (index % 5) * 7) * age; const x = cutter.x + Math.cos(angle) * reach, y = cutter.y + Math.sin(angle) * reach + age * age * 26; context.fillStyle = index % 4 ? `rgba(205,230,232,${1 - age})` : `rgba(255,178,80,${.8 - age * .7})`; context.fillRect(x, y, 1.5 + (index % 2), .8); }
+    const chips = props.variant === "full" ? 20 : 9, chipColors = chipMaterialColors(props.material);
+    for (let index = 0; index < chips; index += 1) { const age = ((time / 720 + index * .173) % 1), angle = -2.7 + (index % 7) * .23; const reach = (18 + (index % 5) * 7) * age; const x = cutter.x + Math.cos(angle) * reach, y = cutter.y + Math.sin(angle) * reach + age * age * 26; const isHot = (index * 7919) % 100 / 100 < chipColors.hotRate; context.fillStyle = isHot ? `rgba(${chipColors.hot},${.8 - age * .7})` : `rgba(${chipColors.cool},${1 - age})`; context.fillRect(x, y, 1.5 + (index % 2), .8); }
     context.restore();
   }
   const vignette = context.createRadialGradient(bounds.width / 2, bounds.height / 2, Math.min(bounds.width, bounds.height) * .25, bounds.width / 2, bounds.height / 2, Math.max(bounds.width, bounds.height) * .7);
