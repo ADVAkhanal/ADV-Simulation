@@ -18,6 +18,7 @@ type SaveData = { credits: number; reputation: number; cleared: string[]; bests:
 type Chip = { x: number; y: number; dx: number; dy: number; born: number; hot: boolean };
 type GameEvent = { id: number; kind: "objective" | "warning" | "reward"; title: string; detail: string };
 const DEFAULT_SAVE: SaveData = { credits: 250, reputation: 0, cleared: [], bests: {}, log: [] };
+const SWAP_TOOL_COST = 45;
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 const STOCK_VIEW = { x: 80, y: 52, width: 960, height: 560 }; // 240 × 140 mm at an exact 4 px/mm drawing scale.
 const LEARNING_LENSES = {
@@ -120,9 +121,17 @@ export default function ManualCampaign() {
 
   useEffect(() => {
     if (screen !== "play" || !spindle || paused) return;
+    const timer = window.setInterval(() => setElapsed((value) => value + 1), 1000);
+    return () => window.clearInterval(timer);
+  }, [screen, spindle, paused]);
+
+  // Heat sheds fastest at safe Z (tool retracted, full coolant exposure) and
+  // only trickles off while the spindle keeps spinning idle - feed hold is a
+  // real cooldown lever, not just a pause.
+  useEffect(() => {
+    if (screen !== "play" || paused) return;
     const timer = window.setInterval(() => {
-      setElapsed((value) => value + 1);
-      setHeat((value) => clamp(value - 0.35, 18, 100));
+      setHeat((value) => clamp(value - (spindle ? 0.35 : 2.4), 18, 100));
       setLoad((value) => Math.max(0, value - 4));
     }, 1000);
     return () => window.clearInterval(timer);
@@ -427,6 +436,16 @@ export default function ManualCampaign() {
   }, [contractIndex, cursor.x, cursor.y, logOpen, paused, result?.accepted, retryContract, screen, spindle, tourStep, viewMode]);
 
   const restoreTool = () => { setCondition(100); setHeat(25); setSpindle(false); setMessage("Fresh cutter loaded. Verify offset before restart."); };
+
+  const swapTool = () => {
+    if (spindle) { setMessage("FEED HOLD first — stop the spindle before a tool swap."); return; }
+    if (condition >= 98 && heat <= 30) { setMessage("Cutter is already fresh and cool. No swap needed."); return; }
+    if (save.credits < SWAP_TOOL_COST) { setMessage(`Not enough credits for a tool swap — need ${SWAP_TOOL_COST} CR.`); return; }
+    setSave((current) => ({ ...current, credits: current.credits - SWAP_TOOL_COST }));
+    setCondition(100); setHeat(20);
+    setMessage(`Cutter swapped for ${SWAP_TOOL_COST} CR — fresh edge, safe temperature.`);
+    trackAnonymous("manual_tool_swap", { contract: contract.id, tool: tool.id, cost: SWAP_TOOL_COST });
+  };
   const inspectionBands = result ? [
     { label: "PROFILE", value: result.precision / 30 * 100, reading: `${overcut}/${contract.tolerance} CELLS` },
     { label: "MATERIAL", value: result.completion, reading: `${result.completion}% CLEAR` },
@@ -458,6 +477,7 @@ export default function ManualCampaign() {
           <div className={styles.strategy}><Hexagon/><p><b>PROCESS NOTE</b>{tool.role}. Larger cutters remove stock faster, but load more cells and cannot resolve tight geometry.</p></div>
           <div className={styles.cellLearning}><span>EXPLANATION DEPTH</span><div>{(Object.keys(LEARNING_LENSES) as LearningLevel[]).map((level) => <button key={level} aria-pressed={learningLevel === level} onClick={() => { setLearningLevel(level); trackAnonymous("learning_lens_change", { level, surface: "machine" }); }}>{LEARNING_LENSES[level].label}</button>)}</div><p><b>{LEARNING_LENSES[learningLevel].eyebrow}</b>{LEARNING_LENSES[learningLevel].play}</p></div>
           <button className={styles.reset} onClick={() => { resetRun(); setMessage("Stock reset. Setup retained."); }}><RotateCcw/> RESET STOCK</button>
+          <button className={styles.reset} onClick={swapTool}><Wrench/> SWAP TOOL ({SWAP_TOOL_COST} CR)</button>
         </aside>
 
         <article className={styles.machine}>
@@ -565,7 +585,7 @@ function ContractSelect({ save, startContract, learningLevel, setLearningLevel }
         <button aria-pressed={showcaseTab === "capability"} onClick={() => setShowcaseTab("capability")}>PROCESS CAPABILITY</button>
         <button aria-pressed={showcaseTab === "ladder"} onClick={() => setShowcaseTab("ladder")}>SKILL LADDER</button>
       </nav>
-      {showcaseTab === "machine" && <div className={styles.landingCell}><FlagshipMachiningKit cursor={{ x: 13.5, y: 7.5 }} spindle={false} completion={0} load={0}/><section className={styles.stageAnnotations} aria-hidden="true"><span className={styles.calloutSpindle}><b>01</b> Z-AXIS / SPINDLE</span><span className={styles.calloutWork}><b>02</b> G54 / STOCK TOP</span><span className={styles.calloutFixture}><b>03</b> FIXTURE DATUM</span><i className={styles.stageCenterline}/></section><div className={styles.landingCopy}><small>PRODUCTION GEOMETRY / MACHINING KIT V1</small><h2>THE MACHINE IS<br/><em>THE STAGE.</em></h2><p>A complete open-front VMC cell surrounds the playable cut: spindle and holder, coolant manifold, vise and stock, Z bellows, cable chain, pendant, guards, chip tray, and six-slot table.</p><dl><div><dt>ENVELOPE</dt><dd>998 × 600 × 808 MM</dd></div><div><dt>STOCK</dt><dd>240 × 140 × 18 MM</dd></div><div><dt>REFERENCE</dt><dd>G54 / TOP CENTER</dd></div><div><dt>ASSET</dt><dd>11,516 TRI / 7 MAT</dd></div></dl></div></div>}
+      {showcaseTab === "machine" && <div className={styles.landingCell}><FlagshipMachiningKit cursor={{ x: 13.5, y: 7.5 }} spindle={false} completion={0} load={0} interactive/><section className={styles.stageAnnotations} aria-hidden="true"><span className={styles.calloutSpindle}><b>01</b> Z-AXIS / SPINDLE</span><span className={styles.calloutWork}><b>02</b> G54 / STOCK TOP</span><span className={styles.calloutFixture}><b>03</b> FIXTURE DATUM</span><i className={styles.stageCenterline}/></section><div className={styles.landingCopy}><small>PRODUCTION GEOMETRY / MACHINING KIT V1</small><h2>THE MACHINE IS<br/><em>THE STAGE.</em></h2><p>A complete open-front VMC cell surrounds the playable cut: spindle and holder, coolant manifold, vise and stock, Z bellows, cable chain, pendant, guards, chip tray, and six-slot table.</p><dl><div><dt>ENVELOPE</dt><dd>998 × 600 × 808 MM</dd></div><div><dt>STOCK</dt><dd>240 × 140 × 18 MM</dd></div><div><dt>REFERENCE</dt><dd>G54 / TOP CENTER</dd></div><div><dt>ASSET</dt><dd>11,516 TRI / 7 MAT</dd></div></dl></div></div>}
       {showcaseTab === "doctrine" && <section className={styles.metrologyDeck} aria-label="The geometry behind the machining experience"><header><small>METROLOGY / VISUAL DOCTRINE</small><h2>BEAUTY WITH<br/><em>A TOLERANCE.</em></h2><p>Every line carries a job: locate the work, communicate force, or predict the surface. Decoration is subordinate to process truth.</p></header><article><div className={styles.datumDiagram}><i/><b>G54</b><span>X0 · Y0 · Z0</span></div><small>01 / DATUM STACK</small><h3>Locate before motion.</h3><p>Orthogonal references make the setup legible at a glance and anchor every measured decision.</p><dl><div><dt>FRAME</dt><dd>3-2-1</dd></div><div><dt>ORIGIN</dt><dd>G54</dd></div></dl></article><article><div className={styles.engagementDiagram}><i/><b>ae</b><span>0–165°</span></div><small>02 / CUTTER ENGAGEMENT</small><h3>Show the force, not noise.</h3><p>The amber arc and force vector reveal radial engagement while load changes in real time.</p><dl><div><dt>VECTOR</dt><dd>Ft</dd></div><div><dt>LIMIT</dt><dd>84%</dd></div></dl></article><article><div className={styles.finishDiagram}><i/><b>Ra</b><span>µm / SIM</span></div><small>03 / SURFACE TRACE</small><h3>Make quality visible.</h3><p>Feed, cutter choice, and damage resolve into a finish estimate instead of an arbitrary glow.</p><dl><div><dt>TRACE</dt><dd>Ra</dd></div><div><dt>STATE</dt><dd>LIVE</dd></div></dl></article></section>}
       {showcaseTab === "lens" && <section className={styles.learningLens} aria-label="Choose explanation depth"><header><small>LEARNING LENS / SAME GAME, THREE DEPTHS</small><h2>HOW DEEP<br/><em>SHOULD WE GO?</em></h2><p>Change the explanation, never the challenge. Start simple and reveal the engineering when curiosity catches up.</p></header><div className={styles.lensContent}><nav aria-label="Explanation level">{(Object.keys(LEARNING_LENSES) as LearningLevel[]).map((level) => <button key={level} aria-pressed={learningLevel === level} onClick={() => { setLearningLevel(level); trackAnonymous("learning_lens_change", { level, surface: "landing" }); }}><span>{LEARNING_LENSES[level].label}</span><small>{LEARNING_LENSES[level].eyebrow}</small></button>)}</nav><article><small>{lens.eyebrow}</small><h3>{lens.title}</h3><p>{lens.summary}</p><div>{lens.concepts.map(([term, explanation], index) => <section key={term}><i>0{index + 1}</i><b>{term}</b><span>{explanation}</span></section>)}</div><footer>SELECTED LENS <b>{lens.label}</b><span>CHANGE ANYTIME INSIDE THE CELL</span></footer></article></div></section>}
       {showcaseTab === "capability" && <div className={styles.disciplineRail}><span>PROCESS CAPABILITY / FICTIONAL ARCHETYPES</span><div><i className={styles.millGlyph}/><b>3-AXIS MILLING</b><small>PROFILE · POCKET · DATUM</small></div><div><i className={styles.turnGlyph}/><b>TURNING</b><small>OD · ID · GROOVE</small></div><div><i className={styles.axisGlyph}/><b>5-AXIS</b><small>VECTOR · TILT · BLEND</small></div><div><i className={styles.edmGlyph}/><b>WIRE EDM</b><small>CONTOUR · TAPER · SKIM</small></div></div>}
