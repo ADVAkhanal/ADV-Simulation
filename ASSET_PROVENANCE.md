@@ -18,4 +18,12 @@ The Asset Lab also uses original procedural geometry generated in Blender 5.2 by
 - The prompt excluded brands, people, readable text, real inventory, customer parts, unsafe sparks, and impossible machine geometry.
 - The playable machine remains repository-owned procedural Blender geometry. No image-derived geometry, manufacturer CAD, or third-party textures are bundled in the GLB.
 
+## 2D production art pack v1
+
+- Five original images were created with OpenAI's built-in image generation tool on 2026-08-05: three fictional first-article contract portraits, one night-shift VMC environment plate, and one twelve-emblem achievement atlas.
+- Full-resolution PNG masters live under `assets-src/2d/`; optimized runtime WebP derivatives live under `public/assets/2d/` and are hash-registered in `public/assets/manifests/toolpath-2d-art-pack-v1.json`.
+- Prompts required original, technically plausible machining forms and excluded readable text, logos, people, real brands, customer geometry, identifiable inventory, unsafe sparks, impossible machinery, and watermarks.
+- The contract portraits provide material and depth reference only. Deterministic contract geometry remains overlaid and authoritative for gameplay.
+- The environment plate is representative game-world artwork, not a real facility photograph. The achievement atlas contains symbols only and makes no certification claim.
+
 No prior company photographs are used by the playable surface. The machine capability kit is deliberately fictional and communicates process categories without claiming or revealing actual company inventory.

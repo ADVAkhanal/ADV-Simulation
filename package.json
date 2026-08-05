@@ -7,7 +7,7 @@
     "dev": "node ./node_modules/vinext/dist/cli.js dev",
     "build": "node ./node_modules/vinext/dist/cli.js build",
     "start": "node ./node_modules/vinext/dist/cli.js start",
-    "test": "npm run build && node --test tests/homepage.test.mjs tests/gcode-engine.test.mjs tests/manual-campaign.test.mjs tests/glb-asset.test.mjs tests/machining-kit.test.mjs",
+    "test": "npm run build && node --test tests/homepage.test.mjs tests/gcode-engine.test.mjs tests/manual-campaign.test.mjs tests/glb-asset.test.mjs tests/machining-kit.test.mjs tests/2d-art-pack.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"
   },

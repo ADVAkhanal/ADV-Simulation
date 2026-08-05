@@ -32,9 +32,9 @@ const ROLE_LADDER = [
   { threshold: 250, level: "L3", role: "CNC PROGRAMMER ALIGNMENT", code: "O*NET 51-9162.00", focus: "Plan sequence · define paths · verify simulation", evidence: "250 best-run XP" },
 ] as const;
 const CONTRACT_VISUALS = {
-  drive: { artifact: "DRIVE INTERFACE", route: "PROFILE + BORE", stock: "PLATE / 18 MM", finish: "MILL / BRUSH" },
-  rib: { artifact: "LIGHTWEIGHT RIB", route: "WEBS + CONTOUR", stock: "PLATE / 22 MM", finish: "MILL / BLEND" },
-  bracket: { artifact: "OPTICAL BRACKET", route: "BOSS + DATUM", stock: "BLOCK / 32 MM", finish: "MILL / SATIN" },
+  drive: { artifact: "DRIVE INTERFACE", route: "PROFILE + BORE", stock: "PLATE / 18 MM", finish: "MILL / BRUSH", image: "/assets/2d/contracts/emergency-drive-plate-v1.webp" },
+  rib: { artifact: "LIGHTWEIGHT RIB", route: "WEBS + CONTOUR", stock: "PLATE / 22 MM", finish: "MILL / BLEND", image: "/assets/2d/contracts/orbital-structural-rib-v1.webp" },
+  bracket: { artifact: "OPTICAL BRACKET", route: "BOSS + DATUM", stock: "BLOCK / 32 MM", finish: "MILL / SATIN", image: "/assets/2d/contracts/sensor-bracket-v1.webp" },
 } as const;
 const TOUR_STEPS = [
   { code: "01", eyebrow: "NAVIGATION", title: "Three surfaces. One shop.", body: "Use the bottom dock to move between hands-on milling, G-code programming, and the 3D asset lab. Your current mode is always highlighted." },
@@ -541,7 +541,7 @@ function ContractSelect({ save, startContract, learningLevel, setLearningLevel }
       const visual = CONTRACT_VISUALS[contract.id];
       return <button key={contract.id} data-contract={contract.id} style={{ "--card-accent": contract.color } as React.CSSProperties} onClick={() => startContract(index)}>
         <header><span>0{index + 1}</span><b>{save.cleared.includes(contract.id) ? "CLEARED" : index === 0 || save.cleared.length >= index ? "AVAILABLE" : "CHALLENGE"}</b></header>
-        <div className={styles.geometry}><div className={styles.artifactPlate}><span>{visual.artifact}</span><b>{contract.program}</b></div><div className={styles.geometryPart}><GeometryPreview contract={contract}/><i aria-hidden="true"/></div><div className={styles.geometryDatum} aria-hidden="true"><i/><b>G54</b><span>X0 Y0</span></div><div className={styles.geometrySpec}><span>{visual.route}</span><span>{visual.stock}</span><span>PROFILE ±{contract.tolerance}</span></div></div>
+        <div className={styles.geometry}><div className={styles.artifactPlate}><span>{visual.artifact}</span><b>{contract.program}</b></div><div className={styles.geometryPart}><img src={visual.image} alt="" loading="lazy"/><GeometryPreview contract={contract}/><i aria-hidden="true"/></div><div className={styles.geometryDatum} aria-hidden="true"><i/><b>G54</b><span>X0 Y0</span></div><div className={styles.geometrySpec}><span>{visual.route}</span><span>{visual.stock}</span><span>PROFILE ±{contract.tolerance}</span></div></div>
         <small>{contract.client}</small><h2>{contract.title}</h2><p>{contract.brief}</p>
         <div className={styles.processStrip}><span>MAT <b>{contract.material}</b></span><span>SURFACE <b>{visual.finish}</b></span><span>WCS <b>G54</b></span></div>
         <footer><span>{contract.par}S PAR</span><span>{contract.reward.toLocaleString()} CR</span><strong>{index === 0 ? "FLAGSHIP / ENTER CELL" : "ENTER CELL"} &rarr;</strong></footer>
