@@ -75,6 +75,7 @@ export default function ManualCampaign() {
   const [condition, setCondition] = useState(100);
   const [load, setLoad] = useState(0);
   const [overcut, setOvercut] = useState(0);
+  const [fixtureStrikes, setFixtureStrikes] = useState(0);
   const [finishPenalty, setFinishPenalty] = useState(0);
   const [breaks, setBreaks] = useState(0);
   const [elapsed, setElapsed] = useState(0);
@@ -190,6 +191,10 @@ export default function ManualCampaign() {
         neighbors.forEach(([dx,dy], edge) => { if (!isManualTarget(contract.id, col + dx, row + dy)) { context.beginPath(); if (edge === 0) { context.moveTo(x,y); context.lineTo(x,y+ch); } if (edge === 1) { context.moveTo(x+cw,y); context.lineTo(x+cw,y+ch); } if (edge === 2) { context.moveTo(x,y); context.lineTo(x+cw,y); } if (edge === 3) { context.moveTo(x,y+ch); context.lineTo(x+cw,y+ch); } context.stroke(); } });
       }
     }
+    // Vise clamp line: the outer ring of cells sits under the fixture jaws.
+    context.save(); context.strokeStyle = "#ffb020c0"; context.lineWidth = 2; context.setLineDash([7, 5]);
+    context.strokeRect(STOCK_VIEW.x + cw, STOCK_VIEW.y + ch, STOCK_VIEW.width - cw * 2, STOCK_VIEW.height - ch * 2);
+    context.restore();
 
     // Brushed finish and machining witness marks are clipped to the stock face.
     context.save(); context.beginPath(); context.rect(STOCK_VIEW.x, STOCK_VIEW.y, STOCK_VIEW.width, STOCK_VIEW.height); context.clip();
@@ -264,7 +269,7 @@ export default function ManualCampaign() {
   const resetRun = useCallback((nextContract = contractIndex) => {
     const freshStock = createManualStock(); materialRef.current = freshStock; milestoneRef.current.clear();
     setContractIndex(nextContract); setMaterial(freshStock); setSpindle(false); setHeat(20); setCondition(100);
-    setLoad(0); setOvercut(0); setFinishPenalty(0); setBreaks(0); setElapsed(0); setCursor({ x: 3, y: 3 }); setResult(null); setShareStatus(""); setViewMode("map"); firstCutTracked.current = false; toolpathRef.current = []; chipsRef.current = [];
+    setLoad(0); setOvercut(0); setFixtureStrikes(0); setFinishPenalty(0); setBreaks(0); setElapsed(0); setCursor({ x: 3, y: 3 }); setResult(null); setShareStatus(""); setViewMode("map"); firstCutTracked.current = false; toolpathRef.current = []; chipsRef.current = [];
     comboRef.current = 0; setCombo(0); setBestCombo(0); setFlowScore(0); setPaused(false); setGameEvent(null);
   }, [contractIndex]);
 
@@ -316,9 +321,14 @@ export default function ManualCampaign() {
     chipsRef.current = chipsRef.current.slice(-48);
     if (now - lastCutTone.current > 75) { tone(cut.overcut ? 92 : 230 + nextLoad * 2.2, .055, cut.overcut ? "sawtooth" : "square", cut.overcut ? .035 : .012); lastCutTone.current = now; }
     const heatGain = cut.engagement * .45 * tool.load * (feed / 50);
-    const wear = cut.engagement * .055 * tool.wear * (1 + Math.max(0, feed - 70) / 35);
-    materialRef.current = cut.material; setMaterial(cut.material); setOvercut((value) => value + cut.overcut); setLoad(nextLoad);
-    const safeCut = cut.correct > 0 && cut.overcut === 0 && nextLoad <= 84;
+    const wear = cut.engagement * .055 * tool.wear * (1 + Math.max(0, feed - 70) / 35) + cut.fixtureStrikes * 14;
+    materialRef.current = cut.material; setMaterial(cut.material); setOvercut((value) => value + cut.overcut); setFixtureStrikes((value) => value + cut.fixtureStrikes); setLoad(nextLoad);
+    if (cut.fixtureStrikes > 0) {
+      comboRef.current = 0; setCombo(0);
+      announceGameEvent({ kind: "warning", title: "FIXTURE STRIKE", detail: "Cutter contacted the vise clamp at the stock edge. Stay inside the margin." });
+      tone(60, .12, "sawtooth", .05);
+    }
+    const safeCut = cut.correct > 0 && cut.overcut === 0 && cut.fixtureStrikes === 0 && nextLoad <= 84;
     if (safeCut) {
       lastComboCutRef.current = now;
       comboRef.current = Math.min(99, comboRef.current + 1);
@@ -339,7 +349,7 @@ export default function ManualCampaign() {
     setHeat((value) => clamp(value + heatGain, 18, 100));
     setCondition((value) => {
       const next = clamp(value - wear, 0, 100);
-      if (next <= 0 && value > 0) { setBreaks((count) => count + 1); setSpindle(false); setMessage("TOOL FAILURE — reset the cutter and reduce engagement."); }
+      if (next <= 0 && value > 0) { setBreaks((count) => count + 1); setSpindle(false); setMessage(cut.fixtureStrikes > 0 ? "TOOL FAILURE — the vise clamp took the edge off the cutter." : "TOOL FAILURE — reset the cutter and reduce engagement."); }
       return next;
     });
     setFinishPenalty((value) => value + Math.max(0, nextLoad - 82) * .018 * tool.finish + cut.overcut * .25);
@@ -363,13 +373,13 @@ export default function ManualCampaign() {
   };
 
   const inspect = () => {
-    const grade = gradeManualRun(material, contract, overcut, finishPenalty, elapsed, breaks);
+    const grade = gradeManualRun(material, contract, overcut, finishPenalty, elapsed, breaks, fixtureStrikes);
     const prior = save.bests[contract.id] ?? null;
     setPreviousBest(prior);
     setResult(grade); setSpindle(false); setScreen("result");
     trackAnonymous("inspection_complete", { contract: contract.id, score: grade.score, accepted: grade.accepted, completion: grade.completion, overcut });
     tone(grade.accepted ? 660 : 105, grade.accepted ? .24 : .3, grade.accepted ? "sine" : "sawtooth", .04);
-    setMessage(grade.accepted ? `PART ACCEPTED — ${grade.rank} rank.` : "INSPECTION HOLD — clear more stock without touching the part.");
+    setMessage(grade.accepted ? `PART ACCEPTED — ${grade.rank} rank.` : fixtureStrikes > 0 ? "INSPECTION HOLD — fixture strike voids release. Retry on fresh stock." : "INSPECTION HOLD — clear more stock without touching the part.");
     setSave((current) => {
       const firstClear = grade.accepted && !current.cleared.includes(contract.id);
       const bests = grade.accepted && (!current.bests[contract.id] || grade.score > current.bests[contract.id].score)
@@ -459,7 +469,7 @@ export default function ManualCampaign() {
             <section className={styles.missionHud} aria-label="Active mission objective"><header><Target/><span>PRIMARY OBJECTIVE / 0{mission.step}</span><b>{completion}% / {mission.target}%</b></header><h3>{mission.title}</h3><p>{mission.detail}</p><i><em style={{ width: `${Math.min(100, completion / mission.target * 100)}%` }}/></i></section>
             {learningLevel !== "easy" && <div className={styles.flowHud} data-active={combo > 1}><Zap/><span>FLOW</span><strong>×{comboMultiplier.toFixed(2)}</strong><small>{combo} CHAIN · {flowScore.toLocaleString()} PTS</small></div>}
             {gameEvent && <div key={gameEvent.id} className={styles.gameEvent} data-kind={gameEvent.kind} role="status"><Sparkles/><span>{gameEvent.kind === "warning" ? "PROCESS WARNING" : "MISSION UPDATE"}</span><strong>{gameEvent.title}</strong><small>{gameEvent.detail}</small></div>}
-            <div className={styles.legend}><span><i className={styles.keep}/> PART</span><span><i className={styles.waste}/> REMOVE</span><span><i className={styles.damage}/> OVERCUT</span></div>
+            <div className={styles.legend}><span><i className={styles.keep}/> PART</span><span><i className={styles.waste}/> REMOVE</span><span><i className={styles.damage}/> OVERCUT</span><span><i className={styles.fixtureSwatch}/> VISE CLAMP</span></div>
             {!spindle && <div className={styles.prompt}><Crosshair/><b>{completion ? "SPINDLE PAUSED" : "SET YOUR CUT"}</b><span>Drag across the stock after cycle start.</span></div>}
             <FlagshipMachiningKit cursor={cursor} spindle={spindle} completion={completion} load={load} material={contract.material} accent={contract.color} verbose={learningLevel !== "easy"} cells={material} contractId={contract.id} toolpath={toolpathRef.current}/>
             {viewMode === "twin" && <section className={styles.twinReview} aria-label="Full-frame 3D machining twin review"><FlagshipMachiningKit cursor={cursor} spindle={false} completion={completion} load={load} variant="full" material={contract.material} accent={contract.color} verbose={learningLevel !== "easy"} cells={material} contractId={contract.id} toolpath={toolpathRef.current}/><div className={styles.twinTitle}><small>DIGITAL TWIN / VISUAL REVIEW</small><b>FIXTURE + TOOL + STOCK</b><span>LIVE GLB / SAFE Z</span></div><div className={styles.twinCoordinates}><span>X <b>{machinePosition.x.toFixed(2)}</b></span><span>Y <b>{machinePosition.y.toFixed(2)}</b></span><span>Z <b>+4.00</b></span><small>G54 / MM</small></div><div className={styles.twinProgress}><span>STOCK REMOVAL</span><strong>{completion}%</strong><i><em style={{ width: `${completion}%` }}/></i><div><small>TOOL</small><b>T{tool.id} / {tool.diameter}</b><small>FIXTURE</small><b>VISE / PARALLELS</b><small>STATE</small><b>REVIEW HOLD</b></div></div><div className={styles.twinCallouts} aria-hidden="true"><span className={styles.twinSpindle}>01 / SPINDLE BODY</span><span className={styles.twinTool}>02 / CUTTER CENTER</span><span className={styles.twinStock}>03 / STOCK ENVELOPE</span><span className={styles.twinFixture}>04 / FIXTURE STACK</span></div><button className={styles.returnMap} onClick={() => { setViewMode("map"); setMessage("CUT MAP ACTIVE — resume from the recorded tool position."); }}>RETURN TO CUT MAP <Crosshair/></button></section>}
@@ -480,7 +490,7 @@ export default function ManualCampaign() {
           <Meter icon={<Activity/>} label="TOOL HEAT" value={heat} suffix="°C" danger={heat > 78}/>
           <Meter icon={<Wrench/>} label="TOOL CONDITION" value={condition} suffix="%" danger={condition < 24}/>
           <div className={styles.coolant}><Waves/><span><b>COOLANT FIELD</b>{spindle ? "ACTIVE / CHIP EVACUATION" : "STANDBY / SAFE Z"}</span><i className={spindle ? styles.coolantLive : ""}/></div>
-          <dl><div><dt>ELAPSED</dt><dd>{String(Math.floor(elapsed/60)).padStart(2,"0")}:{String(elapsed%60).padStart(2,"0")}</dd></div><div><dt>OVERCUT CELLS</dt><dd className={overcut > contract.tolerance ? styles.bad : ""}>{overcut}</dd></div><div><dt>SURFACE EST.</dt><dd>Ra {surfaceRa.toFixed(1)} µm</dd></div><div><dt>TOOL</dt><dd>T{tool.id} / {tool.diameter}</dd></div>{learningLevel !== "easy" && <><div><dt>SPINDLE / SIM</dt><dd>{spindleRpm.toLocaleString()} RPM</dd></div><div><dt>FEED / SIM</dt><dd>{programmedFeed} MM/MIN</dd></div></>}{learningLevel === "hard" && <><div><dt>CHIP LOAD / SIM</dt><dd>{chipLoad.toFixed(3)} MM</dd></div><div><dt>ENGAGEMENT</dt><dd>{engagementAngle}°</dd></div><div><dt>WORK OFFSET</dt><dd>G54</dd></div></>}</dl>
+          <dl><div><dt>ELAPSED</dt><dd>{String(Math.floor(elapsed/60)).padStart(2,"0")}:{String(elapsed%60).padStart(2,"0")}</dd></div><div><dt>OVERCUT CELLS</dt><dd className={overcut > contract.tolerance ? styles.bad : ""}>{overcut}</dd></div><div><dt>FIXTURE STRIKES</dt><dd className={fixtureStrikes > 0 ? styles.bad : ""}>{fixtureStrikes}</dd></div><div><dt>SURFACE EST.</dt><dd>Ra {surfaceRa.toFixed(1)} µm</dd></div><div><dt>TOOL</dt><dd>T{tool.id} / {tool.diameter}</dd></div>{learningLevel !== "easy" && <><div><dt>SPINDLE / SIM</dt><dd>{spindleRpm.toLocaleString()} RPM</dd></div><div><dt>FEED / SIM</dt><dd>{programmedFeed} MM/MIN</dd></div></>}{learningLevel === "hard" && <><div><dt>CHIP LOAD / SIM</dt><dd>{chipLoad.toFixed(3)} MM</dd></div><div><dt>ENGAGEMENT</dt><dd>{engagementAngle}°</dd></div><div><dt>WORK OFFSET</dt><dd>G54</dd></div></>}</dl>
           <div className={styles.safety}><ShieldCheck/><p><b>CREATIVE SIMULATION</b>Not machine-operating guidance. Never transfer game values to physical equipment.</p></div>
         </aside>
       </section>
@@ -490,7 +500,7 @@ export default function ManualCampaign() {
       <article className={styles.resultCard} data-verdict={result.accepted ? "accepted" : "hold"}>
         <div className={styles.resultHero}><div className={styles.rank}><Award/><span>{result.accepted ? "INSPECTION ACCEPTED" : "INSPECTION HOLD"}</span><strong>{result.rank}</strong><small>{result.score} / 100</small></div><section className={styles.inspectionMap} aria-label="Simulated dimensional inspection visualization"><header><span>CMM PROFILE REPORT / SIM</span><b>{contract.program}</b><i>{result.accepted ? "RELEASE" : "REWORK"}</i></header><div className={styles.inspectionGeometry}><GeometryPreview contract={contract}/><i className={styles.inspectionX}/><i className={styles.inspectionY}/><span>G54</span><b>PROFILE TRACE<br/>240 × 140 MM FIELD</b></div><div className={styles.deviationBands}>{inspectionBands.map((band) => <div key={band.label}><span>{band.label}</span><i><em style={{ width: `${clamp(band.value, 0, 100)}%` }}/></i><b>{band.reading}</b></div>)}</div><footer><span>MAT <b>{contract.material}</b></span><span>WCS <b>G54</b></span><span>TOOL <b>T{tool.id}</b></span><span>TRACE <b>{result.accepted ? "IN BAND" : "OUT OF BAND"}</b></span></footer></section></div>
         <div className={styles.resultData}><div><span>GEOMETRY</span><b>{result.geometry}/46</b><small>{result.completion}% waste cleared</small></div><div><span>PRECISION</span><b>{result.precision}/30</b><small>{overcut}/{contract.tolerance} overcut cells</small></div><div><span>FINISH</span><b>{result.finish}/14</b><small>{finishPenalty.toFixed(1)} risk index</small></div><div><span>CYCLE</span><b>{result.time}/10</b><small>{elapsed}s / {contract.par}s par</small></div></div>
-        <div className={styles.scoreProof}><span>SCORE PROOF</span><code>{result.geometry} + {result.precision} + {result.finish} + {result.time} − {result.breakPenalty} = <b>{result.score}</b></code><i>{result.completion >= 90 ? "✓" : "×"} COMPLETION ≥90%</i><i>{overcut <= contract.tolerance ? "✓" : "×"} OVERCUT ≤{contract.tolerance}</i></div>
+        <div className={styles.scoreProof}><span>SCORE PROOF</span><code>{result.geometry} + {result.precision} + {result.finish} + {result.time} − {result.breakPenalty} = <b>{result.score}</b></code><i>{result.completion >= 90 ? "✓" : "×"} COMPLETION ≥90%</i><i>{overcut <= contract.tolerance ? "✓" : "×"} OVERCUT ≤{contract.tolerance}</i><i>{fixtureStrikes === 0 ? "✓" : "×"} NO FIXTURE STRIKES</i></div>
         <div className={styles.runSignature}><Gamepad2/><span>RUN SIGNATURE</span><b>{flowScore.toLocaleString()} FLOW PTS</b><i>BEST CHAIN ×{bestCombo}</i><small>Flow rewards controlled consecutive cuts; it never changes the inspection grade.</small></div>
         <p>{result.accepted ? `Released to ${contract.client}. ${result.payout.toLocaleString()} credits earned.` : `Remove at least 90% of the waste and stay within ${contract.tolerance} overcut cells.`}</p>
         <div className={rapidStyles.improvement}><b>{previousBest ? `${result.score >= previousBest.score ? "+" : ""}${result.score - previousBest.score} VS PERSONAL BEST` : "FIRST VALID RESULT SETS YOUR BENCHMARK"}</b><span>{result.accepted ? (result.precision < 26 ? "Next run: protect the glowing part edge more carefully." : result.completion < 98 ? "Next run: clear the remaining silver stock." : "Next run: preserve quality with a shorter path.") : "Fastest recovery: retry fresh stock, then cut only the silver field."}</span></div>

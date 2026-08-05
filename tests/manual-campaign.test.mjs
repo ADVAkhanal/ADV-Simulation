@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { MANUAL_CONTRACTS, MILL_TOOLS, appendShopRunLog, createManualStock, cutManualStock, deriveFlowPoints, deriveManualMission, deriveShopSkillProgress, gradeManualRun, isManualTarget } from "../app/manual-campaign-engine.ts";
+import { MANUAL_CONTRACTS, MILL_COLS, MILL_ROWS, MILL_TOOLS, appendShopRunLog, createManualStock, cutManualStock, deriveFlowPoints, deriveManualMission, deriveShopSkillProgress, gradeManualRun, isFixtureZone, isManualTarget } from "../app/manual-campaign-engine.ts";
 
 test("manual campaign exposes three distinct geometries and tool tradeoffs",()=>{
   assert.equal(MANUAL_CONTRACTS.length,3); assert.equal(MILL_TOOLS.length,3);
@@ -12,6 +12,23 @@ test("manual campaign cutting and grading are deterministic",()=>{
   const contract=MANUAL_CONTRACTS[0]; const stock=createManualStock();
   const a=cutManualStock(stock,contract.id,0,0,MILL_TOOLS[1].radius); const b=cutManualStock(stock,contract.id,0,0,MILL_TOOLS[1].radius);
   assert.deepEqual(a,b); assert.deepEqual(gradeManualRun(a.material,contract,a.overcut,0,12,0),gradeManualRun(b.material,contract,b.overcut,0,12,0));
+});
+
+test("cutting into the vise clamp zone is a real fixture collision, not just an overcut",()=>{
+  const contract=MANUAL_CONTRACTS[0]; const stock=createManualStock();
+  const edgeCut=cutManualStock(stock,contract.id,0,0,MILL_TOOLS[0].radius);
+  assert.ok(edgeCut.fixtureStrikes>0,"cutting at the grid corner must register a fixture strike");
+  const centerCut=cutManualStock(stock,contract.id,(MILL_COLS-1)/2,(MILL_ROWS-1)/2,MILL_TOOLS[0].radius);
+  assert.equal(centerCut.fixtureStrikes,0,"cutting well inside the stock must not register a fixture strike");
+  for (const contractDef of MANUAL_CONTRACTS) for (let row=0;row<MILL_ROWS;row+=1) for (let col=0;col<MILL_COLS;col+=1) {
+    assert.ok(!(isFixtureZone(col,row)&&isManualTarget(contractDef.id,col,row)), `${contractDef.id} target geometry must clear the vise clamp margin at (${col},${row})`);
+  }
+  const fullyCleared=new Uint8Array(MILL_COLS*MILL_ROWS).map((_,i)=>isManualTarget(contract.id,i%MILL_COLS,Math.floor(i/MILL_COLS))?1:0);
+  const clean=gradeManualRun(fullyCleared,contract,0,0,12,0,0);
+  const struck=gradeManualRun(fullyCleared,contract,0,0,12,0,1);
+  assert.equal(clean.accepted,true,"an otherwise-perfect run with no fixture strikes should be accepted");
+  assert.equal(struck.accepted,false,"the identical run with one fixture strike must void acceptance");
+  assert.ok(struck.breakPenalty>clean.breakPenalty,"a fixture strike must cost more than an identical clean run");
 });
 
 test("shop progression uses personal-best evidence and deterministic role thresholds",()=>{

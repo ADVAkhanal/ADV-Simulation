@@ -56,16 +56,24 @@ export function isManualTarget(contract: ManualContract["id"], col: number, row:
 
 export function createManualStock() { return new Uint8Array(MILL_CELLS).fill(1); }
 
+// The vise clamps the stock's outer perimeter from below the top surface.
+// A pass that cuts all the way to the stock's edge risks striking that
+// clamp - a real fixture collision, distinct from an overcut into the part.
+export function isFixtureZone(col: number, row: number) {
+  return col === 0 || col === MILL_COLS - 1 || row === 0 || row === MILL_ROWS - 1;
+}
+
 export function cutManualStock(source: Uint8Array, contract: ManualContract["id"], cutterX: number, cutterY: number, radius: number) {
   const material = source.slice();
-  let correct = 0; let overcut = 0; let engagement = 0;
+  let correct = 0; let overcut = 0; let engagement = 0; let fixtureStrikes = 0;
   for (let row = 0; row < MILL_ROWS; row += 1) for (let col = 0; col < MILL_COLS; col += 1) {
     const index = row * MILL_COLS + col;
     if (!material[index] || Math.hypot(col-cutterX,row-cutterY) > radius) continue;
     material[index] = 0; engagement += 1;
+    if (isFixtureZone(col, row)) fixtureStrikes += 1;
     if (isManualTarget(contract,col,row)) overcut += 1; else correct += 1;
   }
-  return { material, correct, overcut, engagement };
+  return { material, correct, overcut, engagement, fixtureStrikes };
 }
 
 export function manualCompletion(material: Uint8Array, contract: ManualContract["id"]) {
@@ -91,16 +99,17 @@ export function deriveFlowPoints(correctCells: number, chain: number) {
 
 export function deriveMasteryRank(score: number) { return score>=96?"S":score>=88?"A":score>=76?"B":"C"; }
 
-export function gradeManualRun(material: Uint8Array, contract: ManualContract, overcut: number, finishPenalty: number, elapsed: number, breaks: number) {
+export function gradeManualRun(material: Uint8Array, contract: ManualContract, overcut: number, finishPenalty: number, elapsed: number, breaks: number, fixtureStrikes = 0) {
   const completion=manualCompletion(material,contract.id);
   const geometry=Math.min(46,completion/90*46);
   const precision=Math.max(0,30-overcut*(contract.id==="bracket"?5:3.2));
   const finish=Math.max(0,14-finishPenalty*1.3);
   const time=Math.max(0,10-Math.max(0,elapsed-contract.par)*.1);
-  const score=Math.max(0,Math.min(100,Math.round(geometry+precision+finish+time-breaks*5)));
-  const accepted=completion>=90&&overcut<=contract.tolerance;
+  const breakPenalty=breaks*5+fixtureStrikes*6;
+  const score=Math.max(0,Math.min(100,Math.round(geometry+precision+finish+time-breakPenalty)));
+  const accepted=completion>=90&&overcut<=contract.tolerance&&fixtureStrikes===0;
   const rank=!accepted?"REWORK":deriveMasteryRank(score);
-  return {completion,geometry:Math.round(geometry),precision:Math.round(precision),finish:Math.round(finish),time:Math.round(time),breakPenalty:breaks*5,score,accepted,rank,payout:accepted?Math.round(contract.reward*(.55+score/220)):120};
+  return {completion,geometry:Math.round(geometry),precision:Math.round(precision),finish:Math.round(finish),time:Math.round(time),breakPenalty,score,accepted,rank,payout:accepted?Math.round(contract.reward*(.55+score/220)):120};
 }
 
 export function deriveShopSkillProgress(bests: Record<string, ShopBestRun>, thresholds = [0, 70, 165, 250]) {
