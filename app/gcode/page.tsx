@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, CheckCircle2, Copy, Droplets, Gauge, Layers, ListTree, Pause, Play, Repeat2, RotateCcw, Route, Settings2, Sparkles, StepForward, Trophy, Wrench, Zap } from "lucide-react";
+import { ArrowLeft, Bug, CheckCircle2, Copy, Droplets, Gauge, Layers, ListTree, Pause, Play, Repeat2, RotateCcw, Route, Settings2, Sparkles, StepForward, Trophy, Wrench, Zap } from "lucide-react";
 import { buildMachiningPlan, gradeMission, parseProgram, rasterize, type MachiningSetup } from "./gcode-engine";
 import styles from "./gcode.module.css";
 import readableStyles from "./readability.module.css";
@@ -14,6 +14,8 @@ type Contract = {
   accent: string;
   xp: number;
   code: string;
+  startCode?: string;
+  debug?: boolean;
 };
 
 const CONTRACTS: Contract[] = [
@@ -43,6 +45,17 @@ const CONTRACTS: Contract[] = [
     accent: "#55e7ff",
     xp: 1250,
     code: `(CONTRACT 03 / CROWN POCKET)\nG21 G90\nT3 M06\nM03 M08\nG00 X3 Y30 Z3\nG01 Z-1.2 F170\nG01 X3 Y10 F480\nG01 X12 Y20\nG01 X20 Y5\nG01 X28 Y20\nG01 X37 Y10\nG01 X37 Y30\nG01 X3 Y30\nG01 Z-2.8 F140\nG01 X37 Y30 F300\nG00 Z3\nM09 M05\nM30`,
+  },
+  {
+    name: "FIELD RECALL",
+    subtitle: "A returned program throws a spindle-safety alarm. Find the fault and clear the profile.",
+    client: "REDLINE DYNAMOTORS / QUALITY RECALL",
+    objective: "The controller is holding an alarm before any material moves. Locate the missing block, fix it, then clear the profile.",
+    accent: "#ff9b3f",
+    xp: 1100,
+    debug: true,
+    code: `(CONTRACT 04 / FIELD RECALL)\nG21 G90\nT1 M06\nM03 M08\nG00 X8 Y8 Z3\nG01 Z-1.6 F160\nG01 X30 Y8 F380\nG01 X30 Y28\nG01 X8 Y28\nG01 X8 Y8\nG00 Z3\nM09 M05\nM30`,
+    startCode: `(CONTRACT 04 / FIELD RECALL)\nG21 G90\nT1 M06\nM08\nG00 X8 Y8 Z3\nG01 Z-1.6 F160\nG01 X30 Y8 F380\nG01 X30 Y28\nG01 X8 Y28\nG01 X8 Y8\nG00 Z3\nM09 M05\nM30`,
   },
 ];
 
@@ -109,13 +122,14 @@ export default function GCodeStage() {
   };
 
   const chooseContract = (index: number) => {
+    const item = CONTRACTS[index];
     setContractIndex(index);
-    setCode(CONTRACTS[index].code);
+    setCode(item.startCode ?? item.code);
     setPlaying(false);
     setFrame(1);
     setInspected(false);
     setSetup({ ...DEFAULT_SETUP, finalDepth: index === 1 ? -2.2 : index === 2 ? -2.8 : -1.8, passes: index === 2 ? 2 : 1 });
-    setMessage(`${CONTRACTS[index].name} loaded. Prove the process.`);
+    setMessage(item.debug ? `${item.name} loaded. The controller is holding an alarm - read the Quality Lab for the flagged line.` : `${item.name} loaded. Prove the process.`);
   };
 
   const run = () => {
@@ -161,7 +175,7 @@ export default function GCodeStage() {
       <div className={styles.missionCard}>
         <div><span>ACTIVE CONTRACT</span><b>{contract.client}</b></div>
         <p>{contract.objective}</p>
-        <footer><span><Trophy/> {earnedXp.toLocaleString()} XP</span><span>{completed.length}/3 CLEARED</span></footer>
+        <footer><span><Trophy/> {earnedXp.toLocaleString()} XP</span><span>{completed.length}/{CONTRACTS.length} CLEARED</span></footer>
       </div>
     </section>
 
@@ -173,9 +187,9 @@ export default function GCodeStage() {
       <p>FORM / SYSTEM / SIGNAL</p>
     </section>
 
-    <nav ref={contractsRef} id="contracts" className={styles.programs} aria-label="Machining contracts" tabIndex={-1}>
+    <nav ref={contractsRef} id="contracts" className={styles.programs} style={{ gridTemplateColumns: `repeat(${CONTRACTS.length},1fr)` }} aria-label="Machining contracts" tabIndex={-1}>
       {CONTRACTS.map((item, index) => <button key={item.name} className={index === contractIndex ? styles.selected : ""} onClick={() => chooseContract(index)}>
-        <span>{completed.includes(index) ? <CheckCircle2/> : `0${index + 1}`}</span><div><b>{item.name}</b><small>{item.subtitle}</small></div>
+        <span>{completed.includes(index) ? <CheckCircle2/> : `0${index + 1}`}</span><div><b>{item.name}{item.debug && <i className={styles.debugTag}><Bug/> DEBUG</i>}</b><small>{item.subtitle}</small></div>
       </button>)}
     </nav>
 
