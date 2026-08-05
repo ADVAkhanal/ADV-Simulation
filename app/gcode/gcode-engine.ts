@@ -21,7 +21,7 @@ export type ToolPoint = Vec3 & {
 };
 
 export type ProgramDiagnostic = {
-  category: "unsupported-command" | "missing-axis" | "invalid-arc" | "unsafe-state" | "travel-limit";
+  category: "unsupported-command" | "missing-axis" | "invalid-arc" | "unsafe-state" | "travel-limit" | "collision";
   line: number;
   message: string;
 };
@@ -202,6 +202,10 @@ export function parseProgram(source: string): ParsedProgram {
     }
     const cutting = motionCode !== 0 && target.z < 0 && spindle;
     if (motionCode !== 0 && target.z < 0 && !spindle) diagnostics.push({ category: "unsafe-state", line: lineNumber, message: "feed below stock with spindle stopped" });
+    // Rapids (G00) travel at full non-cutting speed with no engagement control.
+    // A real controller never programs one below the stock surface - that is
+    // a tool crash, not a slow feed, regardless of spindle or prior material state.
+    if (motionCode === 0 && target.z < 0) diagnostics.push({ category: "collision", line: lineNumber, message: "rapid move targets Z below the stock - this crashes the tool" });
     const kind: MotionKind = motionCode === 0 ? "rapid" : motionCode === 1 ? "feed-line" : motionCode === 2 ? "arc-cw" : "arc-ccw";
     let center: { x: number; y: number } | undefined;
     if (motionCode === 2 || motionCode === 3) {
