@@ -20,9 +20,9 @@ export type ShopBestRun = { score: number; precision: number; completion: number
 export type ShopRunLogEntry = { id: string; contract: ManualContract["id"]; program: string; title: string; score: number; rank: string; accepted: boolean; completion: number; precision: number; finish: number; elapsed: number; overcut: number; at: number };
 
 export const MANUAL_CONTRACTS: ManualContract[] = [
-  { id: "drive", program: "NS-0142-A", client: "NORTHSTAR MOBILITY", title: "Emergency drive plate", brief: "Profile the drivetrain interface before the sunrise rig test.", material: "6061 AL", reward: 1700, par: 75, tolerance: 3, color: "#50e6ff" },
-  { id: "rib", program: "KS-2207-R", client: "KESTREL AEROSPACE", title: "Flight rib prototype", brief: "Release a lightweight rib while preserving the load path and three lightening webs.", material: "7075-T6", reward: 2450, par: 92, tolerance: 2, color: "#d8ff3e" },
-  { id: "bracket", program: "OR-771-C", client: "ORBITAL RESEARCH", title: "Sensor bracket", brief: "Cut the asymmetric optical bracket with zero damage around its datum bosses.", material: "Ti-6Al-4V", reward: 3200, par: 110, tolerance: 1, color: "#ff6ea9" },
+  { id: "drive", program: "NS-0142-A", client: "NORTHSTAR MOBILITY", title: "Emergency drive plate", brief: "Profile the drivetrain interface before the sunrise rig test.", material: "6061 AL", reward: 1700, par: 75, tolerance: 3, color: "#00aeef" },
+  { id: "rib", program: "KS-2207-R", client: "KESTREL AEROSPACE", title: "Flight rib prototype", brief: "Release a lightweight rib while preserving the load path and three lightening webs.", material: "7075-T6", reward: 2450, par: 92, tolerance: 2, color: "#9bb0b8" },
+  { id: "bracket", program: "OR-771-C", client: "ORBITAL RESEARCH", title: "Sensor bracket", brief: "Cut the asymmetric optical bracket with zero damage around its datum bosses.", material: "Ti-6Al-4V", reward: 3200, par: 110, tolerance: 1, color: "#ff6a00" },
 ];
 
 export const MILL_TOOLS: MillTool[] = [

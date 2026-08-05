@@ -13,11 +13,11 @@ export async function shareResultCard(data: ResultCardData) {
   const gradient = context.createLinearGradient(0, 0, 1200, 630);
   gradient.addColorStop(0, "#071014"); gradient.addColorStop(.7, "#10252b"); gradient.addColorStop(1, "#063745");
   context.fillStyle = gradient; context.fillRect(0, 0, 1200, 630);
-  context.strokeStyle = "#50e6ff"; context.lineWidth = 3; context.strokeRect(36, 36, 1128, 558);
-  context.fillStyle = "#50e6ff"; context.font = "700 22px monospace"; context.fillText("PROJECT TOOLPATH / INSPECTION RECORD", 74, 92);
+  context.strokeStyle = "#00aeef"; context.lineWidth = 3; context.strokeRect(36, 36, 1128, 558);
+  context.fillStyle = "#00aeef"; context.font = "700 22px monospace"; context.fillText("PROJECT TOOLPATH / INSPECTION RECORD", 74, 92);
   context.fillStyle = "#f2fbfc"; context.font = "800 62px sans-serif"; context.fillText(data.contract.toUpperCase(), 74, 174);
   context.fillStyle = "#809ba2"; context.font = "700 20px monospace"; context.fillText(`${data.program}  /  ${data.accepted ? "PART ACCEPTED" : "INSPECTION HOLD"}`, 76, 218);
-  context.fillStyle = "#50e6ff"; context.font = "900 190px sans-serif"; context.fillText(data.rank, 74, 435);
+  context.fillStyle = "#00aeef"; context.font = "900 190px sans-serif"; context.fillText(data.rank, 74, 435);
   context.fillStyle = "#ffffff"; context.font = "800 58px sans-serif"; context.fillText(`${data.score} / 100`, 275, 405);
   context.font = "700 18px monospace";
   const stats = [["GEOMETRY", `${data.geometry}/46`], ["PRECISION", `${data.precision}/30`], ["FINISH", `${data.finish}/14`], ["CYCLE", `${data.time}/10`]];

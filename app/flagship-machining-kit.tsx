@@ -112,7 +112,7 @@ function draw(canvas: HTMLCanvasElement, scene: Scene | null, props: Props, fall
     context.fillStyle = "#35494f"; context.fillRect(bounds.width * .24, bounds.height * .57, bounds.width * .52, bounds.height * .16);
     context.fillStyle = "#a8babd"; context.fillRect(bounds.width * .34, bounds.height * .49, bounds.width * .32, bounds.height * .1);
     const x = bounds.width * (.34 + props.cursor.x / 27 * .32), y = bounds.height * (.18 + props.cursor.y / 15 * .24);
-    context.strokeStyle = props.spindle ? "#50e6ff" : "#759096"; context.lineWidth = 8; context.beginPath(); context.moveTo(x, 0); context.lineTo(x, y); context.stroke();
+    context.strokeStyle = props.spindle ? "#00aeef" : "#759096"; context.lineWidth = 8; context.beginPath(); context.moveTo(x, 0); context.lineTo(x, y); context.stroke();
     return;
   }
   const all = scene.faces.flatMap((face) => face.vertices);
