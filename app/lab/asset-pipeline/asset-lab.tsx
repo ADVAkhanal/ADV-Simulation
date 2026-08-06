@@ -3,9 +3,10 @@
 import { useEffect, useState } from "react";
 import FlagshipMachiningKit from "../../flagship-machining-kit";
 import GlbPreview from "./glb-preview";
+import ParametricGenerator from "./parametric-generator";
 import styles from "./asset-pipeline.module.css";
 
-type Mode = "kit" | "test" | "atlas";
+type Mode = "kit" | "test" | "atlas" | "parametric";
 type KitManifest = {
   id: string; version: number; path: string; sourceBlend: string; triangleCount: number; materialCount: number; fileSizeBytes: number;
   objects: string[]; materials: string[]; anchors: Record<string, string>; boundingBox: { dimensionsMm: number[] };
@@ -20,8 +21,9 @@ export default function AssetLab() {
       <button className={mode === "kit" ? styles.selectedAsset : ""} onClick={() => setMode("kit")}>MACHINING KIT V1</button>
       <button className={mode === "test" ? styles.selectedAsset : ""} onClick={() => setMode("test")}>TEST ASSET</button>
       <button className={mode === "atlas" ? styles.selectedAsset : ""} onClick={() => setMode("atlas")}>CAPABILITY ATLAS</button>
+      <button className={mode === "parametric" ? styles.selectedAsset : ""} onClick={() => setMode("parametric")}>PARAMETRIC GENERATOR</button>
     </nav>
-    {mode === "kit" ? <KitInspector/> : mode === "test" ? <TestInspector/> : <GlbPreview/>}
+    {mode === "kit" ? <KitInspector/> : mode === "test" ? <TestInspector/> : mode === "parametric" ? <ParametricGenerator/> : <GlbPreview/>}
   </>;
 }
 
