@@ -9,8 +9,16 @@ type Vec3 = [number, number, number];
 type Mat4 = [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
 type Face = { vertices: [Vec3, Vec3, Vec3]; color: string; node: string; metallic: number; roughness: number };
 type Scene = { faces: Face[]; bytes: number };
-type Props = { cursor: { x: number; y: number }; spindle: boolean; completion: number; load: number; variant?: "mini" | "full"; material?: string; accent?: string; verbose?: boolean; cells?: Uint8Array; contractId?: ManualContract["id"]; toolpath?: Array<{ x: number; y: number }>; interactive?: boolean };
+type Props = { cursor: { x: number; y: number }; spindle: boolean; completion: number; load: number; variant?: "mini" | "full"; material?: string; accent?: string; verbose?: boolean; cells?: Uint8Array; contractId?: ManualContract["id"]; toolpath?: Array<{ x: number; y: number }>; interactive?: boolean; toolId?: number };
 type ViewState = { yaw: number; pitch: number; zoom: number; autoOrbit: boolean };
+
+// Node names for every cutting tool the Blender kit ships (see
+// tools/blender/build-machining-kit.py, manifest.tools). All three exist in
+// the GLB simultaneously under the same spindle anchor; only the one
+// matching the game's active tool selection is kept visible per frame.
+const TOOL_NODE_BY_ID: Record<number, string> = { 1: "tool.endmill.flat.010", 2: "tool.endmill.rougher.020", 3: "tool.drill.030" };
+const TOOL_LABEL_BY_ID: Record<number, string> = { 1: "T1 FINISHER", 2: "T2 ROUGHER", 3: "T3 DRILL" };
+function activeToolNode(toolId?: number) { return TOOL_NODE_BY_ID[toolId ?? 1] ?? TOOL_NODE_BY_ID[1]; }
 
 const colors = ["#24353a", "#4ae2fa", "#778b90", "#c6d4d6", "#6a7c81", "#18252a"];
 const STOCK_MATERIAL_COLORS: Record<string, string> = { "6061 AL": "rgb(174,190,194)", "7075-T6": "rgb(182,196,168)", "Ti-6Al-4V": "rgb(146,156,168)" };
@@ -162,7 +170,7 @@ function draw(canvas: HTMLCanvasElement, scene: Scene | null, props: Props, fall
   const orbit = view.autoOrbit && !reducedMotion ? time / (props.variant === "full" ? 15000 : 24000) : 0;
   const project = (point: Vec3, node: string) => {
     let [x, y, z] = point;
-    if (node.startsWith("machine.spindle") || node.startsWith("machine.coolant") || node.startsWith("tool.endmill")) { x += toolX; z += toolZ; y += props.spindle ? -22 : 0; }
+    if (node.startsWith("machine.spindle") || node.startsWith("machine.coolant") || node.startsWith("tool.")) { x += toolX; z += toolZ; y += props.spindle ? -22 : 0; }
     const nx = (x - center[0]) / extent, ny = (y - center[1]) / extent, nz = (z - center[2]) / extent;
     const yaw = view.yaw + orbit, pitch = view.pitch, rx = nx * Math.cos(yaw) + nz * Math.sin(yaw), rz = -nx * Math.sin(yaw) + nz * Math.cos(yaw);
     const ry = ny * Math.cos(pitch) - rz * Math.sin(pitch), depth = ny * Math.sin(pitch) + rz * Math.cos(pitch);
@@ -174,7 +182,8 @@ function draw(canvas: HTMLCanvasElement, scene: Scene | null, props: Props, fall
     if (!points.length) return [0, 0, 0];
     return points.reduce<Vec3>((sum, point) => [sum[0] + point[0] / points.length, sum[1] + point[1] / points.length, sum[2] + point[2] / points.length], [0, 0, 0]);
   };
-  const cutter = project(averagePoint("tool.endmill.flat.010"), "tool.endmill.flat.010");
+  const activeTool = activeToolNode(props.toolId);
+  const cutter = project(averagePoint(activeTool), activeTool);
   const coolant = project(averagePoint("machine.coolant.manifold"), "machine.coolant.manifold");
   context.save(); context.filter = "blur(10px)"; context.globalAlpha = .62; context.fillStyle = "#000"; context.beginPath(); context.ellipse(bounds.width * .49, bounds.height * .77, bounds.width * .34, bounds.height * .075, -.02, 0, Math.PI * 2); context.fill(); context.restore();
   if (props.spindle) {
@@ -184,11 +193,15 @@ function draw(canvas: HTMLCanvasElement, scene: Scene | null, props: Props, fall
   }
   const bounds3d = stockBounds(scene.faces);
   const pockets = props.cells && props.contractId && bounds3d ? pocketFaces(bounds3d, props.cells, props.contractId) : [];
-  const projected = [...scene.faces, ...pockets].map((face) => ({ face, points: face.vertices.map((point) => project(point, face.node)), depth: face.vertices.reduce((sum, point) => sum + project(point, face.node).depth, 0) / 3 })).sort((a, b) => a.depth - b.depth);
+  // The GLB carries every tool the game can mount under the same spindle
+  // anchor; only render the one the player actually has selected so
+  // switching tools visibly changes what's in the spindle.
+  const visibleFaces = scene.faces.filter((face) => !face.node.startsWith("tool.") || face.node === activeTool);
+  const projected = [...visibleFaces, ...pockets].map((face) => ({ face, points: face.vertices.map((point) => project(point, face.node)), depth: face.vertices.reduce((sum, point) => sum + project(point, face.node).depth, 0) / 3 })).sort((a, b) => a.depth - b.depth);
   projected.forEach(({ face, points }) => {
     context.beginPath(); context.moveTo(points[0].x, points[0].y); context.lineTo(points[1].x, points[1].y); context.lineTo(points[2].x, points[2].y); context.closePath();
     const illumination = faceLight(face.vertices), depthFade = clamp(.78 + points[0].depth * .16, .58, 1);
-    const isStock = face.node.includes("stock"), isPocket = face.node === "stock.pocket", isTool = face.node.startsWith("tool.endmill"), isSpindle = face.node.includes("spindle"), isFixture = face.node.includes("vise") || face.node.includes("fixture") || face.node.includes("jaw"), isWorklight = face.node.includes("worklight"), isEnclosure = face.node.includes("enclosure");
+    const isStock = face.node.includes("stock"), isPocket = face.node === "stock.pocket", isTool = face.node.startsWith("tool."), isSpindle = face.node.includes("spindle"), isFixture = face.node.includes("vise") || face.node.includes("fixture") || face.node.includes("jaw"), isWorklight = face.node.includes("worklight"), isEnclosure = face.node.includes("enclosure");
     const materialColor = isPocket ? face.color : isStock ? stockMaterialColor(props.material) : isFixture ? "rgb(79,101,108)" : isSpindle ? "rgb(65,84,91)" : isEnclosure ? "rgb(37,49,54)" : face.color;
     context.globalAlpha = .98 * depthFade;
     context.fillStyle = isTool && props.spindle ? "#7ff1ff" : isWorklight ? "#ff9b3f" : shade(materialColor, illumination, face.metallic); context.fill();
@@ -253,6 +266,7 @@ export default function FlagshipMachiningKit(props: Props) {
   return <aside className={`${styles.kit} ${props.variant === "full" ? styles.full : ""} ${draggable ? styles.interactive : ""}`} aria-label="Live 3D machining kit visualization">
     <canvas ref={canvasRef} tabIndex={draggable ? 0 : -1} aria-label={draggable ? "Interactive 3D machine assembly. Drag to orbit and use the mouse wheel to zoom." : "Live 3D machine assembly preview"} onPointerDown={(event) => { if (!draggable) return; dragRef.current = { x: event.clientX, y: event.clientY }; event.currentTarget.setPointerCapture(event.pointerId); setAutoOrbit(false); }} onPointerMove={(event) => { const start = dragRef.current; if (!start || !draggable) return; viewRef.current.yaw += (event.clientX - start.x) * .008; viewRef.current.pitch = clamp(viewRef.current.pitch + (event.clientY - start.y) * .006, -.95, .2); dragRef.current = { x: event.clientX, y: event.clientY }; }} onPointerUp={() => { dragRef.current = null; }} onPointerCancel={() => { dragRef.current = null; }} onWheel={(event) => { if (!draggable) return; event.preventDefault(); viewRef.current.zoom = clamp(viewRef.current.zoom - event.deltaY * .001, .72, 1.55); }} onDoubleClick={resetView}/><div className={styles.label}><i className={status === "ready" ? styles.live : ""} style={status === "ready" && props.accent ? { background: props.accent, boxShadow: `0 0 12px ${props.accent}` } : undefined}/><span>MACHINING KIT V1</span><b>{status === "loading" ? "DECODING" : status === "ready" ? "LIVE GLB" : "SAFE FALLBACK"}</b></div>
     <div className={styles.signal}><span>{props.material ?? "XYZ BIND"}</span><b>{props.spindle ? "CUTTING" : "SAFE Z"}</b><em>{props.load}% LOAD</em></div>
+    <div className={styles.signal}><span>{TOOL_LABEL_BY_ID[props.toolId ?? 1] ?? TOOL_LABEL_BY_ID[1]}</span><b>MOUNTED</b></div>
     {props.verbose !== false && draggable && <div className={styles.renderSpec}><span>HIERARCHY</span><i/> <span>LIVE CUT FX</span><i/> <span>METAL PBR</span></div>}
     {draggable && <div className={styles.orbitControls}><span>DRAG TO ORBIT · WHEEL TO ZOOM</span><button aria-pressed={autoOrbit} onClick={() => setAutoOrbit((value) => !value)}>{autoOrbit ? "PAUSE ORBIT" : "AUTO ORBIT"}</button><button onClick={resetView}>RESET VIEW</button></div>}
   </aside>;

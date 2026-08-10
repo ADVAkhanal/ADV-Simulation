@@ -47,6 +47,8 @@ EXPECTED_NAMES = [
     "fixture.vise.jaw_moving",
     "fixture.vise.stock_anchor",
     "tool.endmill.flat.010",
+    "tool.endmill.rougher.020",
+    "tool.drill.030",
     "stock.block.flagship",
 ]
 
@@ -123,6 +125,18 @@ def cylinder(name: str, location: tuple[float, float, float], radius: float, dep
     obj.name = name
     obj.data.name = name.replace(".", "_") + "_mesh"
     return apply_and_bevel(obj, material, 1.3)
+
+
+def cone(name: str, location: tuple[float, float, float], radius: float, depth: float, material: bpy.types.Material, vertices: int = 24, apex_down: bool = True) -> bpy.types.Object:
+    # Blender's cone spans -Z..+Z locally; radius1 is at -Z, radius2 at +Z.
+    # apex_down=True puts the pointed tip toward -Z (down, toward the stock),
+    # matching a real drill point aimed at the workpiece.
+    radius1, radius2 = (0.0, radius) if apex_down else (radius, 0.0)
+    bpy.ops.mesh.primitive_cone_add(vertices=vertices, radius1=radius1, radius2=radius2, depth=depth, location=location)
+    obj = bpy.context.active_object
+    obj.name = name
+    obj.data.name = name.replace(".", "_") + "_mesh"
+    return apply_and_bevel(obj, material, 0.6)
 
 
 def join_parts(parts: list[bpy.types.Object], name: str) -> bpy.types.Object:
@@ -327,6 +341,23 @@ tool = join_parts([tool_shank, tool_flute], "tool.endmill.flat.010")
 set_origin(tool, (0, 75, 140)); tag(tool, "cutting_tool", True, "cutter_tip")
 parent_keep_world(tool, tool_anchor)
 
+# Roughing end mill: shorter, thicker flute with a coarser step to read as a
+# chip-clearing roughing cutter rather than a finishing tool at a glance.
+rougher_shank = cylinder("rougher-shank", (0, 75, 190), 5.6, 70, materials["MAT_TOOL_STEEL"], 24)
+rougher_flute = cylinder("rougher-flute", (0, 75, 163), 8.5, 24, materials["MAT_TOOL_STEEL"], 12)
+rougher_step = cylinder("rougher-step", (0, 75, 143), 9.2, 18, materials["MAT_BRUSHED_STEEL"], 12)
+rougher = join_parts([rougher_shank, rougher_flute, rougher_step], "tool.endmill.rougher.020")
+set_origin(rougher, (0, 75, 134)); tag(rougher, "cutting_tool", True, "cutter_tip")
+parent_keep_world(rougher, tool_anchor)
+
+# Spot drill: slim shank with a conical point, unambiguous as a drill rather
+# than a milling cutter.
+drill_shank = cylinder("drill-shank", (0, 75, 187.5), 4.2, 75, materials["MAT_TOOL_STEEL"], 20)
+drill_point = cone("drill-point", (0, 75, 143), 4.2, 32, materials["MAT_BRUSHED_STEEL"], 20)
+drill = join_parts([drill_shank, drill_point], "tool.drill.030")
+set_origin(drill, (0, 75, 127)); tag(drill, "cutting_tool", True, "cutter_tip")
+parent_keep_world(drill, tool_anchor)
+
 chip_tray = join_parts([
     box("tray-pan", (0, -208, -32), (610, 62, 26), materials["MAT_VISE_DARK"], 6),
     *[cylinder(f"chip-{index:02d}", (-245 + index * 70, -212 + (index % 2) * 10, -6), 5 + index % 3, 42 + index * 3, materials["MAT_MACHINED_ALUMINUM"], 10) for index in range(8)],
@@ -404,6 +435,11 @@ manifest = {
         "stock": "stock.block.flagship",
         "stockAnchor": "fixture.vise.stock_anchor",
         "movingJaw": "fixture.vise.jaw_moving",
+    },
+    "tools": {
+        "1": "tool.endmill.flat.010",
+        "2": "tool.endmill.rougher.020",
+        "3": "tool.drill.030",
     },
     "objects": EXPECTED_NAMES,
     "materials": sorted(MATERIAL_SPECS),

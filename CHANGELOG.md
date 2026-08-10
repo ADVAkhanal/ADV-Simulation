@@ -1,5 +1,12 @@
 # Changelog
 
+## 2026-08-10 - Interactive assets: tools visibly mount, orbit everywhere
+
+- The Blender kit now ships three distinct tool geometries (finisher end mill, roughing end mill, spot drill) under the same spindle anchor instead of one hardcoded cutter; the renderer shows only the tool the player has actually selected, so swapping tools in the process panel now visibly changes what's mounted in the spindle.
+- Enabled free-orbit/zoom on the live gameplay machining-kit view (previously only available in the post-cut twin review and the marketing landing page) and added the same drag-to-orbit/zoom interaction to the G//CODE Stage's Tool Crib viewer, which previously had no interaction at all.
+- Added a regression test asserting the three tool nodes exist, are geometrically distinct, and map to the game's `MILL_TOOLS` ids.
+- Fixed a pre-existing render-time ref-mutation lint violation in the Tool Crib viewer while touching its render loop for the new orbit state.
+
 ## 2026-08-10 - Retention and active-inspection gate
 
 - Completed the three-contract manual campaign with ordered profile, pocket, drill, and finish operation plans and explicit operation signoff.

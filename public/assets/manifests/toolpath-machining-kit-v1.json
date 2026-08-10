@@ -4,8 +4,8 @@
   "path": "/assets/workholding/toolpath-machining-kit-v1.glb",
   "sourceBlend": "assets-src/blender/toolpath-machining-kit-v1.blend",
   "sourceScript": "tools/blender/build-machining-kit.py",
-  "generatedAt": "2026-08-05T12:14:25.995178+00:00",
-  "sha256": "B5E596707746715F21D2B3DE9E6E1A915FB62E21F8487F79C01E7BE9A4D35D10",
+  "generatedAt": "2026-08-10T13:04:43.802297+00:00",
+  "sha256": "CE7962178CA50FAC5C12906E081F5E80C8D8E2F5B63C1B51B1A3AF712FE2C798",
   "coordinateSystem": {
     "units": "millimeters",
     "worldUp": "+Z",
@@ -24,6 +24,11 @@
     "stock": "stock.block.flagship",
     "stockAnchor": "fixture.vise.stock_anchor",
     "movingJaw": "fixture.vise.jaw_moving"
+  },
+  "tools": {
+    "1": "tool.endmill.flat.010",
+    "2": "tool.endmill.rougher.020",
+    "3": "tool.drill.030"
   },
   "objects": [
     "machine.enclosure.base",
@@ -47,6 +52,8 @@
     "fixture.vise.jaw_moving",
     "fixture.vise.stock_anchor",
     "tool.endmill.flat.010",
+    "tool.endmill.rougher.020",
+    "tool.drill.030",
     "stock.block.flagship"
   ],
   "materials": [
@@ -58,9 +65,9 @@
     "MAT_VISE_DARK",
     "MAT_WARM_WORKLIGHT"
   ],
-  "triangleCount": 11516,
+  "triangleCount": 12434,
   "materialCount": 7,
-  "fileSizeBytes": 801384,
+  "fileSizeBytes": 865828,
   "boundingBox": {
     "minMm": [
       -491.0,

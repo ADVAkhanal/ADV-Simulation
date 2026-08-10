@@ -88,12 +88,16 @@ function parseGlb(buffer: ArrayBuffer): Scene {
   return { faces };
 }
 
+type ViewState = { yaw: number; pitch: number; zoom: number; autoOrbit: boolean };
+
 export default function ToolCribViewer({ activeTool }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null), sceneRef = useRef<Scene | null>(null);
   const activeToolRef = useRef(activeTool);
-  const yawRef = useRef(-.55);
+  const viewRef = useRef<ViewState>({ yaw: -.55, pitch: -.28, zoom: 1, autoOrbit: true });
+  const dragRef = useRef<{ x: number; y: number } | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "fallback">("loading");
-  activeToolRef.current = activeTool;
+  const [autoOrbit, setAutoOrbit] = useState(true);
+  useEffect(() => { activeToolRef.current = activeTool; viewRef.current.autoOrbit = autoOrbit; }, [activeTool, autoOrbit]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -111,21 +115,35 @@ export default function ToolCribViewer({ activeTool }: Props) {
     let frame = 0;
     const render = (time: number) => {
       const canvas = canvasRef.current, scene = sceneRef.current;
-      if (canvas && scene) draw(canvas, scene, activeToolRef.current, yawRef.current + time / 42000, time);
+      const view = viewRef.current, orbit = view.autoOrbit ? time / 42000 : 0;
+      if (canvas && scene) draw(canvas, scene, activeToolRef.current, view.yaw + orbit, view.pitch, view.zoom, time);
       frame = requestAnimationFrame(render);
     };
     frame = requestAnimationFrame(render);
     return () => cancelAnimationFrame(frame);
   }, []);
 
+  const resetView = () => { viewRef.current = { yaw: -.55, pitch: -.28, zoom: 1, autoOrbit: true }; setAutoOrbit(true); };
+
   return <div className={styles.viewer} aria-label="Tool crib 3D reference">
-    <canvas ref={canvasRef}/>
+    <canvas
+      ref={canvasRef}
+      tabIndex={0}
+      aria-label="Interactive tool crib. Drag to orbit and use the mouse wheel to zoom."
+      onPointerDown={(event) => { dragRef.current = { x: event.clientX, y: event.clientY }; event.currentTarget.setPointerCapture(event.pointerId); setAutoOrbit(false); }}
+      onPointerMove={(event) => { const start = dragRef.current; if (!start) return; viewRef.current.yaw += (event.clientX - start.x) * .008; viewRef.current.pitch = clamp(viewRef.current.pitch + (event.clientY - start.y) * .006, -.95, .2); dragRef.current = { x: event.clientX, y: event.clientY }; }}
+      onPointerUp={() => { dragRef.current = null; }}
+      onPointerCancel={() => { dragRef.current = null; }}
+      onWheel={(event) => { event.preventDefault(); viewRef.current.zoom = clamp(viewRef.current.zoom - event.deltaY * .001, .72, 1.6); }}
+      onDoubleClick={resetView}
+    />
     <div className={styles.label}><i className={status === "ready" ? styles.live : ""}/><span>TOOL CRIB</span><b>{status === "loading" ? "DECODING" : status === "ready" ? "LIVE GLB" : "SAFE FALLBACK"}</b></div>
     <div className={styles.signal}><span>CHECKED IN</span><b>T{activeTool}</b></div>
+    <div className={styles.orbitControls}><span>DRAG TO ORBIT · WHEEL TO ZOOM</span><button aria-pressed={autoOrbit} onClick={() => setAutoOrbit((value) => !value)}>{autoOrbit ? "PAUSE ORBIT" : "AUTO ORBIT"}</button><button onClick={resetView}>RESET VIEW</button></div>
   </div>;
 }
 
-function draw(canvas: HTMLCanvasElement, scene: Scene, activeTool: number, yaw: number, time: number) {
+function draw(canvas: HTMLCanvasElement, scene: Scene, activeTool: number, yaw: number, pitch: number, zoom: number, time: number) {
   const bounds = canvas.getBoundingClientRect(), ratio = Math.min(devicePixelRatio || 1, 2);
   canvas.width = Math.max(1, Math.round(bounds.width * ratio)); canvas.height = Math.max(1, Math.round(bounds.height * ratio));
   const context = canvas.getContext("2d"); if (!context) return;
@@ -137,12 +155,11 @@ function draw(canvas: HTMLCanvasElement, scene: Scene, activeTool: number, yaw: 
   const min: Vec3 = [Infinity, Infinity, Infinity], max: Vec3 = [-Infinity, -Infinity, -Infinity];
   all.forEach((point) => point.forEach((value, axis) => { min[axis] = Math.min(min[axis], value); max[axis] = Math.max(max[axis], value); }));
   const center = min.map((value, axis) => (value + max[axis]) / 2) as Vec3, extent = Math.max(...max.map((value, axis) => value - min[axis])) || 1;
-  const pitch = -.28;
   const project = (point: Vec3) => {
     const nx = (point[0] - center[0]) / extent, ny = (point[1] - center[1]) / extent, nz = (point[2] - center[2]) / extent;
     const rx = nx * Math.cos(yaw) + nz * Math.sin(yaw), rz = -nx * Math.sin(yaw) + nz * Math.cos(yaw);
     const ry = ny * Math.cos(pitch) - rz * Math.sin(pitch), depth = ny * Math.sin(pitch) + rz * Math.cos(pitch);
-    const perspective = 1 / (1.7 - depth * .4), scale = Math.min(bounds.width, bounds.height) * .92;
+    const perspective = 1 / (1.7 - depth * .4), scale = Math.min(bounds.width, bounds.height) * .92 * zoom;
     return { x: bounds.width / 2 + rx * scale * perspective, y: bounds.height * .56 - ry * scale * perspective, depth };
   };
 

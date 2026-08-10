@@ -14,7 +14,8 @@ const expectedObjects = [
   "machine.cablechain.x", "machine.guard.doors", "machine.control.pendant",
   "machine.table", "machine.spindle.body", "machine.spindle.toolholder", "machine.spindle.tool_anchor",
   "fixture.vise.body", "fixture.vise.jaw_fixed", "fixture.vise.jaw_moving",
-  "fixture.vise.stock_anchor", "tool.endmill.flat.010", "stock.block.flagship",
+  "fixture.vise.stock_anchor", "tool.endmill.flat.010", "tool.endmill.rougher.020",
+  "tool.drill.030", "stock.block.flagship",
 ];
 const expectedMaterials = [
   "MAT_BRUSHED_STEEL", "MAT_MACHINED_ALUMINUM", "MAT_MACHINE_ACCENT",
@@ -74,4 +75,12 @@ test("Machining Kit v1 ships a reproducible, budgeted production asset", async (
     assert.ok(!node.scale || node.scale.every((value) => value === 1), `${name} has unapplied scale`);
   }
   for (const anchor of Object.values(manifest.anchors)) assert.ok(nodeNames.includes(anchor), `missing anchor ${anchor}`);
+
+  // Every tool the game can select (see MILL_TOOLS in manual-campaign-engine.ts,
+  // ids 1/2/3) must have a real, distinct node in the GLB so switching tools
+  // in gameplay actually changes what's visibly mounted in the spindle.
+  assert.deepEqual(manifest.tools, { "1": "tool.endmill.flat.010", "2": "tool.endmill.rougher.020", "3": "tool.drill.030" });
+  const toolNodeNames = Object.values(manifest.tools);
+  assert.equal(new Set(toolNodeNames).size, toolNodeNames.length, "tool nodes must be geometrically distinct");
+  for (const node of toolNodeNames) assert.ok(nodeNames.includes(node), `missing tool node ${node}`);
 });
