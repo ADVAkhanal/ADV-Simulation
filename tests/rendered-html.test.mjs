@@ -13,31 +13,32 @@ async function render() {
   );
 }
 
-test("server-renders the finished Advanced experience", async () => {
+test("server-renders the finished Project Toolpath game surface", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
-  assert.match(html, /<title>Advanced \| Precision Machining &amp; Manufacturing<\/title>/i);
-  assert.match(html, /Built for the parts/);
-  assert.match(html, /Advanced signal desk/);
-  assert.match(html, /Capability,?/);
-  assert.match(html, /Evidence room/);
+  assert.match(html, /<title>Project Toolpath \| Precision Manufacturing Game Prototype<\/title>/i);
+  assert.match(html, /MANUAL CAMPAIGN \/ RETENTION GATE/);
+  assert.match(html, /Emergency drive plate/);
+  assert.match(html, /Flight rib prototype/);
+  assert.match(html, /Sensor bracket/);
+  assert.match(html, /2 PLAYABLE MODES/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|Codex is working/i);
 });
 
-test("ships the requested premium interaction system", async () => {
-  const [page, css, packageJson] = await Promise.all([
-    readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
+test("ships responsive, accessible, persistence-backed gameplay interactions", async () => {
+  const [campaign, campaignCss, globalCss, packageJson] = await Promise.all([
+    readFile(new URL("../app/manual-campaign.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/manual-campaign-retention.module.css", import.meta.url), "utf8"),
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
-  assert.match(page, /from "animejs"/);
-  assert.match(page, /from "motion\/react"/);
-  assert.match(page, /function SlideButton/);
-  assert.match(page, /function EvidenceChart/);
-  assert.match(css, /prefers-reduced-motion:\s*reduce/);
-  assert.match(css, /@media \(max-width:\s*760px\)/);
-  assert.match(packageJson, /"animejs"/);
-  assert.match(packageJson, /"motion"/);
+  assert.match(campaign, /onPointerDown=/);
+  assert.match(campaign, /onKeyDown=\{jog\}/);
+  assert.match(campaign, /toolpath-manual-campaign-v3/);
+  assert.match(campaign, /FINAL DISPOSITION/);
+  assert.match(campaignCss, /@media \(max-width: 700px\)/);
+  assert.match(globalCss, /prefers-reduced-motion:reduce/);
+  assert.match(packageJson, /"factory": "node tools\/game-factory\.mjs"/);
 });

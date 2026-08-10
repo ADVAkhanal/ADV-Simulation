@@ -11,21 +11,21 @@ Status legend: **shipped**, **next**, **later**, **gated**.
 | G//CODE Stage creative coding module | shipped | Simplified G-code becomes scored kinetic ASCII art |
 | Blueprint keep-zone and overcut | shipped | Deterministic grid simulation |
 | Feed, load, heat, wear, chatter, breakage | shipped | Live telemetry and failure feedback |
-| Inspection, grade, payout, instant retry | shipped | Result loop |
+| Inspection, grade, payout, instant retry | shipped | Evidence-based accept/rework/scrap result loop |
 | Controller input | next | Required for desktop foundation |
-| Tool selection with real tradeoffs | next | Three-tool retention slice |
-| Multiple operations: profile, pocket, drill, finish | next | Three-contract slice |
-| Active inspection characteristics and measurement choices | next | Quality must become gameplay, not only a result modal |
+| Tool selection with real tradeoffs | shipped | Finisher, rougher, and drill have enforced capabilities, access limits, load, wear, removal, and finish behavior |
+| Multiple operations: profile, pocket, drill, finish | shipped | Ordered operation plans, progress gates, and signoff across three contracts |
+| Active inspection characteristics and measurement choices | shipped | Characteristic/instrument selection, tolerance readings, findings, and blocked invalid dispositions |
 | 3D material removal | gated | Only after 2D retention proof |
 
 ## Progression and content
 
 | Feature | Status | Evidence / gate |
 | --- | --- | --- |
-| Device-local credits, best score, contract count | shipped | Prototype save v1 |
-| Contract ladder | next | Three authored contracts |
+| Device-local credits, mastery, contract count | shipped | Migrated prototype save v3 |
+| Contract ladder | shipped | Three authored contracts with sequential unlock and retry/advance |
 | Machine/tool unlocks | next | No strict linear upgrades |
-| Data-driven contract schema | next | Must validate without renderer |
+| Data-driven contract schema | shipped | Contract, operation, tool, and inspection rules validate without renderer |
 | Deterministic daily challenge | later | After schema and seed tests |
 | Workshop customization | later | After progression economy is tuned |
 | Job board, scheduling, cost, and reputation | later | Add only after the three-contract machining loop validates |
@@ -51,6 +51,6 @@ Status legend: **shipped**, **next**, **later**, **gated**.
 | Build-backed regression tests | shipped | Current test suite |
 | Reduced-motion and muted-audio paths | shipped | Prototype UI |
 | Direct visual/browser release pass | next | Required every release candidate |
-| Save migrations | next | Required before save v2 |
+| Save migrations | shipped | v2 progress migrates to v3 mastery without losing credits or clears |
 | Consented playtest measurement | next | Manual first; no production telemetry |
 | Accessibility review beyond input parity | later | Before public demo |

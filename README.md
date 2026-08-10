@@ -1,8 +1,6 @@
-# vinext-starter
+# Project Toolpath
 
-A clean full-stack starter running on
-[vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and
-Drizzle support.
+A playable browser manufacturing game with a hands-on multi-operation milling campaign and a separate creative G-code stage. The current product is a fictionalized game prototype, not machine-ready guidance or an industrial verification tool.
 
 ## Prerequisites
 
@@ -16,11 +14,24 @@ npm run dev
 npm run build
 ```
 
+## One-command playable build
+
+```powershell
+.\build_game.ps1
+```
+
+The game factory validates production inputs and asset release status, runs lint, builds the app, executes gameplay regressions, hashes the output, creates lightweight dependency/provenance reports, and writes a versioned playable ZIP under `artifacts/`.
+
+Use `-SkipLint` or `-SkipTests` only for local iteration. A release candidate must run without either flag.
+
 This starter does not use `wrangler.jsonc`.
 
-## Included Shape
+## Product shape
 
-- edit site code under `app/`
+- `/` contains the three-contract Manual Mill campaign
+- `/gcode` contains the creative programming campaign
+- deterministic gameplay rules live outside rendering components
+- `build_game.ps1` is the repeatable vertical-slice factory entry point
 - `.openai/hosting.json` declares optional Sites D1 and R2 bindings
 - `vite.config.ts` simulates declared bindings for local development
 - `db/schema.ts` starts intentionally empty
@@ -85,11 +96,12 @@ or enforce explicit server-side membership or allowlist checks.
 Use SIWC for account pages, user-specific dashboards, saved records, and write
 actions tied to the current ChatGPT user. Leave public content anonymous.
 
-## Useful Commands
+## Useful commands
 
 - `npm run dev`: start local development
 - `npm run build`: verify the vinext build output
-- `npm test`: build the starter and verify its rendered loading skeleton
+- `npm test`: build both modes and run all gameplay/route regressions
+- `npm run factory`: run the same production pipeline as `build_game.ps1`
 - `npm run db:generate`: generate Drizzle migrations after schema changes
 
 ## Learn More

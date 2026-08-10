@@ -13,7 +13,7 @@ test("root URL renders the hands-on machine floor", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /THREE MATERIAL SYSTEMS/);
+  assert.match(html, /MANUAL CAMPAIGN \/ RETENTION GATE/);
   assert.match(html, /Emergency drive plate/);
   assert.match(html, /Flight rib prototype/);
   assert.match(html, /Sensor bracket/);
@@ -48,6 +48,7 @@ test("global mode dock exposes both game surfaces", async () => {
   assert.doesNotMatch(page, /href="#contracts"/);
   assert.doesNotMatch(template, /ExperienceRouter/);
   assert.match(home, /ManualCampaign/);
-  assert.match(manual, /THREE MATERIAL SYSTEMS/);
-  assert.match(manual, /INSPECT PART/);
+  assert.match(manual, /Four operations\. Three tool identities\. Active inspection\./);
+  assert.match(manual, /OPEN INSPECTION/);
+  assert.match(manual, /FINAL DISPOSITION/);
 });

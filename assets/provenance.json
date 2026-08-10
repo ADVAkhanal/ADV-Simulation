@@ -1,0 +1,54 @@
+{
+  "schemaVersion": 1,
+  "policy": "Only assets marked usedInBuild=true and approvedForRelease=true may ship.",
+  "assets": [
+    {
+      "path": "public/og.png",
+      "kind": "social-preview",
+      "source": "Project-specific generated artwork already present in this repository",
+      "license": "Project-owned output; retain generation record",
+      "usedInBuild": true,
+      "approvedForRelease": true
+    },
+    {
+      "path": "public/favicon.svg",
+      "kind": "brand-icon",
+      "source": "Project repository",
+      "license": "Project-owned source",
+      "usedInBuild": true,
+      "approvedForRelease": true
+    },
+    {
+      "path": "public/advanced-logo.jpg",
+      "kind": "legacy-image",
+      "source": "Existing repository asset; origin requires confirmation",
+      "license": "[VERIFY]",
+      "usedInBuild": false,
+      "approvedForRelease": false
+    },
+    {
+      "path": "public/work-door-hinge.jpg",
+      "kind": "legacy-image",
+      "source": "Existing repository asset; origin requires confirmation",
+      "license": "[VERIFY]",
+      "usedInBuild": false,
+      "approvedForRelease": false
+    },
+    {
+      "path": "public/work-longeron.jpg",
+      "kind": "legacy-image",
+      "source": "Existing repository asset; origin requires confirmation",
+      "license": "[VERIFY]",
+      "usedInBuild": false,
+      "approvedForRelease": false
+    },
+    {
+      "path": "public/work-motorlead.jpeg",
+      "kind": "legacy-image",
+      "source": "Existing repository asset; origin requires confirmation",
+      "license": "[VERIFY]",
+      "usedInBuild": false,
+      "approvedForRelease": false
+    }
+  ]
+}

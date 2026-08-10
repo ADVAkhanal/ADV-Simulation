@@ -65,7 +65,7 @@ function interpolateLine(from: ToolPoint, to: Vec3, line: number, cut: boolean, 
 
 function interpolateArc(from: ToolPoint, to: Vec3, center: { x: number; y: number }, clockwise: boolean, line: number, cut: boolean, feed: number) {
   const radius = Math.hypot(from.x - center.x, from.y - center.y);
-  let startAngle = Math.atan2(from.y - center.y, from.x - center.x);
+  const startAngle = Math.atan2(from.y - center.y, from.x - center.x);
   let endAngle = Math.atan2(to.y - center.y, to.x - center.x);
   if (clockwise && endAngle >= startAngle) endAngle -= Math.PI * 2;
   if (!clockwise && endAngle <= startAngle) endAngle += Math.PI * 2;

@@ -68,7 +68,10 @@ export default function GCodeStage() {
   const earnedXp = completed.reduce((sum, index) => sum + CONTRACTS[index].xp, 0);
 
   useEffect(() => {
-    try { setCompleted(JSON.parse(localStorage.getItem("toolpath-contracts") ?? "[]")); } catch { /* device-local progress is optional */ }
+    let stored: number[] = [];
+    try { stored = JSON.parse(localStorage.getItem("toolpath-contracts") ?? "[]"); } catch { /* device-local progress is optional */ }
+    const hydration = window.setTimeout(() => setCompleted(stored), 0);
+    return () => window.clearTimeout(hydration);
   }, []);
 
   useEffect(() => {
