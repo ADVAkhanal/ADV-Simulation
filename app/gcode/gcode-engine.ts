@@ -21,7 +21,7 @@ export type ToolPoint = Vec3 & {
 };
 
 export type ProgramDiagnostic = {
-  category: "unsupported-command" | "missing-axis" | "invalid-arc" | "unsafe-state" | "travel-limit";
+  category: "unsupported-command" | "missing-axis" | "invalid-arc" | "unsafe-state" | "travel-limit" | "collision";
   line: number;
   message: string;
 };
@@ -43,10 +43,88 @@ export type MissionGrade = {
   rank: "S" | "A" | "B" | "C" | "REWORK";
 };
 
+export type MachiningSetup = {
+  compensation: "center" | "left" | "right";
+  finalDepth: number;
+  path: "as-programmed" | "climb" | "conventional";
+  passes: number;
+  reverse: boolean;
+};
+
+export type OperationGroup = {
+  id: string;
+  label: string;
+  kind: "setup" | "cut" | "exit";
+  pass: number | null;
+  startFrame: number;
+  endFrame: number;
+  sourceLines: number[];
+};
+
+export type MachiningPlan = {
+  points: ToolPoint[];
+  groups: OperationGroup[];
+  direction: "FORWARD" | "REVERSE";
+  compensationMm: number;
+  passDepths: number[];
+};
+
 const COLS = 46;
 const ROWS = 25;
 const RAPID_FEED = 3000;
 export const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
+
+function signedArea(points: ToolPoint[]) {
+  return points.reduce((area, point, index) => {
+    const next = points[(index + 1) % points.length];
+    return area + point.x * next.y - next.x * point.y;
+  }, 0) / 2;
+}
+
+function offsetPath(points: ToolPoint[], offset: number) {
+  if (!offset || points.length < 2) return points.map((point) => ({ ...point }));
+  return points.map((point, index) => {
+    const previous = points[Math.max(0, index - 1)], next = points[Math.min(points.length - 1, index + 1)];
+    const dx = next.x - previous.x, dy = next.y - previous.y, length = Math.hypot(dx, dy) || 1;
+    return { ...point, x: point.x + (-dy / length) * offset, y: point.y + (dx / length) * offset };
+  });
+}
+
+export function buildMachiningPlan(program: ParsedProgram, setup: MachiningSetup): MachiningPlan {
+  const points = program.points;
+  const firstCut = points.findIndex((point) => point.cut);
+  let lastCut = -1;
+  for (let index = points.length - 1; index >= 0; index -= 1) if (points[index].cut) { lastCut = index; break; }
+  if (firstCut < 0 || lastCut < firstCut) return { points: points.map((point) => ({ ...point })), groups: [{ id: "setup", label: "SETUP / NO CUT", kind: "setup", pass: null, startFrame: 1, endFrame: points.length, sourceLines: [...new Set(points.map((point) => point.line))] }], direction: setup.reverse ? "REVERSE" : "FORWARD", compensationMm: 0, passDepths: [] };
+
+  const setupPoints = points.slice(0, firstCut).map((point) => ({ ...point }));
+  const cuttingPoints = points.slice(firstCut, lastCut + 1).filter((point) => point.cut);
+  const exitPoints = points.slice(lastCut + 1).map((point) => ({ ...point }));
+  const area = signedArea(cuttingPoints);
+  const strategyReverse = setup.path === "climb" ? area > 0 : setup.path === "conventional" ? area < 0 : false;
+  const reverse = strategyReverse !== setup.reverse;
+  const ordered = reverse ? [...cuttingPoints].reverse() : cuttingPoints;
+  const compensationMm = setup.compensation === "left" ? .6 : setup.compensation === "right" ? -.6 : 0;
+  const compensated = offsetPath(ordered, compensationMm);
+  const passCount = clamp(Math.round(setup.passes), 1, 6);
+  const finalDepth = clamp(setup.finalDepth, -6, -.2);
+  const passDepths = Array.from({ length: passCount }, (_, index) => Number((finalDepth * ((index + 1) / passCount)).toFixed(2)));
+  const planned: ToolPoint[] = [...setupPoints];
+  const groups: OperationGroup[] = [];
+  if (setupPoints.length) groups.push({ id: "setup", label: "SETUP / APPROACH", kind: "setup", pass: null, startFrame: 1, endFrame: setupPoints.length, sourceLines: [...new Set(setupPoints.map((point) => point.line))] });
+  passDepths.forEach((depth, passIndex) => {
+    const startFrame = planned.length + 1;
+    const first = compensated[0];
+    planned.push({ ...first, z: Math.max(.8, Math.abs(depth) * .35), cut: false });
+    compensated.forEach((point) => planned.push({ ...point, z: depth, cut: true }));
+    planned.push({ ...compensated.at(-1)!, z: Math.max(.8, Math.abs(depth) * .35), cut: false });
+    groups.push({ id: `pass-${passIndex + 1}`, label: `${passIndex + 1 === passCount ? "FINISH" : "ROUGH"} / PASS ${passIndex + 1}`, kind: "cut", pass: passIndex + 1, startFrame, endFrame: planned.length, sourceLines: [...new Set(compensated.map((point) => point.line))] });
+  });
+  const exitStart = planned.length + 1;
+  planned.push(...exitPoints);
+  if (exitPoints.length) groups.push({ id: "exit", label: "EXIT / SAFE Z", kind: "exit", pass: null, startFrame: exitStart, endFrame: planned.length, sourceLines: [...new Set(exitPoints.map((point) => point.line))] });
+  return { points: planned, groups, direction: reverse ? "REVERSE" : "FORWARD", compensationMm, passDepths };
+}
 
 function wordsFor(line: string) {
   const words = new Map<string, number>();
@@ -124,6 +202,10 @@ export function parseProgram(source: string): ParsedProgram {
     }
     const cutting = motionCode !== 0 && target.z < 0 && spindle;
     if (motionCode !== 0 && target.z < 0 && !spindle) diagnostics.push({ category: "unsafe-state", line: lineNumber, message: "feed below stock with spindle stopped" });
+    // Rapids (G00) travel at full non-cutting speed with no engagement control.
+    // A real controller never programs one below the stock surface - that is
+    // a tool crash, not a slow feed, regardless of spindle or prior material state.
+    if (motionCode === 0 && target.z < 0) diagnostics.push({ category: "collision", line: lineNumber, message: "rapid move targets Z below the stock - this crashes the tool" });
     const kind: MotionKind = motionCode === 0 ? "rapid" : motionCode === 1 ? "feed-line" : motionCode === 2 ? "arc-cw" : "arc-ccw";
     let center: { x: number; y: number } | undefined;
     if (motionCode === 2 || motionCode === 3) {

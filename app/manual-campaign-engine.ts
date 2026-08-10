@@ -67,6 +67,7 @@ export type ManualGrade = {
   finish: number;
   time: number;
   inspection: number;
+  breakPenalty: number;
   score: number;
   accepted: boolean;
   rank: "S" | "A" | "B" | "C" | "REWORK";
@@ -74,6 +75,9 @@ export type ManualGrade = {
 };
 
 export type ManualMastery = { attempts: number; bestScore: number; bestRank: ManualGrade["rank"]; accepted: boolean };
+export type ShopBestRun = { score: number; precision: number; completion: number; elapsed: number; geometry?: number; finish?: number; time?: number };
+export type ShopRunLogEntry = { id: string; contract: ManualContractId; program: string; title: string; score: number; rank: string; accepted: boolean; completion: number; precision: number; finish: number; elapsed: number; overcut: number; at: number };
+
 export type ManualSaveData = {
   version: 3;
   credits: number;
@@ -81,6 +85,8 @@ export type ManualSaveData = {
   cleared: ManualContractId[];
   totalAttempts: number;
   mastery: Partial<Record<ManualContractId, ManualMastery>>;
+  bests: Partial<Record<ManualContractId, ShopBestRun>>;
+  log: ShopRunLogEntry[];
 };
 
 const PROFILE: ManualOperation = { id: "profile", label: "Profile", instruction: "Release the outside contour without crossing the keep line.", requiredProgress: 90 };
@@ -125,7 +131,7 @@ export const MILL_TOOLS: MillTool[] = [
   { id: 3, name: "DRILL", diameter: "8 MM", radius: .72, load: 1.24, wear: .82, finish: 1.2, removal: 1.35, role: "Fast axial feature making", operations: ["drill"], limitation: "Plunge-only; lateral profile and pocket cuts are locked out." },
 ];
 
-export const DEFAULT_MANUAL_SAVE: ManualSaveData = { version: 3, credits: 250, reputation: 0, cleared: [], totalAttempts: 0, mastery: {} };
+export const DEFAULT_MANUAL_SAVE: ManualSaveData = { version: 3, credits: 250, reputation: 0, cleared: [], totalAttempts: 0, mastery: {}, bests: {}, log: [] };
 
 function driveFeatures(x: number, y: number) {
   const center = Math.hypot(x, y) < 2.5;
@@ -185,16 +191,24 @@ export function isManualBoundary(contract: ManualContractId, col: number, row: n
 export function createManualStock() { return new Uint8Array(MILL_CELLS).fill(1); }
 export function createManualFinishMap() { return new Uint8Array(MILL_CELLS); }
 
+// The vise clamps the stock's outer perimeter from below the top surface.
+// A pass that cuts all the way to the stock's edge risks striking that
+// clamp - a real fixture collision, distinct from an overcut into the part.
+export function isFixtureZone(col: number, row: number) {
+  return col === 0 || col === MILL_COLS - 1 || row === 0 || row === MILL_ROWS - 1;
+}
+
 export function cutManualStock(source: Uint8Array, contract: ManualContractId, cutterX: number, cutterY: number, radius: number) {
   const material = source.slice();
-  let correct = 0; let overcut = 0; let engagement = 0;
+  let correct = 0; let overcut = 0; let engagement = 0; let fixtureStrikes = 0;
   for (let row = 0; row < MILL_ROWS; row += 1) for (let col = 0; col < MILL_COLS; col += 1) {
     const index = row * MILL_COLS + col;
     if (!material[index] || Math.hypot(col - cutterX, row - cutterY) > radius) continue;
     material[index] = 0; engagement += 1;
+    if (isFixtureZone(col, row)) fixtureStrikes += 1;
     if (isManualTarget(contract, col, row)) overcut += 1; else correct += 1;
   }
-  return { material, correct, overcut, engagement };
+  return { material, correct, overcut, engagement, fixtureStrikes };
 }
 
 export function machineManualStock(
@@ -208,11 +222,12 @@ export function machineManualStock(
 ) {
   const material = source.slice();
   const finished = finishSource.slice();
-  if (!tool.operations.includes(operation)) return { material, finished, correct: 0, overcut: 0, engagement: 0, mismatch: 0, compatible: false };
-  let correct = 0; let overcut = 0; let engagement = 0; let mismatch = 0;
+  if (!tool.operations.includes(operation)) return { material, finished, correct: 0, overcut: 0, engagement: 0, mismatch: 0, fixtureStrikes: 0, compatible: false };
+  let correct = 0; let overcut = 0; let engagement = 0; let mismatch = 0; let fixtureStrikes = 0;
   for (let row = 0; row < MILL_ROWS; row += 1) for (let col = 0; col < MILL_COLS; col += 1) {
     if (Math.hypot(col - cutterX, row - cutterY) > tool.radius) continue;
     const index = row * MILL_COLS + col;
+    if (isFixtureZone(col, row)) fixtureStrikes += 1;
     if (operation === "finish") {
       if (material[index] && isManualBoundary(contract, col, row) && !finished[index]) {
         finished[index] = 1; correct += 1; engagement += 1;
@@ -228,7 +243,7 @@ export function machineManualStock(
       mismatch += 1;
     }
   }
-  return { material, finished, correct, overcut, engagement, mismatch, compatible: true };
+  return { material, finished, correct, overcut, engagement, mismatch, fixtureStrikes, compatible: true };
 }
 
 export function manualCompletion(material: Uint8Array, contract: ManualContractId) {
@@ -293,6 +308,20 @@ export function evaluateManualDisposition(chosen: InspectionDisposition, recomme
   return { complete, correct, inspectionScore: correct ? 10 : complete ? 4 : 0 };
 }
 
+export function deriveManualMission(completion: number) {
+  if (completion < 35) return { step: 1, target: 35, title: "OPEN THE STOCK", detail: "Establish a safe removal lane without touching the glowing profile." };
+  if (completion < 70) return { step: 2, target: 70, title: "CONTROL THE ENGAGEMENT", detail: "Clear the open field while keeping simulated load below the red band." };
+  if (completion < 90) return { step: 3, target: 90, title: "PROTECT THE EDGE", detail: "Switch strategy near constrained geometry and preserve the part boundary." };
+  return { step: 4, target: 100, title: "INSPECT THE PART", detail: "The release threshold is met. Stop the spindle and run inspection." };
+}
+
+export function deriveFlowPoints(correctCells: number, chain: number) {
+  const multiplier = 1 + Math.min(Math.max(0, chain), 20) * .05;
+  return { multiplier, points: Math.max(0, Math.round(correctCells * 100 * multiplier)) };
+}
+
+export function deriveMasteryRank(score: number) { return score >= 96 ? "S" : score >= 88 ? "A" : score >= 76 ? "B" : "C"; }
+
 export function gradeManualRun(
   material: Uint8Array,
   contract: ManualContract,
@@ -300,25 +329,96 @@ export function gradeManualRun(
   finishPenalty: number,
   elapsed: number,
   breaks: number,
+  fixtureStrikes = 0,
   inspectionScore = 10,
   operationsComplete = true,
 ): ManualGrade {
   const completion = manualCompletion(material, contract.id);
-  const geometry = Math.min(40, completion / 90 * 40);
-  const precision = Math.max(0, 25 - overcut * (contract.id === "bracket" ? 5 : 3.2));
-  const finish = Math.max(0, 15 - finishPenalty * 1.3);
+  const geometry = Math.min(46, completion / 90 * 46);
+  const precision = Math.max(0, 30 - overcut * (contract.id === "bracket" ? 5 : 3.2));
+  const finish = Math.max(0, 14 - finishPenalty * 1.3);
   const time = Math.max(0, 10 - Math.max(0, elapsed - contract.par) * .1);
-  const score = Math.max(0, Math.min(100, Math.round(geometry + precision + finish + time + inspectionScore - breaks * 5)));
-  const accepted = operationsComplete && completion >= 90 && overcut <= contract.tolerance;
+  const breakPenalty = breaks * 5 + fixtureStrikes * 6;
+  const score = Math.max(0, Math.min(100, Math.round(geometry + precision + finish + time + inspectionScore - breakPenalty)));
+  const accepted = operationsComplete && completion >= 90 && overcut <= contract.tolerance && fixtureStrikes === 0;
   const rank: ManualGrade["rank"] = !accepted ? "REWORK" : score >= 96 ? "S" : score >= 88 ? "A" : score >= 76 ? "B" : "C";
-  return { completion, geometry: Math.round(geometry), precision: Math.round(precision), finish: Math.round(finish), time: Math.round(time), inspection: inspectionScore, score, accepted, rank, payout: accepted ? Math.round(contract.reward * (.55 + score / 220)) : 120 };
+  return {
+    completion,
+    geometry: Math.round(geometry),
+    precision: Math.round(precision),
+    finish: Math.round(finish),
+    time: Math.round(time),
+    inspection: inspectionScore,
+    breakPenalty,
+    score,
+    accepted,
+    rank,
+    payout: accepted ? Math.round(contract.reward * (.55 + score / 220)) : 120,
+  };
+}
+
+export function deriveShopSkillProgress(bests: Record<string, ShopBestRun>, thresholds = [0, 70, 165, 250]) {
+  const runs = Object.values(bests), xp = runs.reduce((sum, run) => sum + run.score, 0);
+  const average = (read: (run: ShopBestRun) => number) => runs.length ? Math.round(runs.reduce((sum, run) => sum + read(run), 0) / runs.length) : 0;
+  const skills = [
+    { label: "GEOMETRY CONTROL", value: average((run) => run.geometry !== undefined ? run.geometry / 46 * 100 : run.completion) },
+    { label: "INSPECTION DISCIPLINE", value: average((run) => run.precision / 30 * 100) },
+    { label: "PROCESS CONTROL", value: average((run) => run.finish !== undefined ? run.finish / 14 * 100 : 0) },
+    { label: "CYCLE DISCIPLINE", value: average((run) => run.time !== undefined ? run.time / 10 * 100 : 0) },
+  ];
+  const currentIndex = thresholds.reduce((found, threshold, index) => xp >= threshold ? index : found, 0);
+  const currentThreshold = thresholds[currentIndex] ?? 0, nextThreshold = thresholds[currentIndex + 1] ?? null;
+  const progress = nextThreshold === null ? 100 : Math.max(0, Math.min(100, (xp - currentThreshold) / (nextThreshold - currentThreshold) * 100));
+  return { xp, skills, currentIndex, nextThreshold, progress };
+}
+
+export function appendShopRunLog(log: ShopRunLogEntry[], entry: ShopRunLogEntry, limit = 24) {
+  return [entry, ...log].slice(0, Math.max(1, limit));
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> { return Boolean(value) && typeof value === "object" && !Array.isArray(value); }
 function finiteNumber(value: unknown, fallback: number) { return typeof value === "number" && Number.isFinite(value) ? value : fallback; }
 
+function migrateBests(value: unknown): ManualSaveData["bests"] {
+  const bests: ManualSaveData["bests"] = {};
+  if (!isRecord(value)) return bests;
+  for (const id of ["drive", "rib", "bracket"] as ManualContractId[]) {
+    const source = value[id];
+    if (!isRecord(source)) continue;
+    bests[id] = {
+      score: finiteNumber(source.score, 0),
+      precision: finiteNumber(source.precision, 0),
+      completion: finiteNumber(source.completion, 0),
+      elapsed: finiteNumber(source.elapsed, 0),
+      geometry: typeof source.geometry === "number" ? source.geometry : undefined,
+      finish: typeof source.finish === "number" ? source.finish : undefined,
+      time: typeof source.time === "number" ? source.time : undefined,
+    };
+  }
+  return bests;
+}
+
+function migrateLog(value: unknown): ShopRunLogEntry[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(isRecord).map((entry) => ({
+    id: String(entry.id ?? ""),
+    contract: (entry.contract === "drive" || entry.contract === "rib" || entry.contract === "bracket") ? entry.contract : "drive",
+    program: String(entry.program ?? ""),
+    title: String(entry.title ?? ""),
+    score: finiteNumber(entry.score, 0),
+    rank: String(entry.rank ?? "C"),
+    accepted: Boolean(entry.accepted),
+    completion: finiteNumber(entry.completion, 0),
+    precision: finiteNumber(entry.precision, 0),
+    finish: finiteNumber(entry.finish, 0),
+    elapsed: finiteNumber(entry.elapsed, 0),
+    overcut: finiteNumber(entry.overcut, 0),
+    at: finiteNumber(entry.at, 0),
+  })).filter((entry) => entry.id);
+}
+
 export function migrateManualSave(value: unknown): ManualSaveData {
-  if (!isRecord(value)) return { ...DEFAULT_MANUAL_SAVE, cleared: [], mastery: {} };
+  if (!isRecord(value)) return { ...DEFAULT_MANUAL_SAVE, cleared: [], mastery: {}, bests: {}, log: [] };
   const cleared = Array.isArray(value.cleared) ? value.cleared.filter((id): id is ManualContractId => id === "drive" || id === "rib" || id === "bracket") : [];
   const mastery: ManualSaveData["mastery"] = {};
   if (isRecord(value.mastery)) for (const id of ["drive", "rib", "bracket"] as ManualContractId[]) {
@@ -335,6 +435,8 @@ export function migrateManualSave(value: unknown): ManualSaveData {
     cleared: [...new Set(cleared)],
     totalAttempts: Math.max(0, Math.floor(finiteNumber(value.totalAttempts, Object.values(mastery).reduce((sum, item) => sum + (item?.attempts ?? 0), 0)))),
     mastery,
+    bests: migrateBests(value.bests),
+    log: migrateLog(value.log),
   };
 }
 
@@ -352,6 +454,8 @@ export function recordManualAttempt(save: ManualSaveData, contract: ManualContra
     cleared: firstClear ? [...save.cleared, contract.id] : [...save.cleared],
     totalAttempts: save.totalAttempts + 1,
     mastery: { ...save.mastery, [contract.id]: { attempts: current.attempts + 1, bestScore: Math.max(current.bestScore, grade.score), bestRank, accepted: current.accepted || grade.accepted } },
+    bests: save.bests,
+    log: save.log,
   };
   return next;
 }

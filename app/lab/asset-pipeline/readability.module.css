@@ -1,0 +1,24 @@
+.readable :where(nav, header, footer, section, aside, dl) :where(span, small, dt, dd, code, button) {
+  font-size: 12px !important;
+  line-height: 1.5 !important;
+  letter-spacing: .045em !important;
+}
+
+.readable :where(p, li) {
+  font-size: 15px !important;
+  line-height: 1.68 !important;
+}
+
+.readable button {
+  min-height: 48px;
+}
+
+.readable aside {
+  min-width: 400px;
+}
+
+@media (max-width: 1050px) {
+  .readable aside {
+    min-width: 0;
+  }
+}

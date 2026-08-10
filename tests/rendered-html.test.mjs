@@ -19,11 +19,11 @@ test("server-renders the finished Project Toolpath game surface", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
   assert.match(html, /<title>Project Toolpath \| Precision Manufacturing Game Prototype<\/title>/i);
-  assert.match(html, /MANUAL CAMPAIGN \/ RETENTION GATE/);
+  assert.match(html, /PLAN THE CUT/);
   assert.match(html, /Emergency drive plate/);
   assert.match(html, /Flight rib prototype/);
   assert.match(html, /Sensor bracket/);
-  assert.match(html, /2 PLAYABLE MODES/);
+  assert.match(html, /2 MODES \+ ASSET LAB/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|Codex is working/i);
 });
 
@@ -35,7 +35,7 @@ test("ships responsive, accessible, persistence-backed gameplay interactions", a
     readFile(new URL("../package.json", import.meta.url), "utf8"),
   ]);
   assert.match(campaign, /onPointerDown=/);
-  assert.match(campaign, /onKeyDown=\{jog\}/);
+  assert.match(campaign, /const motion = key === "a"/);
   assert.match(campaign, /toolpath-manual-campaign-v3/);
   assert.match(campaign, /FINAL DISPOSITION/);
   assert.match(campaignCss, /@media \(max-width: 700px\)/);

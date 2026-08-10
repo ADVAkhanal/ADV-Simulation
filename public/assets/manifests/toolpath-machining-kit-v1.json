@@ -1,0 +1,86 @@
+{
+  "id": "toolpath.machining-kit.v1",
+  "version": 1,
+  "path": "/assets/workholding/toolpath-machining-kit-v1.glb",
+  "sourceBlend": "assets-src/blender/toolpath-machining-kit-v1.blend",
+  "sourceScript": "tools/blender/build-machining-kit.py",
+  "generatedAt": "2026-08-05T12:14:25.995178+00:00",
+  "sha256": "B5E596707746715F21D2B3DE9E6E1A915FB62E21F8487F79C01E7BE9A4D35D10",
+  "coordinateSystem": {
+    "units": "millimeters",
+    "worldUp": "+Z",
+    "machineX": "left/right",
+    "machineY": "front/back",
+    "machineZ": "vertical",
+    "stockReference": "top center",
+    "toolReference": "cutter tip",
+    "spindleReference": "tool anchor",
+    "fixtureReference": "stock anchor"
+  },
+  "anchors": {
+    "spindle": "machine.spindle.body",
+    "tool": "tool.endmill.flat.010",
+    "toolAnchor": "machine.spindle.tool_anchor",
+    "stock": "stock.block.flagship",
+    "stockAnchor": "fixture.vise.stock_anchor",
+    "movingJaw": "fixture.vise.jaw_moving"
+  },
+  "objects": [
+    "machine.enclosure.base",
+    "machine.enclosure.column",
+    "machine.enclosure.left",
+    "machine.enclosure.right",
+    "machine.enclosure.roof",
+    "machine.waycover.z",
+    "machine.worklight",
+    "machine.coolant.manifold",
+    "machine.chiptray",
+    "machine.cablechain.x",
+    "machine.guard.doors",
+    "machine.control.pendant",
+    "machine.table",
+    "machine.spindle.body",
+    "machine.spindle.toolholder",
+    "machine.spindle.tool_anchor",
+    "fixture.vise.body",
+    "fixture.vise.jaw_fixed",
+    "fixture.vise.jaw_moving",
+    "fixture.vise.stock_anchor",
+    "tool.endmill.flat.010",
+    "stock.block.flagship"
+  ],
+  "materials": [
+    "MAT_BRUSHED_STEEL",
+    "MAT_MACHINED_ALUMINUM",
+    "MAT_MACHINE_ACCENT",
+    "MAT_MACHINE_DARK",
+    "MAT_TOOL_STEEL",
+    "MAT_VISE_DARK",
+    "MAT_WARM_WORKLIGHT"
+  ],
+  "triangleCount": 11516,
+  "materialCount": 7,
+  "fileSizeBytes": 801384,
+  "boundingBox": {
+    "minMm": [
+      -491.0,
+      -300.0,
+      -158.0
+    ],
+    "maxMm": [
+      507.0,
+      300.0,
+      650.0
+    ],
+    "dimensionsMm": [
+      998.0,
+      600.0,
+      808.0
+    ]
+  },
+  "releaseBudgets": {
+    "trianglesMax": 40000,
+    "materialsMax": 8,
+    "glbBytesMax": 2097152
+  }
+}

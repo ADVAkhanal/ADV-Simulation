@@ -1,0 +1,40 @@
+.readable {
+  --gcode-label: 12px;
+  --gcode-data: 14px;
+}
+
+.readable :where(header, footer, nav, section, article, aside, dl) :where(span, small, dt, dd, label, button) {
+  font-size: var(--gcode-label) !important;
+  line-height: 1.45 !important;
+  letter-spacing: .045em !important;
+}
+
+.readable :where(textarea, pre) {
+  font-size: var(--gcode-data) !important;
+  line-height: 1.6 !important;
+}
+
+.readable textarea {
+  min-height: 470px;
+}
+
+.readable button {
+  min-height: 46px;
+}
+
+.readable :where(p, li) {
+  font-size: 14px !important;
+  line-height: 1.62 !important;
+}
+
+@media (max-width: 760px) {
+  .readable {
+    --gcode-label: 12px;
+    --gcode-data: 13px;
+  }
+
+  .readable pre {
+    font-size: 12px !important;
+    line-height: 1.2 !important;
+  }
+}

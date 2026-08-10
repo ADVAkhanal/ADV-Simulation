@@ -44,3 +44,16 @@ The parser and canonical-motion layer are isolated from React so future presenta
 - An ASCII stock-removal map distinguishes rapid motion from material removed below Z0.
 - Controller alarms block unsafe below-stock feed motion with the spindle stopped, invalid arcs, and travel-envelope violations.
 - Passing inspection awards device-local XP and contract completion. No account, telemetry, or industrial accuracy claim is involved.
+## Process-planning controls
+
+The G//CODE Stage includes a presentation-safe process-planning layer above the canonical parser:
+
+- G40-style center, G41-style left, and G42-style right creative compensation.
+- Adjustable final depth from Z-0.40 through Z-5.00 mm inside the fictional lesson envelope.
+- As-programmed, climb, and conventional path strategies.
+- One through five equal-depth passes.
+- An explicit reverse-path override.
+- Selectable setup, roughing/pass, finishing, and safe-exit operation groups.
+- Live ready, running, feed-hold, complete, and alarm status with active group, pass, depth schedule, compensation, and direction.
+
+These controls regenerate the simulated execution points and stock-removal map. They do not emit validated machine code and must not be transferred to physical equipment.

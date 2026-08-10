@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "assetId": "toolpath-mcp-test",
+  "source": "assets-src/blender/toolpath-mcp-test.blend",
+  "runtime": "/assets/test/toolpath-mcp-test.glb",
+  "generator": "Blender 5.2.0 LTS",
+  "units": "meters",
+  "upAxis": "Y",
+  "objectCount": 1,
+  "materialCount": 1,
+  "sha256": "E961744FDA937B1BF55A43C03A44F018AEA24D644DA41ACEA66FFE04FE3924A5"
+}

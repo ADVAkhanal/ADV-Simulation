@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 import test from "node:test";
-import { gradeMission, parseProgram, rasterize } from "../app/gcode/gcode-engine.ts";
+import { buildMachiningPlan, gradeMission, parseProgram, rasterize } from "../app/gcode/gcode-engine.ts";
 
 test("G-code engine exposes a deterministic canonical boundary", async () => {
   const engine = await readFile(new URL("../app/gcode/gcode-engine.ts", import.meta.url), "utf8");
@@ -30,6 +30,26 @@ test("controller raises an alarm when feeding below stock with the spindle stopp
   assert.ok(parsed.diagnostics.some((item) => item.category === "unsafe-state"));
 });
 
+test("controller flags a tool crash when a rapid targets Z below the stock", () => {
+  const crashed = parseProgram("G21 G90\nM03\nG00 X4 Y4 Z-1\nG01 X10 Y4 F150");
+  assert.ok(crashed.diagnostics.some((item) => item.category === "collision"));
+  const safe = parseProgram("G21 G90\nM03\nG00 X4 Y4 Z3\nG01 Z-1 F100\nG01 X10 Y4 F150\nG00 Z3");
+  assert.ok(!safe.diagnostics.some((item) => item.category === "collision"));
+});
+
+test("setup planning applies compensation, depth, path reversal, grouping, and multipass", () => {
+  const parsed = parseProgram(`G21 G90\nT1 M06\nM03\nG00 X2 Y2 Z3\nG01 Z-1 F120\nG01 X12 Y2\nG01 X12 Y12\nG01 X2 Y12\nG01 X2 Y2\nG00 Z3\nM05`);
+  const forward = buildMachiningPlan(parsed, { compensation: "center", finalDepth: -3, path: "as-programmed", passes: 3, reverse: false });
+  const reversed = buildMachiningPlan(parsed, { compensation: "left", finalDepth: -3, path: "as-programmed", passes: 3, reverse: true });
+  assert.deepEqual(forward.passDepths, [-1, -2, -3]);
+  assert.equal(forward.groups.filter((group) => group.kind === "cut").length, 3);
+  assert.equal(reversed.direction, "REVERSE");
+  assert.equal(reversed.compensationMm, .6);
+  assert.ok(reversed.points.length > parsed.points.length);
+  assert.equal(Math.min(...reversed.points.filter((point) => point.cut).map((point) => point.z)), -3);
+  assert.notDeepEqual(reversed.points.filter((point) => point.cut).map(({ x, y }) => [x, y]), forward.points.filter((point) => point.cut).map(({ x, y }) => [x, y]));
+});
+
 test("G//CODE Stage remains explicitly non-machine-ready", async () => {
   const [page, blueprint] = await Promise.all([
     readFile(new URL("../app/gcode/page.tsx", import.meta.url), "utf8"),
@@ -37,5 +57,11 @@ test("G//CODE Stage remains explicitly non-machine-ready", async () => {
   ]);
   assert.match(page, /NOT MACHINE-READY/);
   assert.match(page, /SINGLE BLOCK/);
+  assert.match(page, /REVERSE PATH/);
+  assert.match(page, /OPERATION GROUPS/);
+  assert.match(page, /CUTTER COMP/);
+  assert.match(page, /FINAL DEPTH/);
+  assert.match(page, /MACHINING PATH/);
+  assert.match(page, /MULTIPASS/);
   assert.match(blueprint, /fictional creative sandbox/i);
 });

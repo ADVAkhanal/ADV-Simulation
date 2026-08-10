@@ -1,0 +1,137 @@
+# Industrial authenticity system
+
+Project Toolpath uses measurable industrial and geometric constraints instead of decorative “tech” styling.
+
+## Spatial system
+
+- Primary spacing follows the Fibonacci sequence: 8, 13, 21, 34, and 55 px.
+- Hero and primary workspace proportions use the golden ratio, 1.618:1.
+- The playable 240 × 140 mm stock is drawn at exactly 4 px/mm: 960 × 560 px.
+- The canvas rulers use 10 mm minor divisions and 50 mm labeled divisions.
+- The main workspace gives the machine viewport 1.618 times the visual weight of a setup rail.
+
+## Machining references
+
+- Work coordinates are presented in millimeters against a fictional G54 datum.
+- The stock, vise jaws, parallels, spindle, cutter, enclosure, and T-slot table establish physical hierarchy.
+- The simulated path is rendered continuously over the authoritative cell model.
+- Brushed grain, cavity floors, edge witness lines, coolant, chips, and cutter load are state-driven.
+- Surface roughness and material-removal readings are explicitly labeled as simulation estimates.
+- Live kinematic overlays communicate orthogonal centerlines, radial engagement angle, and a tangential force vector at the cutter.
+- Simulated spindle speed, feed rate, feed per tooth, and engagement are derived consistently from the selected material, tool, and feed override.
+
+## Visual doctrine
+
+- Datum, engagement, and surface finish form the three-part visual narrative on the public landing screen.
+- Machine callouts label the spindle axis, work offset, and fixture datum without relying on brand marks or decorative diagrams.
+- Amber means physical engagement or force. It is not reused as ambient decoration.
+- Technical annotations remain secondary to the machine silhouette and use hairline rules, compact labels, and explicit units.
+
+## Machine rendering
+
+- The GLB viewer calculates per-face normals and applies a consistent three-quarter inspection light.
+- Metallic and roughness values from the asset influence highlight strength and technical edge weight.
+- Perspective floor lines, a contact shadow, depth attenuation, and a controlled vignette ground the machine in a coherent volume.
+- Camera motion is limited to a subtle idle inspection orbit and stops while the spindle is active.
+- The renderer avoids noisy full-strength wireframes; edges remain subordinate to form and material value.
+- The flagship VMC now reads as a complete open-front cell: structural plinth and sump, rear Z column, guard frame, roof mass, bellows, T-slot table, vise and stock stack, spindle/tool assembly, coolant manifold, work light, and chip tray.
+- The source asset stays below 12,000 triangles, eight materials, and a 2 MB GLB budget so added authenticity does not compromise browser delivery.
+- Browser GLB traversal applies full hierarchical transform matrices rather than translation-only approximation, keeping parented spindle, coolant, tool, and stock geometry assembled during motion.
+- A repository-owned Blender preview script supplies repeatable camera and lighting QA independently of the browser renderer.
+- The second modeling pass adds an open guard pair, operator pendant and controls, X-axis cable chain, and a three-piece spindle toolholder, increasing the machine from 18 to 22 validated assemblies without crossing the 2 MB delivery budget.
+- Cutting state now changes the physical scene: the cutter receives phase animation, coolant jets converge on the tool center, deterministic chips arc from engagement, warm/cool light bounces in the cutting zone, and the machined floor grows with authoritative completion.
+- Cut effects are derived from live GLB node centers after hierarchy transforms, so orbit, zoom, spindle travel, and process effects remain spatially registered rather than screen-pinned decoration.
+
+## Inspection payoff
+
+- Result hierarchy follows a 1:1.618 split between verdict and dimensional evidence.
+- The report reuses the contract geometry and adds a G54 datum frame, profile field, and four measured performance bands.
+- Geometry, remaining material, simulated surface finish, and cycle performance each retain their own unit-bearing readout.
+- Program, material, work offset, tool, and trace state provide a compact fictional traceability record.
+- Accepted and rework states alter the inspection color system without changing layout, preserving instant comparison and retry speed.
+
+## Progressive explanation
+
+- Public labels are Easy, Medium, and Hard; no age or intelligence labels are shown.
+- Easy explains the visible goal and immediate feedback in concrete language.
+- Medium introduces tool choice, radial engagement, load, heat, and roughing-versus-finishing strategy.
+- Hard exposes the simulation's quantitative relationships, including derived chip load, tangential force, and independent inspection signals.
+- The selected learning lens changes explanation only. Contract geometry, scoring, and challenge remain identical.
+- Players may change depth before a contract or inside the machine cell without restarting.
+
+## Shop skill ladder
+
+- Progression is derived only from saved personal-best scores, preventing repetitive low-quality runs from grinding advancement.
+- Four independent signals are retained: geometry control, inspection discipline, process control, and cycle discipline.
+- Role alignment follows current O*NET occupational families for CNC tool operators (51-9161.00), machinists (51-4041.00), and CNC tool programmers (51-9162.00).
+- The ladder communicates role awareness, not qualification, certification, safety readiness, or employability.
+- Real advancement still requires supervised shop training, safety instruction, hands-on measurement, credentials where applicable, and employer evaluation.
+- Automation, SCADA/PLC systems, and external business-deal mechanics are explicitly deferred; this release remains focused on machining, inspection, 3D assets, and the core play loop.
+
+## Shop log
+
+- Every inspection creates a device-local run record, including accepted and rework outcomes; the ledger retains the latest 24 runs.
+- Career XP remains personal-best-only, so the review history cannot be used to grind role progression.
+- The log combines current role alignment, four skill signals, contract releases, average best score, milestone plates, and filterable run evidence.
+- Milestones reward first inspection, first release, contract breadth, precision, finish control, and S-rank performance.
+- No account, cloud identity, public leaderboard, employment record, or certification claim is created.
+
+## Full-frame 3D twin
+
+- The machine cell provides two explicit views: the authoritative interactive Cut Map and a full-frame 3D Twin review.
+- The twin uses the same live GLB fixture, spindle, cutter, and stock assets as the landing-stage renderer.
+- Current XY coordinates, tool selection, fixture stack, completion, and process state remain visible in the 3D review.
+- Entering the twin forces spindle hold and zero displayed load; machining cannot continue behind the 3D layer.
+- Cycle Start from the twin returns to the Cut Map before any cutting state can resume.
+- The 3D twin is a visual fixture/process review, not a collision-verified manufacturing simulation.
+
+## Typography and color
+
+- Display type is condensed and low-tracking; machine data uses the mono family.
+- Body copy uses a minimum 1.55 line-height and restrained width.
+- Cyan is reserved for active datum, tool, and process state; red is reserved for overcut and alarms; amber is reserved for safety.
+- Most hierarchy comes from proportion, luminance, metal value, and line weight—not glow.
+
+## Public defensibility
+
+The visuals contain no real manufacturer marks, exact machine inventory, customer information, controller procedures, or production parameters. Every process value is fictional or labeled as a simulation estimate. The game is not machine-operating guidance.
+
+## Shop-threshold key art
+
+The landing hero now uses one authored cinematic machining plate as a material anchor. Its role is to communicate mass, surface, fixture discipline, and enclosure depth before the player enters the abstracted simulation. Measured G54 reticles, restrained captions, a four-signal evidence rail, and an explicit representative-game-world label keep the image inside the same technical grammar as the live GLB renderer. Cyan remains a status/datum color; amber appears only as a small fresh-chip accent.
+
+## First-article contract plates
+
+Contract selection treats each job as a manufactured artifact rather than a generic game tile. The deterministic target geometry remains authoritative, but layered depth, contact shadow, surface response, datum reticles, stock form, simulated finish, route, and program identity give each part its own physical reading. The 6061 drive plate is cool and bright, the 7075 rib is neutral with a restrained lime process signal, and the titanium bracket is darker with a muted violet response. Anime.js provides a short staged hero reveal only when reduced motion is not requested; hover movement is similarly removed under the reduced-motion preference.
+
+## Interactive 3D and readable instrumentation
+
+The full-frame 3D Twin now prioritizes physical comprehension over passive presentation. It continuously orbits at a restrained speed, supports direct pointer orbit and wheel zoom, exposes pause/reset controls, honors reduced-motion preferences, and retains the existing safe-hold behavior. Increased ambient contribution, material overrides for stock/fixture/spindle families, stronger edge separation, and a larger projection make the assembly legible against the enclosure rather than disappearing into black.
+
+Primary machine-cell text no longer depends on 6–9 px microtype at desktop widths. Contract, setup, controls, coordinates, process estimates, telemetry, and twin callouts use a larger calibrated scale while secondary metadata remains compact. A persistent Help / Tour control provides six contextual steps and highlights navigation, contract, setup, interactive 3D, telemetry, and inspection without hiding the actual interface.
+
+## Directed game loop
+
+- A four-stage mission director turns stock removal into readable short-term goals: establish the entry path, complete roughing, bring the profile to tolerance, and inspect the part.
+- Milestone callouts at 35, 70, and 90 percent expose progress without pausing the cut, while warnings interrupt the flow chain when simulated load or overcut risk becomes unsafe.
+- WASD or arrow keys drive the cutter, Space controls the spindle, V changes review view, I starts inspection, R resets stock, and Escape opens a full pause layer.
+- Consecutive controlled cuts build a capped flow multiplier and a separate run signature. Flow points provide arcade feedback but never alter the dimensional inspection grade, role progress, or acceptance decision.
+- The machine cell can be paused, restarted, toured, or exited to the contract index without browser refreshes or hidden route changes.
+- Reduced-motion preferences suppress event animation while retaining all objective, warning, and score information.
+
+## Readability and Tool-Crib boundary
+
+- Every explicit CSS type declaration has a 12 px minimum; body copy starts at 14 px, controls at 13 px, and critical values remain larger. Density comes from hierarchy and layout, never 6–10 px microtype.
+- The mode dock, machine rails, G-code editor, asset diagnostics, 3D annotations, and inspection result all reserve additional physical space for the larger scale.
+- Textual hold verdicts use a width-aware display scale so `REWORK` cannot collide with dimensional evidence at compact desktop widths.
+- Tool-Crib credentials are never embedded in the public client, copied into source, or used as a substitute for a scoped integration design.
+- Project Toolpath remains accountless and advisory. Tool-Crib permissions, calibration blocks, reservations, and human review remain authoritative in Tool-Crib.
+- Any future idle-tool or cost-reality feature must receive a privacy-safe server-generated snapshot or scoped service response. Until a real record is connected, the game must show no shop metric rather than fabricate one.
+
+## Interaction contract
+
+- Every visible button must remain enabled and resolve to an explicit action; unavailable operations are explained through safe state transitions instead of dead controls.
+- Selecting Finisher, Rougher, or Hog Mill during an active cycle automatically commands feed hold, clears displayed load, selects the requested tool, and requires offset verification before restart.
+- The guided tour never presents a disabled Previous control. Its first step exposes Exit Tour in the same location, preserving a predictable action target.
+- A repository-wide regression test rejects disabled or unwired button elements across every TSX route.
+- L0 through L3 are interactive path selectors, including levels whose evidence threshold is not yet met. Selection reveals role focus, evidence target, threshold status, and remaining personal-best XP without implying certification or unlocking real-world permissions.

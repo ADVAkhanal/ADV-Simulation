@@ -1,0 +1,44 @@
+.improvement {
+  margin: 0 23px 16px;
+  padding: 14px 16px;
+  display: grid;
+  gap: 6px;
+  border-left: 3px solid var(--accent);
+  background: #071013;
+}
+
+.improvement b {
+  color: var(--accent);
+  font: 900 12px/1.4 ui-monospace, monospace;
+  letter-spacing: .08em;
+}
+
+.improvement span {
+  color: #a6b5b8;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.actions {
+  grid-template-columns: 1fr 1fr 1.25fr;
+}
+
+.actions button {
+  height: auto;
+  min-height: 48px;
+  padding: 8px;
+  line-height: 1.35;
+  letter-spacing: .07em;
+}
+
+.actions kbd {
+  margin-left: 5px;
+  color: inherit;
+  font: inherit;
+  opacity: .65;
+}
+
+@media (max-width: 700px) {
+  .actions { grid-template-columns: 1fr; }
+  .improvement { margin-inline: 16px; }
+}

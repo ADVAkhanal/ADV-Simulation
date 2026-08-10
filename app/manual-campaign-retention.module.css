@@ -9,7 +9,7 @@
   padding: 5px 7px;
   color: #9badb1;
   border: 1px solid #30454b;
-  font: 700 7px/1 ui-monospace, monospace;
+  font: 700 12px/1 ui-monospace, monospace;
   letter-spacing: .08em;
   text-transform: uppercase;
 }
@@ -30,7 +30,7 @@
   color: #72868b;
   border: 1px solid #24373c;
   background: #071013;
-  font: 800 8px/1.3 ui-monospace, monospace;
+  font: 800 12px/1.3 ui-monospace, monospace;
   letter-spacing: .07em;
 }
 
@@ -75,7 +75,7 @@
   align-items: end;
 }
 
-.inspectionBay > header small { color: var(--accent); font: 800 8px ui-monospace, monospace; letter-spacing: .14em; }
+.inspectionBay > header small { color: var(--accent); font: 800 12px ui-monospace, monospace; letter-spacing: .14em; }
 .inspectionBay > header h1 { margin: 7px 0; font-size: clamp(32px, 5vw, 62px); line-height: .9; }
 .inspectionBay > header p { max-width: 700px; margin: 0; color: #91a4a8; line-height: 1.5; }
 .inspectionBay > header button { padding: 12px; color: #aebdc0; border: 1px solid #34494f; background: #0b171a; }
@@ -97,7 +97,7 @@
   margin: 0;
   padding: 18px;
   border-bottom: 1px solid #273b40;
-  font: 900 11px ui-monospace, monospace;
+  font: 900 12px ui-monospace, monospace;
   letter-spacing: .12em;
 }
 
@@ -114,16 +114,16 @@
   background: none;
 }
 
-.characteristics button > span { display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid #344b51; font: 900 9px ui-monospace, monospace; }
+.characteristics button > span { display: grid; place-items: center; width: 26px; height: 26px; border: 1px solid #344b51; font: 900 12px ui-monospace, monospace; }
 .characteristics b,
 .characteristics small { display: block; }
-.characteristics b { font-size: 11px; }
-.characteristics small { margin-top: 6px; color: #71858a; font: 700 8px ui-monospace, monospace; }
-.characteristics em { align-self: center; font: 800 8px ui-monospace, monospace; font-style: normal; }
+.characteristics b { font-size: 12px; }
+.characteristics small { margin-top: 6px; color: #71858a; font: 700 12px ui-monospace, monospace; }
+.characteristics em { align-self: center; font: 800 12px ui-monospace, monospace; font-style: normal; }
 .characteristics .inspectionActive { color: var(--ink); background: color-mix(in srgb, var(--accent) 9%, transparent); box-shadow: inset 3px 0 var(--accent); }
 
 .measurementStation { padding-bottom: 20px; }
-.toleranceBand { min-height: 90px; margin: 18px; display: grid; grid-template-columns: 70px 1fr 70px; align-items: center; text-align: center; color: #8fa2a6; font: 700 8px ui-monospace, monospace; }
+.toleranceBand { min-height: 90px; margin: 18px; display: grid; grid-template-columns: 70px 1fr 70px; align-items: center; text-align: center; color: #8fa2a6; font: 700 12px ui-monospace, monospace; }
 .toleranceBand > div { height: 54px; position: relative; border: 1px solid #33494f; background: linear-gradient(90deg, #421321 0 15%, #12362f 15% 85%, #421321 85%); }
 .toleranceBand i { position: absolute; top: 4px; width: 2px; height: 44px; background: #fff; box-shadow: 0 0 12px #fff; transition: left .25s; }
 .readout { margin: 16px 18px; padding: 18px; text-align: center; border: 1px solid #30464c; background: #050b0d; }
@@ -131,27 +131,27 @@
 .readout strong,
 .readout span { display: block; }
 .readout strong { margin: 7px 0; font: 900 30px ui-monospace, monospace; }
-.readout span { font: 800 8px ui-monospace, monospace; letter-spacing: .12em; }
+.readout span { font: 800 12px ui-monospace, monospace; letter-spacing: .12em; }
 .pass { color: #5de2ba; }
 .fail { color: #ff5577; }
-.measurementStation h3 { margin: 18px; color: #8da0a4; font: 800 8px ui-monospace, monospace; letter-spacing: .12em; }
+.measurementStation h3 { margin: 18px; color: #8da0a4; font: 800 12px ui-monospace, monospace; letter-spacing: .12em; }
 .instrumentGrid { margin: 0 18px; display: grid; grid-template-columns: repeat(3, 1fr); gap: 7px; }
-.instrumentGrid button { min-height: 58px; padding: 8px; color: #899ca0; border: 1px solid #2d4248; background: #0b171a; font: 800 8px/1.35 ui-monospace, monospace; }
+.instrumentGrid button { min-height: 58px; padding: 8px; color: #899ca0; border: 1px solid #2d4248; background: #0b171a; font: 800 12px/1.35 ui-monospace, monospace; }
 .instrumentGrid button b,
 .instrumentGrid button small { display: block; }
 .instrumentGrid button small { margin-top: 4px; color: inherit; opacity: .75; }
 .instrumentGrid .inspectionActive { color: #071013; border-color: var(--accent); background: var(--accent); }
-.measureButton { width: calc(100% - 36px); height: 44px; margin: 14px 18px 0; color: #061013; border: 0; background: var(--accent); font: 900 9px ui-monospace, monospace; letter-spacing: .12em; }
+.measureButton { width: calc(100% - 36px); height: 44px; margin: 14px 18px 0; color: #061013; border: 0; background: var(--accent); font: 900 12px ui-monospace, monospace; letter-spacing: .12em; }
 
 .findings { padding-bottom: 18px; }
 .findingList { padding: 0 15px; }
-.findingList > div { padding: 13px 0; display: grid; grid-template-columns: 1fr auto; gap: 5px 8px; border-bottom: 1px solid #25383d; color: #8ca0a4; font-size: 10px; }
+.findingList > div { padding: 13px 0; display: grid; grid-template-columns: 1fr auto; gap: 5px 8px; border-bottom: 1px solid #25383d; color: #8ca0a4; font-size: 12px; }
 .findingList b { color: var(--ink); }
-.findingList em { grid-column: 1 / -1; font: 800 8px ui-monospace, monospace; font-style: normal; }
+.findingList em { grid-column: 1 / -1; font: 800 12px ui-monospace, monospace; font-style: normal; }
 .disposition { margin: 18px 15px 0; display: grid; gap: 7px; }
-.disposition small { color: var(--accent); font: 800 8px ui-monospace, monospace; letter-spacing: .12em; }
-.disposition p { margin: 2px 0 8px; color: #82969a; font-size: 10px; line-height: 1.5; }
-.disposition button { height: 40px; color: #c5d2d4; border: 1px solid #33494f; background: #101d20; font: 900 8px ui-monospace, monospace; letter-spacing: .1em; }
+.disposition small { color: var(--accent); font: 800 12px ui-monospace, monospace; letter-spacing: .12em; }
+.disposition p { margin: 2px 0 8px; color: #82969a; font-size: 12px; line-height: 1.5; }
+.disposition button { height: 40px; color: #c5d2d4; border: 1px solid #33494f; background: #101d20; font: 900 12px ui-monospace, monospace; letter-spacing: .1em; }
 .disposition button:first-of-type { color: #061013; border-color: var(--accent); background: var(--accent); }
 .disposition button:disabled { cursor: not-allowed; opacity: .4; }
 
