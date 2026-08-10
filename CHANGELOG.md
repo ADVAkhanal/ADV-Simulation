@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-08-10 - Fix real overlapping HUD/panel bugs (not viewport-specific)
+
+- Manual Mill: the bottom-left mission objective card and the bottom-center operation-setup prompt both anchored to `bottom:16px` with no width coordination, so a long setup instruction would render into the mission card's space. Confirmed via measured DOM rects (not assumption) at 979px and 1600px window widths. Fixed by capping the prompt's width and shifting its anchor off the mission card's reserved zone.
+- G//CODE Stage: the Tool Crib 3D inset floated as an absolutely-positioned corner overlay on top of the ASCII stock-removal map, but the ASCII `pre` element renders at nearly the full size of its container (415x560 inside a 577x579 box) at every window width tested from 979px to 1600px - there was no window size where they didn't collide, this was not a responsive edge case. Fixed by moving the Tool Crib viewer out of the overlay layer into its own reserved grid row below the map, so it no longer competes for the same pixels as the simulation it was covering.
+- Both fixes verified empirically via `getBoundingClientRect()` overlap checks against a local dev server (this sandbox's browser preview cannot composite frames, so pixel screenshots weren't available) at multiple window widths, plus the full test suite.
+
 ## 2026-08-10 - Interactive assets: tools visibly mount, orbit everywhere
 
 - The Blender kit now ships three distinct tool geometries (finisher end mill, roughing end mill, spot drill) under the same spindle anchor instead of one hardcoded cutter; the renderer shows only the tool the player has actually selected, so swapping tools in the process panel now visibly changes what's mounted in the spindle.

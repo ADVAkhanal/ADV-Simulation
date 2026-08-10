@@ -226,8 +226,8 @@ export default function GCodeStage() {
           <div className={styles.datum} aria-hidden="true"><i/><b>G54</b><span>X0 Y0</span></div><pre aria-label="ASCII stock-removal visualization">{stock}</pre>
           <div className={styles.depthReadout}><span>TOOL POSITION</span><b>X {active?.x.toFixed(2)}</b><b>Y {active?.y.toFixed(2)}</b><b className={active?.z < 0 ? styles.cuttingDepth : ""}>Z {active?.z.toFixed(2)}</b></div>
           <div className={styles.machineState}><span className={parsed.state.spindle ? styles.stateOn : ""}><Gauge/> SPINDLE</span><span className={parsed.state.coolant ? styles.stateOn : ""}><Droplets/> COOLANT</span><span><Wrench/> T{parsed.state.tool}</span></div>
-          <div className={styles.toolCribInset}><ToolCribViewer activeTool={parsed.state.tool}/></div>
         </div>
+        <div className={styles.toolCribInset}><ToolCribViewer activeTool={parsed.state.tool}/></div>
         <div className={styles.status} role="status"><Sparkles/>{message}</div>
       </article>
 
