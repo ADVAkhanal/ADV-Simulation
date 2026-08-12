@@ -56,12 +56,12 @@ test("root URL renders the hands-on machine floor", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /WELCOME TO YOUR FIRST SHIFT/);
+  assert.match(html, /AFTER HOURS \/ WELCOME TO YOUR FIRST SHIFT/);
   assert.match(html, /START FIRST PART/);
   assert.match(html, /EXPLORE SAFELY/);
-  assert.match(html, /MAKE SOMETHING/);
+  assert.match(html, /THE CELL IS/);
   assert.match(html, /toolpath-cnc-keyart-v1\.webp/);
-  assert.match(html, /TRAINING CELL/);
+  assert.match(html, /CELL 01 \/ READY/);
   assert.match(html, /Emergency drive plate/);
   assert.match(html, /Flight rib prototype/);
   assert.match(html, /Sensor bracket/);

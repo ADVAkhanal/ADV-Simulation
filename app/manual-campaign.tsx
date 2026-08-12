@@ -67,6 +67,11 @@ const ROLE_LADDER = [
   { threshold: 165, level: "L2", role: "MACHINIST / SETUP ALIGNMENT", code: "O*NET 51-4041.00", focus: "Read geometry · select tooling · control tolerance", evidence: "165 best-run XP" },
   { threshold: 250, level: "L3", role: "CNC PROGRAMMER ALIGNMENT", code: "O*NET 51-9162.00", focus: "Plan sequence · define paths · verify simulation", evidence: "250 best-run XP" },
 ] as const;
+const CELL_SIGNALS = [
+  { code: "CELL 01 / READY", message: "The spindle is parked. Your first part is waiting." },
+  { code: "WORKLIGHT / LIVE", message: "One controlled cut is enough to begin." },
+  { code: "G54 / LOCKED", message: "The part has a home. Now give it a shape." },
+] as const;
 const CONTRACT_VISUALS = {
   drive: { artifact: "DRIVE INTERFACE", route: "PROFILE + BORE", stock: "PLATE / 18 MM", finish: "MILL / BRUSH", image: "/assets/2d/contracts/emergency-drive-plate-v1.webp" },
   rib: { artifact: "LIGHTWEIGHT RIB", route: "WEBS + CONTOUR", stock: "PLATE / 22 MM", finish: "MILL / BLEND", image: "/assets/2d/contracts/orbital-structural-rib-v1.webp" },
@@ -694,6 +699,7 @@ type ShowcaseTab = "machine" | "doctrine" | "lens" | "capability" | "ladder";
 function ContractSelect({ save, startContract, learningLevel, setLearningLevel }: { save: ManualSaveData; startContract: (index: number) => void; learningLevel: LearningLevel; setLearningLevel: (level: LearningLevel) => void }) {
   const lens = LEARNING_LENSES[learningLevel];
   const [showcaseTab, setShowcaseTab] = useState<ShowcaseTab>("machine");
+  const [signalIndex, setSignalIndex] = useState(0);
   const selectRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -702,21 +708,29 @@ function ContractSelect({ save, startContract, learningLevel, setLearningLevel }
     const entrance = animate(targets, { opacity: { from: 0 }, y: { from: 22 }, delay: stagger(85), duration: 720, ease: "out(3)" });
     return () => entrance.cancel();
   }, []);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const timer = window.setInterval(() => setSignalIndex((value) => (value + 1) % CELL_SIGNALS.length), 4600);
+    return () => window.clearInterval(timer);
+  }, []);
+  const signal = CELL_SIGNALS[signalIndex];
   return <section ref={selectRef} className={styles.select}>
     <div className={styles.selectIntro}>
       <div className={styles.heroCopy} data-reveal>
-        <p>WELCOME TO YOUR FIRST SHIFT</p>
-        <h1>MAKE SOMETHING<br/><em>REMARKABLE.</em></h1>
+        <p>AFTER HOURS / WELCOME TO YOUR FIRST SHIFT</p>
+        <h1>THE CELL IS<br/><em>WAITING.</em></h1>
         <span>Learn precision machining by making a real part—one satisfying cut at a time. We’ll guide your first run, and you can reveal the engineering detail whenever you’re ready.</span>
         <div className={styles.heroActions}><button onClick={() => startContract(0)}><Play/> START FIRST PART</button><small>NO ACCOUNT NEEDED · ABOUT 3 MINUTES · SAFE CREATIVE SIMULATION</small></div>
         <div className={styles.welcomeSteps} aria-label="Your first shift in three steps"><span><b>1</b> Choose a tool</span><span><b>2</b> Shape the part</span><span><b>3</b> Check your work</span></div>
+        <div className={styles.cellSignal} aria-live="polite"><i/><small>{signal.code}</small><b>{signal.message}</b></div>
       </div>
       <figure className={styles.heroVisual} data-reveal>
         <img src="/assets/keyart/toolpath-cnc-keyart-v1.webp" alt="Carbide end mill over a fixtured aluminum plate inside a vertical machining center" fetchPriority="high"/>
         <FlagshipMachiningKit variant="full" cursor={{ x: 13.5, y: 7.5 }} spindle={false} completion={0} load={0} heat={20} condition={100} cameraMode="establishing" material="6061 AL" accent="#00aeef" verbose={false}/>
         <div className={styles.heroReticle} aria-hidden="true"><i/><i/><b>G54</b></div>
-        <div className={styles.heroVisualIndex} aria-hidden="true"><span>01</span><b>YOUR FIRST PART</b><small>GUIDED · HANDS-ON · REPLAYABLE</small></div>
-        <figcaption><span>TRAINING CELL / READY</span><b>ALUMINUM · THREE-AXIS MILL</b><small>DRAG TO EXPLORE THE MACHINE</small></figcaption>
+        <div className={styles.heroVisualIndex} aria-hidden="true"><span>01</span><b>THE LIGHTS ARE ON</b><small>GUIDED · HANDS-ON · REPLAYABLE</small></div>
+        <div className={styles.cellAlert} aria-hidden="true"><i/> MACHINE STANDBY <b>01</b></div>
+        <figcaption><span>AFTER-HOURS CELL / READY</span><b>ALUMINUM · THREE-AXIS MILL</b><small>DRAG TO EXPLORE THE MACHINE</small></figcaption>
       </figure>
       <dl className={styles.heroMetrics} data-reveal aria-label="What to expect"><div><dt>LEARN</dt><dd>AS YOU PLAY</dd></div><div><dt>MAKE</dt><dd>THREE REAL PARTS</dd></div><div><dt>IMPROVE</dt><dd>WITH CLEAR FEEDBACK</dd></div><div><dt>RETRY</dt><dd>IN UNDER 3 SECONDS</dd></div></dl>
     </div>
