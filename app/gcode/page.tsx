@@ -27,7 +27,7 @@ const CONTRACTS: Contract[] = [
     objective: "Cut the complete lightning profile below Z0. Keep waste under 12%.",
     accent: "#00aeef",
     xp: 650,
-    code: `(CONTRACT 01 / NEON BOLT)\nG21 G90\nT1 M06\nM03 M08\nG00 X10 Y5 Z3\nG01 Z-1.8 F180\nG01 X22 Y5 F420\nG01 X15 Y17\nG01 X27 Y17\nG01 X7 Y36\nG01 X13 Y22\nG01 X2 Y22\nG01 X10 Y5\nG00 Z3\nM09 M05\nM30`,
+    code: `(CONTRACT 01 / NEON BOLT)\nG17 G21 G90 G54\nT1 M06\nG43 H01\nM03 M08\nG00 X10 Y5 Z3\nG01 Z-1.8 F180\nG01 X22 Y5 F420\nG01 X15 Y17\nG01 X27 Y17\nG01 X7 Y36\nG01 X13 Y22\nG01 X2 Y22\nG01 X10 Y5\nG00 Z3\nM09 M05\nM30`,
   },
   {
     name: "ORBIT SEAL",
@@ -36,7 +36,7 @@ const CONTRACTS: Contract[] = [
     objective: "Use clockwise arcs and one continuous cut. Radius mismatch triggers rework.",
     accent: "#9bb0b8",
     xp: 900,
-    code: `(CONTRACT 02 / ORBIT SEAL)\nG21 G90\nT2 M06\nM03 M08\nG00 X30 Y20 Z4\nG01 Z-2.2 F160\nG02 X10 Y20 I-10 J0 F360\nG02 X30 Y20 I10 J0\nG00 Z4\nM09 M05\nM30`,
+    code: `(CONTRACT 02 / ORBIT SEAL)\nG17 G21 G90 G54\nT2 M06\nG43 H02\nM03 M08\nG00 X30 Y20 Z4\nG01 Z-2.2 F160\nG02 X10 Y20 I-10 J0 F360\nG02 X30 Y20 I10 J0\nG00 Z4\nM09 M05\nM30`,
   },
   {
     name: "CROWN POCKET",
@@ -45,7 +45,7 @@ const CONTRACTS: Contract[] = [
     objective: "Repeat the crown at a finishing depth. Earn A-rank geometry or better.",
     accent: "#ff6a00",
     xp: 1250,
-    code: `(CONTRACT 03 / CROWN POCKET)\nG21 G90\nT3 M06\nM03 M08\nG00 X3 Y30 Z3\nG01 Z-1.2 F170\nG01 X3 Y10 F480\nG01 X12 Y20\nG01 X20 Y5\nG01 X28 Y20\nG01 X37 Y10\nG01 X37 Y30\nG01 X3 Y30\nG01 Z-2.8 F140\nG01 X37 Y30 F300\nG00 Z3\nM09 M05\nM30`,
+    code: `(CONTRACT 03 / CROWN POCKET)\nG17 G21 G90 G54\nT3 M06\nG43 H03\nM03 M08\nG00 X3 Y30 Z3\nG01 Z-1.2 F170\nG01 X3 Y10 F480\nG01 X12 Y20\nG01 X20 Y5\nG01 X28 Y20\nG01 X37 Y10\nG01 X37 Y30\nG01 X3 Y30\nG01 Z-2.8 F140\nG01 X37 Y30 F300\nG00 Z3\nM09 M05\nM30`,
   },
   {
     name: "FIELD RECALL",
@@ -55,8 +55,8 @@ const CONTRACTS: Contract[] = [
     accent: "#ff9b3f",
     xp: 1100,
     debug: true,
-    code: `(CONTRACT 04 / FIELD RECALL)\nG21 G90\nT1 M06\nM03 M08\nG00 X8 Y8 Z3\nG01 Z-1.6 F160\nG01 X30 Y8 F380\nG01 X30 Y28\nG01 X8 Y28\nG01 X8 Y8\nG00 Z3\nM09 M05\nM30`,
-    startCode: `(CONTRACT 04 / FIELD RECALL)\nG21 G90\nT1 M06\nM08\nG00 X8 Y8 Z3\nG01 Z-1.6 F160\nG01 X30 Y8 F380\nG01 X30 Y28\nG01 X8 Y28\nG01 X8 Y8\nG00 Z3\nM09 M05\nM30`,
+    code: `(CONTRACT 04 / FIELD RECALL)\nG17 G21 G90 G54\nT1 M06\nG43 H01\nM03 M08\nG00 X8 Y8 Z3\nG01 Z-1.6 F160\nG01 X30 Y8 F380\nG01 X30 Y28\nG01 X8 Y28\nG01 X8 Y8\nG00 Z3\nM09 M05\nM30`,
+    startCode: `(CONTRACT 04 / FIELD RECALL)\nG17 G21 G90 G54\nT1 M06\nG43 H01\nM08\nG00 X8 Y8 Z3\nG01 Z-1.6 F160\nG01 X30 Y8 F380\nG01 X30 Y28\nG01 X8 Y28\nG01 X8 Y8\nG00 Z3\nM09 M05\nM30`,
   },
 ];
 
@@ -225,7 +225,7 @@ export default function GCodeStage() {
         <div className={styles.stage}>
           <div className={styles.datum} aria-hidden="true"><i/><b>G54</b><span>X0 Y0</span></div><PartPreview points={plan.points} frame={frame} accent={contract.accent} material="6061 ALUMINUM" tool={parsed.state.tool} passes={setup.passes} finalDepth={setup.finalDepth}/>
           <div className={styles.depthReadout}><span>TOOL POSITION</span><b>X {active?.x.toFixed(2)}</b><b>Y {active?.y.toFixed(2)}</b><b className={active?.z < 0 ? styles.cuttingDepth : ""}>Z {active?.z.toFixed(2)}</b></div>
-          <div className={styles.machineState}><span className={parsed.state.spindle ? styles.stateOn : ""}><Gauge/> SPINDLE</span><span className={parsed.state.coolant ? styles.stateOn : ""}><Droplets/> COOLANT</span><span><Wrench/> T{parsed.state.tool}</span></div>
+          <div className={styles.machineState}><span className={parsed.state.spindle ? styles.stateOn : ""}><Gauge/> SPINDLE</span><span className={parsed.state.coolant ? styles.stateOn : ""}><Droplets/> COOLANT</span><span><Wrench/> T{parsed.state.tool}</span><span>G54</span><span className={parsed.state.toolLengthOffset === null ? styles.offsetHold : styles.stateOn}>H{parsed.state.toolLengthOffset ?? "--"}</span></div>
         </div>
         <div className={styles.status} role="status"><Sparkles/>{message}</div>
       </article>

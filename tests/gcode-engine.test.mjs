@@ -45,6 +45,16 @@ test("controller distinguishes clamp strikes and deep dry cutting from ordinary 
   assert.ok(!dryDepth.diagnostics.some((item) => item.category === "unsupported-command"));
 });
 
+test("controller keeps the active G54 and tool-length setup state with the program", () => {
+  const prepared = parseProgram("G17 G21 G90 G54\nT2 M06\nG43 H02\nM03 M08\nG00 X4 Y4 Z3\nG01 Z-1 F120");
+  assert.equal(prepared.errors.length, 0);
+  assert.equal(prepared.state.workOffset, "G54");
+  assert.equal(prepared.state.tool, 2);
+  assert.equal(prepared.state.toolLengthOffset, 2);
+  const missingLength = parseProgram("G21 G90\nG43\nG00 X4 Y4 Z3");
+  assert.ok(missingLength.diagnostics.some((item) => item.message.includes("needs an H offset")));
+});
+
 test("setup planning applies compensation, depth, path reversal, grouping, and multipass", () => {
   const parsed = parseProgram(`G21 G90\nT1 M06\nM03\nG00 X2 Y2 Z3\nG01 Z-1 F120\nG01 X12 Y2\nG01 X12 Y12\nG01 X2 Y12\nG01 X2 Y2\nG00 Z3\nM05`);
   const forward = buildMachiningPlan(parsed, { compensation: "center", finalDepth: -3, path: "as-programmed", passes: 3, reverse: false });
