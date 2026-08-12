@@ -96,6 +96,33 @@
 @media(min-width:1281px) and (max-height:940px){.immersiveWorkspace .machine{grid-template-rows:58px minmax(520px,1fr) 84px 50px}.immersiveWorkspace .setup,.immersiveWorkspace .telemetry{max-height:calc(100svh - 258px)}.immersiveWorkspace .cinematicState{bottom:234px}.immersiveWorkspace .missionHud,.immersiveWorkspace .legend,.immersiveWorkspace .prompt{bottom:112px}.immersiveWorkspace .flowHud{display:none}}
 @media(max-width:800px){.immersiveWorkspace{display:flex}.immersiveWorkspace .machine{min-height:0}.immersiveWorkspace .setup,.immersiveWorkspace .telemetry{width:100%;max-height:none}.immersiveWorkspace .machineHead>span{display:none}.machineHead .viewSwitch{width:100%;justify-content:center}.immersiveWorkspace .controls{grid-template-columns:1fr 1fr;padding:8px}.immersiveWorkspace .timeline{grid-column:1/-1;grid-row:2}.immersiveWorkspace .message{padding-inline:12px}.immersiveWorkspace .cinematicState{left:18px}.heroVisual>aside{pointer-events:none}}
 
+/* GAME VIEW: protect the 3D stage from dashboard clutter. Technical View keeps the full process console. */
+.immersiveWorkspace{display:block;min-height:calc(100svh - 166px);padding:0;background:#030607}
+.immersiveWorkspace .machine{min-height:calc(100svh - 166px);grid-template-rows:48px minmax(480px,1fr) 76px 44px;border-inline:0;box-shadow:none}
+.immersiveWorkspace .telemetry{display:none}
+.immersiveWorkspace .setup{position:absolute;z-index:30;top:72px;left:24px;width:min(330px,calc(100vw - 48px));max-height:none;margin:0;padding:0;overflow:visible;border-color:#4b626a;background:#081216ed;backdrop-filter:blur(14px);box-shadow:0 20px 60px #000b}
+.immersiveWorkspace .setup>:not(.setupGate){display:none}
+.immersiveWorkspace .setupGate{margin:0;padding:14px}
+.immersiveWorkspace .setupGate header{margin-bottom:10px;font-size:12px}
+.immersiveWorkspace .setupGate button{min-height:42px;margin-top:7px;font-size:12px}
+.immersiveWorkspace .setupGate button:nth-of-type(3){display:none}
+.immersiveWorkspace.setupArmed .setup{display:none}
+.immersiveWorkspace .machineHead{min-height:48px;padding-inline:24px;background:#091215}
+.immersiveWorkspace .machineHead>span:last-child{display:none}
+.immersiveWorkspace .viewSwitch button:not(:last-child){display:none}
+.immersiveWorkspace .viewSwitch button:last-child{min-height:30px;padding:0 12px;color:#b6c7cb;border-color:#40575e;background:#101d21;font-size:12px}
+.immersiveWorkspace .viewport:before,.immersiveWorkspace .viewport:after,.immersiveWorkspace .coordinates,.immersiveWorkspace .processPlate,.immersiveWorkspace .legend,.immersiveWorkspace .cinematicState,.immersiveWorkspace .flowHud{display:none}
+.immersiveWorkspace .missionHud{left:24px;bottom:104px;width:min(360px,calc(100% - 48px));padding:15px 17px;border-color:#526b73;background:#071115dc;box-shadow:0 15px 45px #000a;backdrop-filter:blur(10px)}
+.immersiveWorkspace .missionHud header{gap:9px}.immersiveWorkspace .missionHud h3{margin-top:9px;font-size:clamp(20px,2vw,28px);line-height:1}.immersiveWorkspace .missionHud p{font-size:13px;line-height:1.48}
+.immersiveWorkspace .prompt{left:50%;bottom:32px;max-width:min(460px,calc(100% - 48px));padding:11px 18px}
+.immersiveWorkspace .controls{position:relative;z-index:20;display:flex;justify-content:center;padding:13px 24px;border-top-color:#31454b;background:#091316}
+.immersiveWorkspace .controls .start,.immersiveWorkspace .controls .hold{width:min(420px,100%);height:48px;font-size:13px}
+.immersiveWorkspace .controls .timeline{display:none}
+.immersiveWorkspace .controls .inspect{position:absolute;right:24px;width:auto;height:48px;padding-inline:17px;font-size:12px}
+.actionHint{align-self:center;color:#8da1a6;font:800 12px/1.4 var(--font-mono),ui-monospace,monospace;letter-spacing:.07em;text-align:center}
+.immersiveWorkspace .message{min-height:44px;justify-content:center;padding:0 24px;text-align:center;font-size:12px}.immersiveWorkspace .keyHints{display:none}
+@media(max-width:800px){.immersiveWorkspace{display:block;min-height:calc(100svh - 154px)}.immersiveWorkspace .machine{min-height:calc(100svh - 154px);grid-template-rows:48px minmax(390px,1fr) 72px 48px}.immersiveWorkspace .setup{top:60px;left:12px;width:calc(100vw - 24px)}.immersiveWorkspace .machineHead{padding-inline:12px}.immersiveWorkspace .missionHud{left:12px;bottom:96px;width:calc(100% - 24px)}.immersiveWorkspace .missionHud p{display:none}.immersiveWorkspace .prompt{bottom:20px}.immersiveWorkspace .controls{padding:12px}.immersiveWorkspace .controls .inspect{position:static;width:min(420px,100%);margin-left:8px}.immersiveWorkspace .controls:has(.inspect) .start,.immersiveWorkspace .controls:has(.hold){width:auto;flex:1}.immersiveWorkspace .actionHint{display:none}.immersiveWorkspace .message{padding-inline:14px;font-size:12px}}
+
 /* Friendly first-run homepage: calm language, a single decision in the first
    viewport, and advanced material disclosed only when curiosity asks for it. */
 .select{background:radial-gradient(ellipse at 18% 5%,#17333a 0,transparent 32%),radial-gradient(ellipse at 82% 18%,#163029 0,transparent 28%),linear-gradient(145deg,#0b171a,#040809 68%)}
