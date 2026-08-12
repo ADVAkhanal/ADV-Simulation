@@ -155,6 +155,7 @@ export default function ThreeMachiningStage(props: Props) {
     const root = new THREE.Group();
     scene.add(root);
     let model: THREE.Group | null = null;
+    let toolCrib: THREE.Group | null = null;
     const movingNodes: THREE.Object3D[] = [];
     const basePosition = new Map<THREE.Object3D, THREE.Vector3>();
     let stock: THREE.Object3D | null = null;
@@ -180,6 +181,11 @@ export default function ThreeMachiningStage(props: Props) {
       new THREE.MeshBasicMaterial({ color: 0x78eeff, transparent: true, opacity: 0, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }),
     );
     cutRing.rotation.x = -Math.PI / 2; root.add(cutRing);
+
+    const sparkPositions = new Float32Array(84 * 3);
+    const sparkGeometry = new THREE.BufferGeometry().setAttribute("position", new THREE.BufferAttribute(sparkPositions, 3));
+    const sparks = new THREE.Points(sparkGeometry, new THREE.PointsMaterial({ color: 0xffb24a, size: 5, transparent: true, opacity: .82, depthWrite: false, blending: THREE.AdditiveBlending }));
+    sparks.frustumCulled = false; root.add(sparks);
 
     const pathMaterial = new THREE.LineBasicMaterial({ color: 0x6feaff, transparent: true, opacity: .85, depthWrite: false });
     const pathGeometry = new THREE.BufferGeometry();
@@ -229,6 +235,22 @@ export default function ThreeMachiningStage(props: Props) {
       if (stock) stockBox = new THREE.Box3().setFromObject(stock);
       propsRef.current.onReady();
     }, undefined, () => propsRef.current.onFailure());
+
+    loader.load("/assets/workholding/toolpath-tool-crib-v1.glb", (gltf) => {
+      if (disposed) return;
+      toolCrib = gltf.scene;
+      toolCrib.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) return;
+        object.castShadow = true; object.receiveShadow = true;
+        const source = object.material as THREE.MeshStandardMaterial;
+        if (source?.isMeshStandardMaterial) { object.material = source.clone(); object.material.envMapIntensity = 1.3; }
+      });
+      const bounds = new THREE.Box3().setFromObject(toolCrib);
+      toolCrib.position.sub(bounds.getCenter(new THREE.Vector3()));
+      toolCrib.position.set(-495, -258, -438);
+      toolCrib.rotation.y = .16;
+      root.add(toolCrib);
+    }, undefined, () => { /* ambient authored asset is optional */ });
 
     let frame = 0, previous = performance.now(), drag: { x: number; y: number } | null = null, cutting = false, firstCutAt = 0, wasCutting = false, stockHovered = false;
     let audio: AudioContext | null = null, motor: OscillatorNode | null = null, harmonic: OscillatorNode | null = null, motorGain: GainNode | null = null;
@@ -336,6 +358,16 @@ export default function ThreeMachiningStage(props: Props) {
         mistPositions[index * 3 + 2] = origin.z + Math.sin(angle) * age * 70;
       }
       (mist.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+      const sparkCount = live.spindle && live.load > 66 ? Math.round((live.load - 62) * .95) : 0;
+      sparks.visible = sparkCount > 0;
+      sparks.geometry.setDrawRange(0, Math.min(84, sparkCount));
+      for (let index = 0; index < Math.min(84, sparkCount); index += 1) {
+        const age = (now * .0032 + index * .137) % 1, angle = index * 2.399963;
+        sparkPositions[index * 3] = origin.x + Math.cos(angle) * (12 + age * 54);
+        sparkPositions[index * 3 + 1] = origin.y - age * age * 38 + 8;
+        sparkPositions[index * 3 + 2] = origin.z + Math.sin(angle) * (12 + age * 42);
+      }
+      (sparks.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
       cutRing.visible = live.spindle; cutRing.position.copy(origin); cutRing.position.y += 2; cutRing.scale.setScalar(0.75 + Math.sin(now * 0.012) * 0.12 + live.load * 0.004);
       (cutRing.material as THREE.MeshBasicMaterial).opacity = live.spindle ? 0.26 + live.load * 0.003 : 0;
       workLight.intensity = live.spindle ? 14 + live.load * .09 : 7 + Math.sin(now * .0014) * .6;
@@ -343,6 +375,7 @@ export default function ThreeMachiningStage(props: Props) {
       shop.lights.material.emissiveIntensity = live.spindle ? 3.4 + live.load * .018 : 2.25 + Math.sin(now * .0011) * .18;
       shop.warmScreen.emissiveIntensity = live.spindle ? 2.45 + live.load * .018 : 1.45 + Math.sin(now * .0017) * .15;
       shop.floorGrid.material.opacity = live.spindle ? .58 : .42;
+      if (toolCrib) toolCrib.rotation.y = .16 + Math.sin(now * .00032) * .006;
 
       if (stockBox && live.cells) {
         const removed = Array.from(live.cells).filter((value) => value === 0).length;
