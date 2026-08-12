@@ -486,11 +486,16 @@ export default function ManualCampaign() {
 
   const toggleSpindle = () => {
     if (condition <= 0) { restoreTool(); return; }
+    if (toolCompatible && !fixtureConfirmed) { setFixtureConfirmed(true); tone(350, .07, "sine", .018); setMessage("FIXTURE CONFIRMED - vise jaws and clamp margin are live."); return; }
+    if (toolCompatible && !zeroConfirmed) { setZeroConfirmed(true); setDatumVisible(true); tone(440, .07, "sine", .018); setMessage(workOffsetError ? "G54 CONFIRMED WITH A +2.5 CELL SHIFT - this can ruin the part." : "G54 ESTABLISHED - work zero is locked to the stock datum."); return; }
+    if (toolCompatible && !toolLengthConfirmed) { setToolLengthConfirmed(true); tone(520, .07, "sine", .018); setMessage(`T${tool.id} LENGTH VERIFIED - safe Z is armed.`); return; }
     if (!toolCompatible) { setMessage(`SETUP HOLD — choose a tool rated for ${operation.label.toLowerCase()}.`); return; }
     if (!setupReady) { setMessage(`SETUP HOLD — ${!fixtureConfirmed ? "confirm fixture" : !zeroConfirmed ? "establish G54 work zero" : "confirm tool length"} before cycle start.`); return; }
     if (!spindle) { trackAnonymous("cycle_start", { contract: contract.id, feed, tool: tool.id }); tone(185, .14, "triangle", .032); window.setTimeout(() => tone(310, .09, "sine", .018), 70); } else tone(120, .09, "triangle", .018);
     setSpindle((value) => !value); setMessage(spindle ? "FEED HOLD — spindle stopped." : `${operation.label.toUpperCase()} LIVE — ${operation.instruction}`);
   };
+
+  const cycleAction = spindle ? "FEED HOLD" : condition <= 0 ? "CHANGE TOOL" : !toolCompatible ? "SELECT VALID TOOL" : !fixtureConfirmed ? "CONFIRM FIXTURE" : !zeroConfirmed ? "SET G54 ZERO" : !toolLengthConfirmed ? `VERIFY T${tool.id} LENGTH` : "CYCLE START";
 
   const advanceOperation = () => {
     if (operationProgress < operation.requiredProgress) { setMessage(`${operation.label.toUpperCase()} HOLD — reach ${operation.requiredProgress}% before signoff.`); return; }
@@ -640,7 +645,7 @@ export default function ManualCampaign() {
             {showCoach && <div className={styles.coach} role="dialog" aria-label="First run briefing"><small>FIRST CUT / 20 SECONDS</small><b>SILVER GOES. CYAN STAYS.</b><ol><li>Press cycle start.</li><li>Drag through silver stock.</li><li>Sign off each operation, then inspect.</li></ol><button onClick={() => { localStorage.setItem("toolpath-first-run-complete-v1", "yes"); setShowCoach(false); cycleButtonRef.current?.focus(); }}>I&apos;M READY</button></div>}
           </div>
           <div className={styles.controls}>
-            <button ref={cycleButtonRef} className={spindle ? styles.hold : styles.start} onClick={toggleSpindle}>{spindle ? <Pause/> : <Play/>}<span>{spindle ? "FEED HOLD" : condition <= 0 ? "CHANGE TOOL" : !toolCompatible ? "SELECT VALID TOOL" : "CYCLE START"}</span></button>
+            <button ref={cycleButtonRef} className={spindle ? styles.hold : styles.start} onClick={toggleSpindle}>{spindle ? <Pause/> : <Play/>}<span>{cycleAction}</span></button>
             <div className={styles.timeline}><i style={{ width: `${operationProgress}%` }}/><span>{operation.label.toUpperCase()} {operationProgress}% / OVERALL {completion}%</span></div>
             {operationProgress >= operation.requiredProgress ? <button className={styles.inspect} onClick={advanceOperation}><ScanLine/> {operationIndex < contract.operations.length - 1 ? "SIGN OFF OP" : "OPEN INSPECTION"}</button> : <span className={styles.actionHint}>CLEAR {operation.requiredProgress - operationProgress}% MORE TO UNLOCK SIGN-OFF</span>}
           </div>
