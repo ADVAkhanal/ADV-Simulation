@@ -169,6 +169,7 @@ export default function ThreeMachiningStage(props: Props) {
     scene.add(root);
     let model: THREE.Group | null = null;
     let toolCrib: THREE.Group | null = null;
+    let guardDoors: THREE.Object3D | null = null, guardDoorYaw = 0;
     const movingNodes: THREE.Object3D[] = [];
     const basePosition = new Map<THREE.Object3D, THREE.Vector3>();
     let stock: THREE.Object3D | null = null;
@@ -216,6 +217,13 @@ export default function ThreeMachiningStage(props: Props) {
     scanner.rotation.x = -Math.PI / 2; scanner.visible = false; root.add(scanner);
     const cueBeacon = new THREE.PointLight(0x70f5ff, 0, 520, 2);
     cueBeacon.position.set(0, 120, 80); root.add(cueBeacon);
+    const contactLight = new THREE.PointLight(0x76f0ff, 0, 210, 2);
+    root.add(contactLight);
+    const workEnvelope = new THREE.Mesh(
+      new THREE.RingGeometry(126, 129, 64),
+      new THREE.MeshBasicMaterial({ color: 0x63e9ff, transparent: true, opacity: 0, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }),
+    );
+    workEnvelope.rotation.x = -Math.PI / 2; workEnvelope.visible = false; root.add(workEnvelope);
 
     const pocketMaterial = new THREE.MeshStandardMaterial({ color: 0x33494f, metalness: 0.58, roughness: 0.64 });
     const pocketGeometry = new THREE.BoxGeometry(1, 1, 1);
@@ -239,6 +247,7 @@ export default function ThreeMachiningStage(props: Props) {
         if (object.name.startsWith("machine.spindle") || object.name.startsWith("machine.coolant") || object.name.startsWith("tool.")) {
           movingNodes.push(object); basePosition.set(object, object.position.clone());
         }
+        if (object.name === "machine.guard.doors") { guardDoors = object; guardDoorYaw = object.rotation.y; }
         if (object.name === "stock.block.flagship") stock = object;
         if (object.name.startsWith("tool.")) toolNodes.push(object);
       });
@@ -333,7 +342,8 @@ export default function ThreeMachiningStage(props: Props) {
       camera.lookAt(view.target);
 
       const toolX = (live.cursor.x / 27 - 0.5) * 230, toolZ = (live.cursor.y / 15 - 0.5) * 120;
-      movingNodes.forEach((object) => { const base = basePosition.get(object)!; object.position.x = base.x + toolX; object.position.z = base.z + toolZ; });
+      const plunge = live.spindle ? 15 + Math.min(live.load, 80) * .07 : 0;
+      movingNodes.forEach((object) => { const base = basePosition.get(object)!; object.position.x = base.x + toolX; object.position.y = base.y - plunge; object.position.z = base.z + toolZ; });
       const activeTool = TOOL_NODE_BY_ID[live.toolId ?? 1] ?? TOOL_NODE_BY_ID[1];
       toolNodes.forEach((tool) => { tool.visible = tool.name === activeTool; if (live.spindle) tool.rotation.y += dt * 38; });
 
@@ -349,6 +359,9 @@ export default function ThreeMachiningStage(props: Props) {
       });
       const mountedTool = toolNodes.find((tool) => tool.name === activeTool);
       const origin = mountedTool ? mountedTool.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3(toolX, -5, toolZ);
+      contactLight.position.copy(origin); contactLight.position.y += 12;
+      contactLight.color.set(live.load > 76 ? 0xffa95b : live.accent ?? "#76f0ff");
+      contactLight.intensity = live.spindle ? 6.4 + live.load * .09 : stockHovered ? 2.8 : 0;
       if (requestedMode === "macro") view.target.lerp(origin.clone().add(new THREE.Vector3(0, -8, 0)), 1 - Math.exp(-4 * dt));
       const chipColors = CHIP_COLORS[live.material ?? "6061 AL"] ?? CHIP_COLORS["6061 AL"];
       chipMaterial.color.setHex(live.load > 78 ? chipColors[1] : chipColors[0]);
@@ -396,6 +409,7 @@ export default function ThreeMachiningStage(props: Props) {
       shop.cart.rotation.y = Math.sin(now * .00028) * .014;
       shop.palletRail.position.x = Math.sin(now * shopMotion * .6) * (live.spindle ? 34 : 11);
       if (toolCrib) toolCrib.rotation.y = .16 + Math.sin(now * .00032) * .006;
+      if (guardDoors) guardDoors.rotation.y = guardDoorYaw + (live.spindle ? 0 : .06 + Math.sin(now * .00045) * .018);
 
       if (stockBox && live.cells) {
         const removed = Array.from(live.cells).filter((value) => value === 0).length;
@@ -413,6 +427,10 @@ export default function ThreeMachiningStage(props: Props) {
       if (stockBox) {
         const center = stockBox.getCenter(new THREE.Vector3()), top = stockBox.max.y + 3;
         datum.position.set(center.x, top, center.z); datum.visible = live.datumVisible === true || requestedMode === "datum";
+        workEnvelope.visible = live.spindle || stockHovered || live.datumVisible === true;
+        workEnvelope.position.set(center.x, top + .55, center.z);
+        workEnvelope.scale.setScalar(1 + Math.sin(now * .003) * .025);
+        (workEnvelope.material as THREE.MeshBasicMaterial).opacity = live.spindle ? .32 + Math.min(live.load, 70) * .002 : stockHovered || live.datumVisible ? .16 : 0;
         const cue = live.sceneCue ?? "idle";
         scanner.visible = live.inspectionActive === true || requestedMode === "inspection" || cue === "inspection"; scanner.position.set(center.x, top + 2, center.z + Math.sin(now * .0014) * stockBox.getSize(new THREE.Vector3()).z * .48);
         cueBeacon.position.set(center.x, top + 86, center.z);
