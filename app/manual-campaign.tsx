@@ -149,6 +149,10 @@ export default function ManualCampaign() {
   const [flowScore, setFlowScore] = useState(0);
   const [gameEvent, setGameEvent] = useState<GameEvent | null>(null);
   const [sceneCue, setSceneCue] = useState<"idle" | "tool-change" | "inspection">("idle");
+  const [fixtureConfirmed, setFixtureConfirmed] = useState(false);
+  const [zeroConfirmed, setZeroConfirmed] = useState(false);
+  const [toolLengthConfirmed, setToolLengthConfirmed] = useState(false);
+  const [workOffsetError, setWorkOffsetError] = useState<0 | 2.5>(0);
 
   const contract = MANUAL_CONTRACTS[contractIndex];
   const operation = contract.operations[Math.min(operationIndex, contract.operations.length - 1)];
@@ -159,7 +163,9 @@ export default function ManualCampaign() {
   const readings = useMemo(() => buildManualMeasurements(material, finished, contract, overcut, finishPenalty, breaks), [breaks, contract, finishPenalty, finished, material, overcut]);
   const surfaceRa = clamp(.8 + finishPenalty * .42 + Math.max(0, feed - 85) * .025, .8, 12.5);
   const removalIndex = spindle ? Math.round(parseFloat(tool.diameter) * feed * Math.max(1, load) / 100) : 0;
-  const machinePosition = { x: cursor.x / (MILL_COLS - 1) * 240, y: cursor.y / (MILL_ROWS - 1) * 140 };
+  // The displayed machine coordinate is the physical location, including any deliberate G54 error.
+  // The target cursor remains the programmed coordinate so an incorrect zero is immediately legible.
+  const machinePosition = { x: clamp(cursor.x + workOffsetError, 0, MILL_COLS - 1) / (MILL_COLS - 1) * 240, y: cursor.y / (MILL_ROWS - 1) * 140 };
   const spindleRpm = contract.material.includes("Ti") ? 2380 : contract.material.includes("7075") ? 6120 : 7480;
   const programmedFeed = Math.round((contract.material.includes("Ti") ? 310 : contract.material.includes("7075") ? 780 : 940) * feed / 100);
   const chipLoad = programmedFeed / Math.max(1, spindleRpm * 3);
@@ -168,6 +174,7 @@ export default function ManualCampaign() {
   const mission = deriveManualMission(completion);
   const comboMultiplier = deriveFlowPoints(0, combo).multiplier;
   const toolCompatible = tool.operations.includes(operation.id);
+  const setupReady = fixtureConfirmed && zeroConfirmed && toolLengthConfirmed;
 
   useEffect(() => {
     let migrated = DEFAULT_MANUAL_SAVE;
@@ -355,7 +362,7 @@ export default function ManualCampaign() {
     setContractIndex(nextContract); setOperationIndex(0); setToolIndex(toolForOperation(next.operations[0].id));
     setMaterial(freshStock); setFinished(freshFinish); setSpindle(false); setHeat(20); setCondition(100);
     setLoad(0); setOvercut(0); setFixtureStrikes(0); setFinishPenalty(0); setBreaks(0); setElapsed(0); setCursor({ x: 3, y: 3 }); setResult(null); setShareStatus(""); setViewMode("twin"); setDatumVisible(false); firstCutTracked.current = false; toolpathRef.current = []; setToolpath([]); chipsRef.current = [];
-    setMeasured({}); setInspectionMistakes(0); setSelectedCharacteristic(next.inspection[0].id); setInstrument(next.inspection[0].instrument);
+    setMeasured({}); setInspectionMistakes(0); setSelectedCharacteristic(next.inspection[0].id); setInstrument(next.inspection[0].instrument); setFixtureConfirmed(false); setZeroConfirmed(false); setToolLengthConfirmed(false); setWorkOffsetError(0);
     comboRef.current = 0; setCombo(0); setBestCombo(0); setFlowScore(0); setPaused(false); setGameEvent(null);
   }, [contractIndex]);
 
@@ -370,6 +377,7 @@ export default function ManualCampaign() {
     const compatible = nextTool.operations.includes(operation.id);
     setLoad(0);
     setToolIndex(index);
+    setToolLengthConfirmed(false);
     setMessage(`SAFE TOOL CHANGE — T${nextTool.id} ${nextTool.name} selected. ${compatible ? nextTool.role : nextTool.limitation}`);
     trackAnonymous("manual_tool_change", { contract: contract.id, tool: nextTool.id, duringCycle: spindle });
   };
@@ -403,7 +411,8 @@ export default function ManualCampaign() {
   const cutAt = (x: number, y: number) => {
     setCursor({ x, y });
     if (!spindle || condition <= 0 || paused) return;
-    const cut = machineManualStock(materialRef.current, finishedRef.current, contract.id, operation.id, tool, x, y);
+    const programmedX = clamp(x + workOffsetError, 0, MILL_COLS - 1);
+    const cut = machineManualStock(materialRef.current, finishedRef.current, contract.id, operation.id, tool, programmedX, y);
     if (!cut.compatible) { setLoad(0); setMessage(`T${tool.id} LOCKOUT — ${tool.name.toLowerCase()} cannot perform ${operation.label.toLowerCase()}.`); return; }
     if (!cut.engagement) { setLoad(0); if (cut.mismatch) setMessage(`${operation.label.toUpperCase()} ACTIVE — that stock belongs to another operation.`); return; }
     toolpathRef.current.push({ x, y }); toolpathRef.current = toolpathRef.current.slice(-320); setToolpath(toolpathRef.current);
@@ -478,6 +487,7 @@ export default function ManualCampaign() {
   const toggleSpindle = () => {
     if (condition <= 0) { restoreTool(); return; }
     if (!toolCompatible) { setMessage(`SETUP HOLD — choose a tool rated for ${operation.label.toLowerCase()}.`); return; }
+    if (!setupReady) { setMessage(`SETUP HOLD — ${!fixtureConfirmed ? "confirm fixture" : !zeroConfirmed ? "establish G54 work zero" : "confirm tool length"} before cycle start.`); return; }
     if (!spindle) { trackAnonymous("cycle_start", { contract: contract.id, feed, tool: tool.id }); tone(185, .14, "triangle", .032); window.setTimeout(() => tone(310, .09, "sine", .018), 70); } else tone(120, .09, "triangle", .018);
     setSpindle((value) => !value); setMessage(spindle ? "FEED HOLD — spindle stopped." : `${operation.label.toUpperCase()} LIVE — ${operation.instruction}`);
   };
@@ -596,6 +606,7 @@ export default function ManualCampaign() {
       {screen === "inspection" ? <InspectionBay contract={contract} material={material} toolId={tool.id} finishPenalty={finishPenalty} readings={readings} measured={measured} selectedCharacteristic={selectedCharacteristic} setSelectedCharacteristic={setSelectedCharacteristic} instrument={instrument} setInstrument={setInstrument} measureSelected={measureSelected} dispositionPart={dispositionPart} returnToCell={() => setScreen("play")}/> : <section className={`${styles.workspace} ${immersiveHud ? styles.immersiveWorkspace : ""}`}>
         <aside className={styles.setup}>
           <div className={styles.panelTitle}><span>01</span><div><small>PROCESS PLAN</small><b>Sequence and tooling</b></div></div>
+          <section className={styles.setupGate} aria-label="Pre-cycle setup verification"><header><span>SETUP GATE</span><b>{setupReady ? "ARMED" : "HOLD"}</b></header><button aria-pressed={fixtureConfirmed} onClick={() => { setFixtureConfirmed((value) => !value); setMessage(fixtureConfirmed ? "Fixture verification cleared." : "Fixture confirmed — vise jaws and clamp margin are live."); }}>01 / FIXTURE {fixtureConfirmed ? "CONFIRMED" : "CONFIRM"}</button><button aria-pressed={zeroConfirmed} onClick={() => { setZeroConfirmed(true); setDatumVisible(true); setMessage(workOffsetError ? "G54 CONFIRMED WITH A +2.5 CELL SHIFT — this can ruin the part." : "G54 established at the stock datum."); }}>02 / G54 {zeroConfirmed ? workOffsetError ? "SHIFTED" : "SET" : "SET ZERO"}</button><button aria-pressed={Boolean(workOffsetError)} onClick={() => { setWorkOffsetError((value) => value ? 0 : 2.5); setZeroConfirmed(false); setMessage(workOffsetError ? "G54 nominal offset restored." : "Offset fault injected: confirm G54 to run the shifted program."); }}>G54 OFFSET {workOffsetError ? "+2.5 CELLS" : "NOMINAL"}</button><button aria-pressed={toolLengthConfirmed} onClick={() => { if (!toolCompatible) { setMessage(`Tool length cannot be confirmed: T${tool.id} is not rated for ${operation.label.toLowerCase()}.`); return; } setToolLengthConfirmed((value) => !value); setMessage(toolLengthConfirmed ? "Tool length check cleared." : `T${tool.id} length verified at safe Z.`); }}>03 / T{tool.id} LENGTH {toolLengthConfirmed ? "VERIFIED" : "VERIFY"}</button></section>
           <div className={styles.operationList}>{contract.operations.map((item, index) => {
             const progress = manualOperationProgress(material, finished, contract.id, item.id);
             return <div key={item.id} className={index < operationIndex ? styles.operationDone : index === operationIndex ? styles.operationActive : ""}><span>0{index + 1}</span><div><b>{item.label}</b><small>{index < operationIndex ? "SIGNED OFF" : index === operationIndex ? `${progress}% / ${item.requiredProgress}% required` : "LOCKED"}</small></div><em>{index < operationIndex ? "✓" : `${progress}%`}</em></div>;
@@ -618,7 +629,7 @@ export default function ManualCampaign() {
           <div className={styles.viewport}>
             <canvas className={viewMode === "map" ? styles.mapVisible : styles.mapHidden} ref={canvasRef} width={1120} height={640} aria-label={`Interactive ${operation.label.toLowerCase()} process map`} onPointerDown={(event) => { dragging.current = true; event.currentTarget.setPointerCapture(event.pointerId); millAt(event.clientX, event.clientY); }} onPointerMove={(event) => dragging.current ? millAt(event.clientX, event.clientY) : moveCursor(event.clientX, event.clientY)} onPointerUp={() => { dragging.current = false; setLoad(0); }} onPointerCancel={() => { dragging.current = false; setLoad(0); }}/>
             {viewMode === "twin" && <FlagshipMachiningKit variant="hero" cursor={cursor} spindle={spindle} completion={completion} load={load} heat={heat} condition={condition} finishPenalty={finishPenalty} material={contract.material} accent={contract.color} verbose={learningLevel !== "easy"} cells={material} contractId={contract.id} toolpath={toolpath} toolId={tool.id} cameraMode={datumVisible ? "datum" : spindle ? "machining" : "operator"} datumVisible={datumVisible} inputMode="cut" soundEnabled={soundOn} sceneCue={sceneCue} onToolInput={moveToolFromTwin} interactive/>}
-            {learningLevel !== "easy" && <div className={styles.coordinates}><small>G54 POSITION / MM</small><b>X {machinePosition.x.toFixed(2)}</b><b>Y {machinePosition.y.toFixed(2)}</b><b>Z {spindle ? "-1.80" : "+4.00"}</b></div>}
+            {learningLevel !== "easy" && <div className={styles.coordinates}><small>G54 POSITION / MM</small><b>X {machinePosition.x.toFixed(2)}</b><b>Y {machinePosition.y.toFixed(2)}</b><b>Z {spindle ? "-1.80" : "+4.00"}</b>{workOffsetError > 0 && <em>OFFSET +{workOffsetError.toFixed(1)} CELLS</em>}</div>}
             <div className={styles.processPlate}><small>PROCESS ESTIMATE / SIM</small><span><b>S</b>{spindleRpm.toLocaleString()} RPM</span><span><b>F</b>{programmedFeed} MM/MIN</span>{learningLevel !== "easy" && <span><b>Ra</b>{surfaceRa.toFixed(1)} µm</span>}{learningLevel === "hard" && <><span><b>fz</b>{chipLoad.toFixed(3)} MM</span><span><b>ae</b>{engagementAngle}°</span><span><b>MRR</b>{removalIndex}</span><span><b>WCS</b>G54</span><span><b>OP</b>{operation.label.toUpperCase()}</span></>}</div>
             <section className={styles.missionHud} aria-label="Active mission objective"><header><Target/><span>PRIMARY OBJECTIVE / 0{mission.step}</span><b>{completion}% / {mission.target}%</b></header><h3>{mission.title}</h3><p>{mission.detail}</p><i><em style={{ width: `${Math.min(100, completion / mission.target * 100)}%` }}/></i></section>
             {learningLevel !== "easy" && <div className={styles.flowHud} data-active={combo > 1}><Zap/><span>FLOW</span><strong>×{comboMultiplier.toFixed(2)}</strong><small>{combo} CHAIN · {flowScore.toLocaleString()} PTS</small></div>}
