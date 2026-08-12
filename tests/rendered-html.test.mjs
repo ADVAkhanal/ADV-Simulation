@@ -23,7 +23,8 @@ test("server-renders the finished Project Toolpath game surface", async () => {
   assert.match(html, /Emergency drive plate/);
   assert.match(html, /Flight rib prototype/);
   assert.match(html, /Sensor bracket/);
-  assert.match(html, /2 MODES \+ ASSET LAB/);
+  assert.match(html, /3 MODES \+ ASSET LAB/);
+  assert.match(html, /CNC LATHE/);
   assert.doesNotMatch(html, /codex-preview|Your site is taking shape|Codex is working/i);
 });
 

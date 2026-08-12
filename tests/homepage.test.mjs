@@ -111,6 +111,8 @@ test("global mode dock exposes both game surfaces", async () => {
   assert.match(dock, /MANUAL MILL/);
   assert.match(dock, /G\/\/CODE STAGE/);
   assert.match(dock, /ASSET LAB/);
+  assert.match(dock, /CNC LATHE/);
+  assert.match(dock, /href="\/turn"/);
   assert.match(page, /INSPECTION FAILED/);
   assert.match(page, /toolpath-contracts/);
   assert.match(page, /scrollIntoView/);

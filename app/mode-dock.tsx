@@ -1,12 +1,13 @@
-import { Box, Code2, Factory, Layers3 } from "lucide-react";
+import { Box, Code2, Factory, Layers3, RotateCw } from "lucide-react";
 import Link from "next/link";
 import styles from "./mode-dock.module.css";
 
 export default function ModeDock() {
   return <nav className={styles.dock} aria-label="Project Toolpath game modes">
-    <div className={styles.identity}><Layers3/><span>PROJECT TOOLPATH</span><b>2 MODES + ASSET LAB</b></div>
+    <div className={styles.identity}><Layers3/><span>PROJECT TOOLPATH</span><b>3 MODES + ASSET LAB</b></div>
     <Link href="/"><Factory/><span><small>HANDS-ON CELL</small>MANUAL MILL</span></Link>
     <Link href="/gcode"><Code2/><span><small>PROGRAMMING CELL</small>G//CODE STAGE</span></Link>
+    <Link href="/turn"><RotateCw/><span><small>TURNING CELL</small>CNC LATHE</span></Link>
     <Link href="/lab/asset-pipeline"><Box/><span><small>BLENDER PIPELINE</small>ASSET LAB</span></Link>
   </nav>;
 }
