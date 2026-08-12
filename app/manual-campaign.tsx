@@ -148,6 +148,7 @@ export default function ManualCampaign() {
   const [bestCombo, setBestCombo] = useState(0);
   const [flowScore, setFlowScore] = useState(0);
   const [gameEvent, setGameEvent] = useState<GameEvent | null>(null);
+  const [sceneCue, setSceneCue] = useState<"idle" | "tool-change" | "inspection">("idle");
 
   const contract = MANUAL_CONTRACTS[contractIndex];
   const operation = contract.operations[Math.min(operationIndex, contract.operations.length - 1)];
@@ -340,6 +341,11 @@ export default function ManualCampaign() {
     eventTimerRef.current = window.setTimeout(() => setGameEvent(null), event.kind === "warning" ? 1800 : 2400);
   }, []);
 
+  const triggerSceneCue = useCallback((cue: "tool-change" | "inspection") => {
+    setSceneCue(cue);
+    window.setTimeout(() => setSceneCue("idle"), cue === "inspection" ? 1100 : 850);
+  }, []);
+
   const toolForOperation = (operationId: ManualOperationId) => Math.max(0, MILL_TOOLS.findIndex((item) => item.operations.includes(operationId)));
 
   const resetRun = useCallback((nextContract = contractIndex) => {
@@ -467,7 +473,7 @@ export default function ManualCampaign() {
     if (cutting) cutAt(x, y); else setCursor({ x, y });
   };
 
-  const restoreTool = () => { setCondition(100); setHeat(25); setSpindle(false); setMessage("Fresh cutter loaded. Verify the active operation before restart."); };
+  const restoreTool = () => { setCondition(100); setHeat(25); setSpindle(false); triggerSceneCue("tool-change"); tone(420, .11, "square", .018); setMessage("Fresh cutter loaded. Verify the active operation before restart."); };
 
   const toggleSpindle = () => {
     if (condition <= 0) { restoreTool(); return; }
@@ -485,7 +491,7 @@ export default function ManualCampaign() {
       setMessage(`${operation.label.toUpperCase()} SIGNED OFF — ${nextOperation.label.toLowerCase()} is now active.`);
     } else {
       setMeasured({}); setInspectionMistakes(0); setSelectedCharacteristic(contract.inspection[0].id); setInstrument(contract.inspection[0].instrument);
-      setViewMode("map"); setScreen("inspection"); setMessage("INSPECTION BAY — measure every characteristic, then disposition the part.");
+      setViewMode("map"); triggerSceneCue("inspection"); setScreen("inspection"); setMessage("INSPECTION BAY — measure every characteristic, then disposition the part.");
     }
   };
 
@@ -495,6 +501,7 @@ export default function ManualCampaign() {
     if (instrument !== reading.instrument) { setInspectionMistakes((value) => value + 1); setMessage(`NO VALID READING — ${reading.label.toLowerCase()} requires the ${reading.instrumentLabel.toLowerCase()}.`); return; }
     setMeasured((current) => ({ ...current, [reading.id]: reading }));
     setElapsed((value) => value + 2);
+    triggerSceneCue("inspection"); tone(reading.pass ? 520 : 135, .12, reading.pass ? "sine" : "sawtooth", .022);
     setMessage(`${reading.label.toUpperCase()} — ${reading.actual.toFixed(3)} ${reading.unit}, ${reading.pass ? "WITHIN" : "OUTSIDE"} ±${reading.tolerance.toFixed(2)}.`);
   };
 
@@ -561,7 +568,7 @@ export default function ManualCampaign() {
     if (condition >= 98 && heat <= 30) { setMessage("Cutter is already fresh and cool. No swap needed."); return; }
     if (save.credits < SWAP_TOOL_COST) { setMessage(`Not enough credits for a tool swap — need ${SWAP_TOOL_COST} CR.`); return; }
     setSave((current) => ({ ...current, credits: current.credits - SWAP_TOOL_COST }));
-    setCondition(100); setHeat(20);
+    setCondition(100); setHeat(20); triggerSceneCue("tool-change"); tone(420, .11, "square", .018);
     setMessage(`Cutter swapped for ${SWAP_TOOL_COST} CR — fresh edge, safe temperature.`);
     trackAnonymous("manual_tool_swap", { contract: contract.id, tool: tool.id, cost: SWAP_TOOL_COST });
   };
@@ -610,7 +617,7 @@ export default function ManualCampaign() {
           <div className={styles.machineHead}><span><i className={spindle ? styles.machineLive : ""}/> VMC-01 / LIVE MACHINING CELL</span><div className={styles.viewSwitch} aria-label="Machine viewport mode"><button aria-pressed={viewMode === "twin"} onClick={() => { setViewMode("twin"); setMessage("3D MACHINING VIEW — drag over the stock to guide the cutter."); trackAnonymous("view_3d_cut", { contract: contract.id }); }}>3D CUT</button><button aria-pressed={viewMode === "map"} onClick={() => { setViewMode("map"); trackAnonymous("view_process_map", { contract: contract.id }); }}>PROCESS MAP</button><button aria-pressed={datumVisible} onClick={() => { setDatumVisible((value) => !value); setMessage("G54 DATUM — stock origin, axes, and work plane are spatially linked."); trackAnonymous("view_g54_datum", { contract: contract.id, visible: !datumVisible }); }}>G54</button><button aria-pressed={immersiveHud} onClick={() => { setImmersiveHud((value) => !value); trackAnonymous("view_hud_mode", { contract: contract.id, mode: immersiveHud ? "control" : "cell" }); }}>{immersiveHud ? "CELL VIEW" : "CONTROL VIEW"}</button></div><span>PROGRAM <b>{contract.program}</b></span></div>
           <div className={styles.viewport}>
             <canvas className={viewMode === "map" ? styles.mapVisible : styles.mapHidden} ref={canvasRef} width={1120} height={640} aria-label={`Interactive ${operation.label.toLowerCase()} process map`} onPointerDown={(event) => { dragging.current = true; event.currentTarget.setPointerCapture(event.pointerId); millAt(event.clientX, event.clientY); }} onPointerMove={(event) => dragging.current ? millAt(event.clientX, event.clientY) : moveCursor(event.clientX, event.clientY)} onPointerUp={() => { dragging.current = false; setLoad(0); }} onPointerCancel={() => { dragging.current = false; setLoad(0); }}/>
-            {viewMode === "twin" && <FlagshipMachiningKit variant="hero" cursor={cursor} spindle={spindle} completion={completion} load={load} heat={heat} condition={condition} finishPenalty={finishPenalty} material={contract.material} accent={contract.color} verbose={learningLevel !== "easy"} cells={material} contractId={contract.id} toolpath={toolpath} toolId={tool.id} cameraMode={datumVisible ? "datum" : spindle ? "machining" : "operator"} datumVisible={datumVisible} inputMode="cut" soundEnabled={soundOn} onToolInput={moveToolFromTwin} interactive/>}
+            {viewMode === "twin" && <FlagshipMachiningKit variant="hero" cursor={cursor} spindle={spindle} completion={completion} load={load} heat={heat} condition={condition} finishPenalty={finishPenalty} material={contract.material} accent={contract.color} verbose={learningLevel !== "easy"} cells={material} contractId={contract.id} toolpath={toolpath} toolId={tool.id} cameraMode={datumVisible ? "datum" : spindle ? "machining" : "operator"} datumVisible={datumVisible} inputMode="cut" soundEnabled={soundOn} sceneCue={sceneCue} onToolInput={moveToolFromTwin} interactive/>}
             {learningLevel !== "easy" && <div className={styles.coordinates}><small>G54 POSITION / MM</small><b>X {machinePosition.x.toFixed(2)}</b><b>Y {machinePosition.y.toFixed(2)}</b><b>Z {spindle ? "-1.80" : "+4.00"}</b></div>}
             <div className={styles.processPlate}><small>PROCESS ESTIMATE / SIM</small><span><b>S</b>{spindleRpm.toLocaleString()} RPM</span><span><b>F</b>{programmedFeed} MM/MIN</span>{learningLevel !== "easy" && <span><b>Ra</b>{surfaceRa.toFixed(1)} µm</span>}{learningLevel === "hard" && <><span><b>fz</b>{chipLoad.toFixed(3)} MM</span><span><b>ae</b>{engagementAngle}°</span><span><b>MRR</b>{removalIndex}</span><span><b>WCS</b>G54</span><span><b>OP</b>{operation.label.toUpperCase()}</span></>}</div>
             <section className={styles.missionHud} aria-label="Active mission objective"><header><Target/><span>PRIMARY OBJECTIVE / 0{mission.step}</span><b>{completion}% / {mission.target}%</b></header><h3>{mission.title}</h3><p>{mission.detail}</p><i><em style={{ width: `${Math.min(100, completion / mission.target * 100)}%` }}/></i></section>

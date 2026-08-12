@@ -27,6 +27,7 @@ type Props = {
   inspectionActive?: boolean;
   inputMode?: "orbit" | "cut";
   soundEnabled?: boolean;
+  sceneCue?: "idle" | "tool-change" | "inspection";
   onToolInput?: (x: number, y: number, cutting: boolean) => void;
   onReady: () => void;
   onFailure: () => void;
@@ -201,6 +202,8 @@ export default function ThreeMachiningStage(props: Props) {
 
     const scanner = new THREE.Mesh(new THREE.PlaneGeometry(290, 180), new THREE.MeshBasicMaterial({ color: 0x85f5ff, transparent: true, opacity: .13, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
     scanner.rotation.x = -Math.PI / 2; scanner.visible = false; root.add(scanner);
+    const cueBeacon = new THREE.PointLight(0x70f5ff, 0, 520, 2);
+    cueBeacon.position.set(0, 120, 80); root.add(cueBeacon);
 
     const pocketMaterial = new THREE.MeshStandardMaterial({ color: 0x33494f, metalness: 0.58, roughness: 0.64 });
     const pocketGeometry = new THREE.BoxGeometry(1, 1, 1);
@@ -393,7 +396,12 @@ export default function ThreeMachiningStage(props: Props) {
       if (stockBox) {
         const center = stockBox.getCenter(new THREE.Vector3()), top = stockBox.max.y + 3;
         datum.position.set(center.x, top, center.z); datum.visible = live.datumVisible === true || requestedMode === "datum";
-        scanner.visible = live.inspectionActive === true || requestedMode === "inspection"; scanner.position.set(center.x, top + 2, center.z + Math.sin(now * .0014) * stockBox.getSize(new THREE.Vector3()).z * .48);
+        const cue = live.sceneCue ?? "idle";
+        scanner.visible = live.inspectionActive === true || requestedMode === "inspection" || cue === "inspection"; scanner.position.set(center.x, top + 2, center.z + Math.sin(now * .0014) * stockBox.getSize(new THREE.Vector3()).z * .48);
+        cueBeacon.position.set(center.x, top + 86, center.z);
+        cueBeacon.color.setHex(cue === "tool-change" ? 0xffc15a : 0x70f5ff);
+        cueBeacon.intensity = cue === "idle" ? 0 : 5.5 + Math.sin(now * .02) * 1.8;
+        (scanner.material as THREE.MeshBasicMaterial).opacity = cue === "inspection" ? .22 + Math.sin(now * .015) * .06 : .13;
         if (live.toolpath && live.toolpath.length > 1) {
           const size = stockBox.getSize(new THREE.Vector3()), min = stockBox.min;
           const points = live.toolpath.map(point => new THREE.Vector3(min.x + point.x / 27 * size.x, top + 2.5, min.z + point.y / 15 * size.z));
