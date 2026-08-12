@@ -11,7 +11,7 @@ type Vec3 = [number, number, number];
 type Mat4 = [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
 type Face = { vertices: [Vec3, Vec3, Vec3]; color: string; node: string; metallic: number; roughness: number };
 type Scene = { faces: Face[]; bytes: number };
-type Props = { cursor: { x: number; y: number }; spindle: boolean; completion: number; load: number; heat?: number; condition?: number; finishPenalty?: number; variant?: "mini" | "full" | "hero"; material?: string; accent?: string; verbose?: boolean; cells?: Uint8Array; contractId?: ManualContract["id"]; toolpath?: Array<{ x: number; y: number }>; interactive?: boolean; toolId?: number; cameraMode?: MachineCameraMode; datumVisible?: boolean; inspectionActive?: boolean; inputMode?: "orbit" | "cut"; onToolInput?: (x: number, y: number, cutting: boolean) => void };
+type Props = { cursor: { x: number; y: number }; spindle: boolean; completion: number; load: number; heat?: number; condition?: number; finishPenalty?: number; variant?: "mini" | "full" | "hero"; material?: string; accent?: string; verbose?: boolean; cells?: Uint8Array; contractId?: ManualContract["id"]; toolpath?: Array<{ x: number; y: number }>; interactive?: boolean; toolId?: number; cameraMode?: MachineCameraMode; datumVisible?: boolean; inspectionActive?: boolean; inputMode?: "orbit" | "cut"; soundEnabled?: boolean; onToolInput?: (x: number, y: number, cutting: boolean) => void };
 type ViewState = { yaw: number; pitch: number; zoom: number; autoOrbit: boolean };
 
 // Node names for every cutting tool the Blender kit ships (see

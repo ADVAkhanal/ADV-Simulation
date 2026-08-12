@@ -26,6 +26,7 @@ type Props = {
   datumVisible?: boolean;
   inspectionActive?: boolean;
   inputMode?: "orbit" | "cut";
+  soundEnabled?: boolean;
   onToolInput?: (x: number, y: number, cutting: boolean) => void;
   onReady: () => void;
   onFailure: () => void;
@@ -91,7 +92,25 @@ function proceduralShop(scene: THREE.Scene) {
   );
   backWall.position.set(0, -26, -550);
   scene.add(backWall);
-  return { slab, bays, lights, floorGrid };
+  const paintedSteel = new THREE.MeshStandardMaterial({ color: 0x1c343a, roughness: 0.58, metalness: 0.7 });
+  const safetyYellow = new THREE.MeshStandardMaterial({ color: 0xd58d2f, emissive: 0x341300, emissiveIntensity: .25, roughness: .46, metalness: .46 });
+  const warmScreen = new THREE.MeshStandardMaterial({ color: 0x101b1b, emissive: 0x65e6d3, emissiveIntensity: 1.45, roughness: .4, metalness: .2 });
+  const rack = new THREE.Group();
+  const uprightGeometry = new THREE.BoxGeometry(18, 270, 18), shelfGeometry = new THREE.BoxGeometry(250, 12, 62);
+  for (const x of [-118, 118]) { const upright = new THREE.Mesh(uprightGeometry, paintedSteel); upright.position.set(x, -270, 0); rack.add(upright); }
+  for (const y of [-350, -250, -150]) { const shelf = new THREE.Mesh(shelfGeometry, paintedSteel); shelf.position.set(0, y, 0); rack.add(shelf); }
+  for (let index = 0; index < 9; index += 1) { const bin = new THREE.Mesh(new THREE.BoxGeometry(42, 28, 52), index % 3 === 0 ? safetyYellow : steel); bin.position.set(-86 + (index % 3) * 86, -320 + Math.floor(index / 3) * 100, -12); rack.add(bin); }
+  rack.position.set(-510, 0, -405); scene.add(rack);
+  const cart = new THREE.Group();
+  const cartBody = new THREE.Mesh(new THREE.BoxGeometry(150, 18, 95), safetyYellow); cartBody.position.y = -285; cart.add(cartBody);
+  for (const x of [-57, 57]) for (const z of [-34, 34]) { const wheel = new THREE.Mesh(new THREE.CylinderGeometry(13, 13, 10, 16), steel); wheel.rotation.x = Math.PI / 2; wheel.position.set(x, -326, z); cart.add(wheel); }
+  const cartScreen = new THREE.Mesh(new THREE.BoxGeometry(76, 48, 7), warmScreen); cartScreen.position.set(0, -220, -12); cart.add(cartScreen); const cartNeck = new THREE.Mesh(new THREE.BoxGeometry(10, 68, 10), paintedSteel); cartNeck.position.set(0, -254, 0); cart.add(cartNeck);
+  cart.position.set(450, 0, -300); scene.add(cart);
+  const gantry = new THREE.Group();
+  const gantryMat = new THREE.MeshStandardMaterial({ color: 0x11262b, roughness: .62, metalness: .66 });
+  for (const x of [-510, 510]) { const column = new THREE.Mesh(new THREE.BoxGeometry(34, 670, 34), gantryMat); column.position.set(x, -76, -500); gantry.add(column); }
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(1054, 34, 34), gantryMat); beam.position.set(0, 246, -500); gantry.add(beam); scene.add(gantry);
+  return { slab, bays, lights, floorGrid, warmScreen };
 }
 
 export default function ThreeMachiningStage(props: Props) {
@@ -212,6 +231,7 @@ export default function ThreeMachiningStage(props: Props) {
     }, undefined, () => propsRef.current.onFailure());
 
     let frame = 0, previous = performance.now(), drag: { x: number; y: number } | null = null, cutting = false, firstCutAt = 0, wasCutting = false, stockHovered = false;
+    let audio: AudioContext | null = null, motor: OscillatorNode | null = null, harmonic: OscillatorNode | null = null, motorGain: GainNode | null = null;
     const raycaster = new THREE.Raycaster(), pointer = new THREE.Vector2();
     const resize = () => {
       const rect = canvas.getBoundingClientRect(), budget = qualityBudget(rect.width), ratio = Math.min(devicePixelRatio || 1, budget.dpr);
@@ -236,7 +256,17 @@ export default function ThreeMachiningStage(props: Props) {
         isCutting,
       );
     };
-    const onDown = (event: PointerEvent) => { if (!propsRef.current.interactive) return; canvas.setPointerCapture(event.pointerId); if (propsRef.current.inputMode === "cut" && event.button === 0) { cutting = true; emitTool(event, true); } else drag = { x: event.clientX, y: event.clientY }; };
+    const armAudio = () => {
+      if (!propsRef.current.soundEnabled || audio) return;
+      const AudioCtor = window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtor) return;
+      audio = new AudioCtor(); motorGain = audio.createGain(); motorGain.gain.value = .0001; motorGain.connect(audio.destination);
+      motor = audio.createOscillator(); motor.type = "sawtooth"; motor.frequency.value = 62;
+      harmonic = audio.createOscillator(); harmonic.type = "sine"; harmonic.frequency.value = 124;
+      const harmonicGain = audio.createGain(); harmonicGain.gain.value = .18;
+      motor.connect(motorGain); harmonic.connect(harmonicGain).connect(motorGain); motor.start(); harmonic.start();
+    };
+    const onDown = (event: PointerEvent) => { if (!propsRef.current.interactive) return; armAudio(); canvas.setPointerCapture(event.pointerId); if (propsRef.current.inputMode === "cut" && event.button === 0) { cutting = true; emitTool(event, true); } else drag = { x: event.clientX, y: event.clientY }; };
     const onMove = (event: PointerEvent) => { if (cutting) { emitTool(event, true); return; } if (propsRef.current.inputMode === "cut" && !drag) { emitTool(event, false); return; } if (!drag) return; view.yaw += (event.clientX - drag.x) * 0.008; view.pitch = THREE.MathUtils.clamp(view.pitch + (event.clientY - drag.y) * 0.006, -0.9, 0.12); drag = { x: event.clientX, y: event.clientY }; };
     const onUp = () => { drag = null; cutting = false; };
     const onLeave = () => { stockHovered = false; };
@@ -247,6 +277,7 @@ export default function ThreeMachiningStage(props: Props) {
     const animate = (now: number) => {
       const dt = Math.min(0.05, (now - previous) / 1000); previous = now;
       const live = propsRef.current;
+      if (audio && motor && harmonic && motorGain) { const target = live.soundEnabled && live.spindle ? .026 + live.load * .00048 : .0001; motorGain.gain.setTargetAtTime(target, audio.currentTime, .08); motor.frequency.setTargetAtTime(58 + live.load * .9, audio.currentTime, .07); harmonic.frequency.setTargetAtTime(116 + live.load * 2.4, audio.currentTime, .07); }
       const mood = deriveMachineMood({ spindle: live.spindle, load: live.load, heat: live.heat ?? 20, condition: live.condition ?? 100, finishPenalty: live.finishPenalty ?? 0, cameraMode: live.cameraMode ?? "establishing" });
       const liveCut = live.spindle && live.load > 4;
       if (liveCut && !wasCutting) firstCutAt = performance.now();
@@ -310,6 +341,7 @@ export default function ThreeMachiningStage(props: Props) {
       workLight.intensity = live.spindle ? 14 + live.load * .09 : 7 + Math.sin(now * .0014) * .6;
       workLight.color.setHex(mood === "critical" ? 0xff4938 : mood === "warning" ? 0xff9e54 : 0xffbd7c);
       shop.lights.material.emissiveIntensity = live.spindle ? 3.4 + live.load * .018 : 2.25 + Math.sin(now * .0011) * .18;
+      shop.warmScreen.emissiveIntensity = live.spindle ? 2.45 + live.load * .018 : 1.45 + Math.sin(now * .0017) * .15;
       shop.floorGrid.material.opacity = live.spindle ? .58 : .42;
 
       if (stockBox && live.cells) {
@@ -345,6 +377,7 @@ export default function ThreeMachiningStage(props: Props) {
 
     return () => {
       disposed = true; cancelAnimationFrame(frame); observer.disconnect();
+      motor?.stop(); harmonic?.stop(); audio?.close();
       canvas.removeEventListener("pointerdown", onDown); canvas.removeEventListener("pointermove", onMove); canvas.removeEventListener("pointerup", onUp); canvas.removeEventListener("pointercancel", onUp); canvas.removeEventListener("pointerleave", onLeave); canvas.removeEventListener("wheel", onWheel); canvas.removeEventListener("webglcontextlost", onContextLost);
       scene.traverse((object) => { if (object instanceof THREE.Mesh || object instanceof THREE.Points) { object.geometry?.dispose(); const materials = Array.isArray(object.material) ? object.material : [object.material]; materials.forEach((material) => material?.dispose()); } });
       renderer.dispose();
