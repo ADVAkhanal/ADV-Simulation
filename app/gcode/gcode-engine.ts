@@ -176,7 +176,7 @@ export function parseProgram(source: string): ParsedProgram {
     const gCodes = [...clean.matchAll(/\bG0*(\d+)\b/g)].map((match) => Number(match[1]));
     const mCodes = [...clean.matchAll(/\bM0*(\d+)\b/g)].map((match) => Number(match[1]));
     for (const code of gCodes) {
-      if (![0, 1, 2, 3, 20, 21, 90, 91].includes(code)) diagnostics.push({ category: "unsupported-command", line: lineNumber, message: `G${code} is outside this creative controller` });
+      if (![0, 1, 2, 3, 17, 20, 21, 90, 91, 94].includes(code)) diagnostics.push({ category: "unsupported-command", line: lineNumber, message: `G${code} is outside this creative controller` });
     }
     if (gCodes.includes(20)) units = "inch";
     if (gCodes.includes(21)) units = "mm";
@@ -202,10 +202,14 @@ export function parseProgram(source: string): ParsedProgram {
     }
     const cutting = motionCode !== 0 && target.z < 0 && spindle;
     if (motionCode !== 0 && target.z < 0 && !spindle) diagnostics.push({ category: "unsafe-state", line: lineNumber, message: "feed below stock with spindle stopped" });
+    if (cutting && target.z < -2 && !coolant) diagnostics.push({ category: "unsafe-state", line: lineNumber, message: "deep feed below stock with coolant off" });
     // Rapids (G00) travel at full non-cutting speed with no engagement control.
     // A real controller never programs one below the stock surface - that is
     // a tool crash, not a slow feed, regardless of spindle or prior material state.
     if (motionCode === 0 && target.z < 0) diagnostics.push({ category: "collision", line: lineNumber, message: "rapid move targets Z below the stock - this crashes the tool" });
+    // The lesson stock is held in a vise. A powered cut past this envelope strikes a clamp
+    // rather than removing free material; it is intentionally independent of travel limits.
+    if (cutting && (target.x < 1.5 || target.x > 38.5 || target.y < 1.5 || target.y > 38.5)) diagnostics.push({ category: "collision", line: lineNumber, message: "cut enters the vise clamp envelope" });
     const kind: MotionKind = motionCode === 0 ? "rapid" : motionCode === 1 ? "feed-line" : motionCode === 2 ? "arc-cw" : "arc-ccw";
     let center: { x: number; y: number } | undefined;
     if (motionCode === 2 || motionCode === 3) {

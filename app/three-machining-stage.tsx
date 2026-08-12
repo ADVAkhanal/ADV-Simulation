@@ -225,9 +225,14 @@ export default function ThreeMachiningStage(props: Props) {
     );
     workEnvelope.rotation.x = -Math.PI / 2; workEnvelope.visible = false; root.add(workEnvelope);
 
-    const pocketMaterial = new THREE.MeshStandardMaterial({ color: 0x33494f, metalness: 0.58, roughness: 0.64 });
-    const pocketGeometry = new THREE.BoxGeometry(1, 1, 1);
-    let pockets: THREE.InstancedMesh | null = null;
+    // The GLB supplies the vise and stock envelope; the cut map drives this
+    // physical 28 x 16 voxel field so removed material is empty volume, not paint.
+    const voxelMaterial = new THREE.MeshStandardMaterial({ color: 0xb8d2d6, metalness: 0.86, roughness: 0.27 });
+    const cavityMaterial = new THREE.MeshStandardMaterial({ color: 0x16292e, metalness: 0.62, roughness: 0.56 });
+    let voxelStock: THREE.InstancedMesh | null = null;
+    let cavityFloor: THREE.Mesh | null = null;
+    let stockRaycast: THREE.Mesh | null = null;
+    let lastCells: Uint8Array | undefined;
     let stockBox: THREE.Box3 | null = null;
 
     const forcedFallback = new URLSearchParams(location.search).has("assetFallback");
@@ -256,7 +261,21 @@ export default function ThreeMachiningStage(props: Props) {
       model.position.sub(center);
       model.position.y -= 30;
       root.add(model);
-      if (stock) stockBox = new THREE.Box3().setFromObject(stock);
+      if (stock) {
+        stockBox = new THREE.Box3().setFromObject(stock);
+        const size = stockBox.getSize(new THREE.Vector3()), center = stockBox.getCenter(new THREE.Vector3());
+        const cellX = size.x / 28, cellZ = size.z / 16;
+        voxelStock = new THREE.InstancedMesh(new THREE.BoxGeometry(cellX * .975, 1, cellZ * .975), voxelMaterial, 28 * 16);
+        voxelStock.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        voxelStock.castShadow = true; voxelStock.receiveShadow = true;
+        root.add(voxelStock);
+        cavityFloor = new THREE.Mesh(new THREE.BoxGeometry(size.x * .995, Math.max(.8, size.y * .12), size.z * .995), cavityMaterial);
+        cavityFloor.position.set(center.x, stockBox.min.y + Math.max(.4, size.y * .06), center.z);
+        cavityFloor.receiveShadow = true; root.add(cavityFloor);
+        stockRaycast = new THREE.Mesh(new THREE.BoxGeometry(size.x, size.y, size.z), new THREE.MeshBasicMaterial({ colorWrite: false, depthWrite: false }));
+        stockRaycast.position.copy(center); root.add(stockRaycast);
+        stock.visible = false;
+      }
       propsRef.current.onReady();
     }, undefined, () => propsRef.current.onFailure());
 
@@ -288,11 +307,11 @@ export default function ThreeMachiningStage(props: Props) {
     const observer = new ResizeObserver(resize); observer.observe(canvas); resize();
 
     const emitTool = (event: PointerEvent, isCutting: boolean) => {
-      if (!stock || !stockBox) return;
+      if (!stockRaycast || !stockBox) return;
       const rect = canvas.getBoundingClientRect();
       pointer.set((event.clientX - rect.left) / rect.width * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
       raycaster.setFromCamera(pointer, camera);
-      const hit = raycaster.intersectObject(stock, true)[0];
+      const hit = raycaster.intersectObject(stockRaycast, true)[0];
       stockHovered = Boolean(hit);
       if (!hit) return;
       const size = stockBox.getSize(new THREE.Vector3());
@@ -411,17 +430,20 @@ export default function ThreeMachiningStage(props: Props) {
       if (toolCrib) toolCrib.rotation.y = .16 + Math.sin(now * .00032) * .006;
       if (guardDoors) guardDoors.rotation.y = guardDoorYaw + (live.spindle ? 0 : .06 + Math.sin(now * .00045) * .018);
 
-      if (stockBox && live.cells) {
-        const removed = Array.from(live.cells).filter((value) => value === 0).length;
-        if (!pockets || pockets.count !== Math.max(1, removed)) {
-          if (pockets) { root.remove(pockets); pockets.dispose(); }
-          pockets = new THREE.InstancedMesh(pocketGeometry, pocketMaterial, Math.max(1, removed)); root.add(pockets);
-        }
+      if (stockBox && voxelStock && live.cells && lastCells !== live.cells) {
         const size = stockBox.getSize(new THREE.Vector3()), min = stockBox.min, cellX = size.x / 28, cellZ = size.z / 16;
+        const finish = surfaceState(live.finishPenalty ?? 0, live.load, live.heat ?? 20);
+        voxelMaterial.color.copy(finish.color); voxelMaterial.roughness = finish.roughness; voxelMaterial.metalness = finish.metalness;
         let instance = 0;
-        live.cells.forEach((value, index) => { if (value !== 0) return; const col = index % 28, row = Math.floor(index / 28); particleMatrix.compose(new THREE.Vector3(min.x + (col + 0.5) * cellX, stockBox!.max.y + 0.35, min.z + (row + 0.5) * cellZ), new THREE.Quaternion(), new THREE.Vector3(cellX * 0.92, 1.2, cellZ * 0.92)); pockets!.setMatrixAt(instance++, particleMatrix); });
-        pockets.count = Math.max(1, instance); pockets.visible = instance > 0; pockets.instanceMatrix.needsUpdate = true;
-        const finish = surfaceState(live.finishPenalty ?? 0, live.load, live.heat ?? 20); pocketMaterial.color.copy(finish.color); pocketMaterial.roughness = finish.roughness; pocketMaterial.metalness = finish.metalness;
+        live.cells.forEach((value, index) => {
+          if (value === 0) return;
+          const col = index % 28, row = Math.floor(index / 28);
+          particleMatrix.compose(new THREE.Vector3(min.x + (col + .5) * cellX, min.y + size.y / 2, min.z + (row + .5) * cellZ), new THREE.Quaternion(), new THREE.Vector3(1, size.y, 1));
+          voxelStock!.setMatrixAt(instance++, particleMatrix);
+        });
+        voxelStock.count = instance;
+        voxelStock.instanceMatrix.needsUpdate = true;
+        lastCells = live.cells;
       }
 
       if (stockBox) {

@@ -111,7 +111,10 @@ test("Machining Kit v3 makes the Three.js cell the playable process surface", as
     readFile(new URL("../app/manual-campaign.tsx", import.meta.url), "utf8"),
   ]);
   assert.match(stage, /Raycaster/);
-  assert.match(stage, /intersectObject\(stock, true\)/);
+  assert.match(stage, /voxelStock/);
+  assert.match(stage, /cavityFloor/);
+  assert.match(stage, /stockRaycast/);
+  assert.match(stage, /intersectObject\(stockRaycast, true\)/);
   assert.match(stage, /webglcontextlost/);
   assert.match(stage, /completedPath/);
   assert.match(stage, /datumPlane/);
