@@ -27,3 +27,7 @@ The Asset Lab also uses original procedural geometry generated in Blender 5.2 by
 - The environment plate is representative game-world artwork, not a real facility photograph. The achievement atlas contains symbols only and makes no certification claim.
 
 No prior company photographs are used by the playable surface. The machine capability kit is deliberately fictional and communicates process categories without claiming or revealing actual company inventory. Any repository image not yet wired into a shipped surface is listed as unused, unapproved, and `[VERIFY]` in `assets/provenance.json` so the game factory can distinguish dormant files from release assets.
+
+## Three.js systems reference
+
+The live machining stage uses the official Three.js package and an original Toolpath implementation. Procedural scene composition and instanced particle architecture were informed by Achref Elouafi's MIT-licensed public Three.js experiments. No code, shaders, textures, models, or runtime assets from those repositories are copied into this project; see `THREE_SYSTEMS_INTEGRATION.md` for the precise mapping and boundaries.

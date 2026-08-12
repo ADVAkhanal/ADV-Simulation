@@ -84,3 +84,21 @@ test("Machining Kit v1 ships a reproducible, budgeted production asset", async (
   assert.equal(new Set(toolNodeNames).size, toolNodeNames.length, "tool nodes must be geometrically distinct");
   for (const node of toolNodeNames) assert.ok(nodeNames.includes(node), `missing tool node ${node}`);
 });
+
+test("Machining Kit v2 includes a domain-specific Three.js systems layer and preserves fallback", async () => {
+  const [stage, wrapper, packageJson, integration] = await Promise.all([
+    readFile(new URL("../app/three-machining-stage.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/flagship-machining-kit.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../package.json", import.meta.url), "utf8").then(JSON.parse),
+    readFile(new URL("../THREE_SYSTEMS_INTEGRATION.md", import.meta.url), "utf8"),
+  ]);
+  assert.ok(packageJson.dependencies.three, "Three.js must be a pinned runtime dependency");
+  assert.match(stage, /GLTFLoader/);
+  assert.match(stage, /InstancedMesh/);
+  assert.match(stage, /CHIP_COLORS/);
+  assert.match(stage, /PointsMaterial/);
+  assert.match(stage, /ACESFilmicToneMapping/);
+  assert.match(wrapper, /SAFE FALLBACK/);
+  assert.match(wrapper, /ThreeMachiningStage/);
+  assert.match(integration, /No source files, textures, shaders, models, or brands/);
+});
