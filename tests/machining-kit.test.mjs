@@ -117,6 +117,9 @@ test("Machining Kit v3 makes the Three.js cell the playable process surface", as
   assert.match(stage, /datumPlane/);
   assert.match(stage, /scanner/);
   assert.match(stage, /surfaceState/);
+  assert.match(stage, /cameraLockedByPlayer/);
+  assert.match(stage, /cameraLockedByPlayer = true/);
+  assert.match(stage, /cameraLockedByPlayer = false/);
   assert.match(systems, /CAMERA_PRESETS/);
   assert.match(systems, /deriveMachineMood/);
   assert.match(systems, /qualityBudget/);

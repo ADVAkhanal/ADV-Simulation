@@ -141,26 +141,28 @@ export default function ThreeMachiningStage(props: Props) {
     }
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.08;
+    renderer.toneMappingExposure = 1.28;
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x050b0e);
-    scene.fog = new THREE.FogExp2(0x071014, 0.00105);
+    scene.background = new THREE.Color(0x081216);
+    scene.fog = new THREE.FogExp2(0x071014, 0.00078);
     const camera = new THREE.PerspectiveCamera(34, 1, 1, 5000);
     const initial = CAMERA_PRESETS[propsRef.current.cameraMode ?? "establishing"];
     const view = { yaw: initial.yaw, pitch: initial.pitch, distance: initial.distance, target: initial.target.clone() };
     let lastReset = propsRef.current.resetToken;
 
-    scene.add(new THREE.HemisphereLight(0xccefff, 0x071014, 1.35));
-    const key = new THREE.DirectionalLight(0xe8fbff, 5.4);
+    scene.add(new THREE.HemisphereLight(0xd7f5ff, 0x0a171b, 1.75));
+    const key = new THREE.DirectionalLight(0xe8fbff, 6.8);
     key.position.set(-520, 740, 420); key.castShadow = true;
     key.shadow.mapSize.set(1024, 1024); scene.add(key);
-    const workLight = new THREE.PointLight(0xffad66, 13, 850, 2);
+    const workLight = new THREE.PointLight(0xffbd78, 17, 900, 2);
     workLight.position.set(-150, 120, 220); scene.add(workLight);
-    const rim = new THREE.PointLight(0x27d9ff, 9, 1200, 2);
+    const rim = new THREE.PointLight(0x27d9ff, 13, 1250, 2);
     rim.position.set(480, 180, -380); scene.add(rim);
+    const fill = new THREE.PointLight(0x76e9ff, 7, 760, 2);
+    fill.position.set(-420, -10, 260); scene.add(fill);
     const shop = proceduralShop(scene);
 
     const root = new THREE.Group();
@@ -265,7 +267,7 @@ export default function ThreeMachiningStage(props: Props) {
       root.add(toolCrib);
     }, undefined, () => { /* ambient authored asset is optional */ });
 
-    let frame = 0, previous = performance.now(), drag: { x: number; y: number } | null = null, cutting = false, firstCutAt = 0, wasCutting = false, stockHovered = false;
+    let frame = 0, previous = performance.now(), drag: { x: number; y: number } | null = null, cutting = false, firstCutAt = 0, wasCutting = false, stockHovered = false, cameraLockedByPlayer = false;
     let audio: AudioContext | null = null, motor: OscillatorNode | null = null, harmonic: OscillatorNode | null = null, motorGain: GainNode | null = null;
     const raycaster = new THREE.Raycaster(), pointer = new THREE.Vector2();
     const resize = () => {
@@ -301,11 +303,11 @@ export default function ThreeMachiningStage(props: Props) {
       const harmonicGain = audio.createGain(); harmonicGain.gain.value = .18;
       motor.connect(motorGain); harmonic.connect(harmonicGain).connect(motorGain); motor.start(); harmonic.start();
     };
-    const onDown = (event: PointerEvent) => { if (!propsRef.current.interactive) return; armAudio(); canvas.setPointerCapture(event.pointerId); if (propsRef.current.inputMode === "cut" && event.button === 0) { cutting = true; emitTool(event, true); } else drag = { x: event.clientX, y: event.clientY }; };
+    const onDown = (event: PointerEvent) => { if (!propsRef.current.interactive) return; armAudio(); canvas.setPointerCapture(event.pointerId); if (propsRef.current.inputMode === "cut" && event.button === 0) { cutting = true; emitTool(event, true); } else { cameraLockedByPlayer = true; drag = { x: event.clientX, y: event.clientY }; } };
     const onMove = (event: PointerEvent) => { if (cutting) { emitTool(event, true); return; } if (propsRef.current.inputMode === "cut" && !drag) { emitTool(event, false); return; } if (!drag) return; view.yaw += (event.clientX - drag.x) * 0.008; view.pitch = THREE.MathUtils.clamp(view.pitch + (event.clientY - drag.y) * 0.006, -0.9, 0.12); drag = { x: event.clientX, y: event.clientY }; };
     const onUp = () => { drag = null; cutting = false; };
     const onLeave = () => { stockHovered = false; };
-    const onWheel = (event: WheelEvent) => { if (!propsRef.current.interactive) return; event.preventDefault(); view.distance = THREE.MathUtils.clamp(view.distance + event.deltaY * 0.75, 760, 1900); };
+    const onWheel = (event: WheelEvent) => { if (!propsRef.current.interactive) return; event.preventDefault(); cameraLockedByPlayer = true; view.distance = THREE.MathUtils.clamp(view.distance + event.deltaY * 0.75, 760, 1900); };
     const onContextLost = (event: Event) => { event.preventDefault(); propsRef.current.onFailure(); };
     canvas.addEventListener("pointerdown", onDown); canvas.addEventListener("pointermove", onMove); canvas.addEventListener("pointerup", onUp); canvas.addEventListener("pointercancel", onUp); canvas.addEventListener("pointerleave", onLeave); canvas.addEventListener("wheel", onWheel, { passive: false }); canvas.addEventListener("webglcontextlost", onContextLost);
 
@@ -319,9 +321,9 @@ export default function ThreeMachiningStage(props: Props) {
       wasCutting = liveCut;
       const requestedMode: MachineCameraMode = mood === "failure" || mood === "critical" ? "failure" : live.sceneCue === "tool-change" ? "tool-change" : live.sceneCue === "inspection" ? "inspection" : live.cameraMode === "release" ? "release" : live.spindle && live.load > 4 && performance.now() - firstCutAt < 2600 ? "macro" : live.cameraMode ?? (live.spindle ? "machining" : "operator");
       const preset = CAMERA_PRESETS[requestedMode];
-      if (live.resetToken !== lastReset) { lastReset = live.resetToken; view.yaw = preset.yaw; view.pitch = preset.pitch; view.distance = preset.distance; view.target.copy(preset.target); }
-      if (live.autoOrbit && live.inputMode !== "cut" && !matchMedia("(prefers-reduced-motion: reduce)").matches) view.yaw += dt * 0.045;
-      if (!drag) { view.yaw = damp(view.yaw, preset.yaw, 2.4, dt); view.pitch = damp(view.pitch, preset.pitch, 2.4, dt); view.distance = damp(view.distance, preset.distance, 2.2, dt); view.target.lerp(preset.target, 1 - Math.exp(-2.2 * dt)); }
+      if (live.resetToken !== lastReset) { lastReset = live.resetToken; cameraLockedByPlayer = false; view.yaw = preset.yaw; view.pitch = preset.pitch; view.distance = preset.distance; view.target.copy(preset.target); }
+      if (live.autoOrbit && !cameraLockedByPlayer && live.inputMode !== "cut" && !matchMedia("(prefers-reduced-motion: reduce)").matches) view.yaw += dt * 0.045;
+      if (!drag && !cameraLockedByPlayer) { view.yaw = damp(view.yaw, preset.yaw, 2.4, dt); view.pitch = damp(view.pitch, preset.pitch, 2.4, dt); view.distance = damp(view.distance, preset.distance, 2.2, dt); view.target.lerp(preset.target, 1 - Math.exp(-2.2 * dt)); }
       const vibration = mood === "critical" ? Math.sin(now * .11) * 4.5 : mood === "warning" ? Math.sin(now * .075) * 1.35 : 0;
       camera.position.set(
         view.target.x + Math.sin(view.yaw) * Math.cos(view.pitch) * view.distance + vibration,

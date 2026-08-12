@@ -2,3 +2,6 @@
 
 /* Persistent navigation remains readable at normal browser zoom. */
 .dock{height:78px}.identity{min-width:230px;padding-inline:21px;grid-template-columns:28px 1fr}.identity span{font-size:13px;letter-spacing:.045em}.identity b{font-size:12px;letter-spacing:.045em}.dock a{min-width:205px;padding-inline:22px}.dock a span{font-size:14px}.dock a small{font-size:12px;letter-spacing:.045em}.dock a svg{width:21px;height:21px}@media(max-width:880px){.identity{display:none}.dock{width:calc(100% - 24px)}.dock a{min-width:0;flex:1}}@media(max-width:680px){.dock{height:72px}.dock a span{font-size:12px}.dock a small{font-size:12px}}
+
+/* The cell owns the screen in immersive play; a fixed global dock must never cover controls or objectives. */
+body:has(.immersiveWorkspace) .dock{display:none}
