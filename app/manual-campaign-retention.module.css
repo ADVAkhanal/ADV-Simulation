@@ -79,6 +79,7 @@
 .inspectionBay > header h1 { margin: 7px 0; font-size: clamp(32px, 5vw, 62px); line-height: .9; }
 .inspectionBay > header p { max-width: 700px; margin: 0; color: #91a4a8; line-height: 1.5; }
 .inspectionBay > header button { padding: 12px; color: #aebdc0; border: 1px solid #34494f; background: #0b171a; }
+.inspectionTwin{position:relative;min-height:300px;margin:0 0 18px;overflow:hidden;border:1px solid #385159;background:#03080a}.inspectionTwin>aside{position:absolute;inset:0;width:100%;height:100%}.inspectionTwin>div{position:absolute;z-index:12;left:18px;bottom:18px;padding:10px 13px;border-left:3px solid var(--accent);background:#040a0ce8;pointer-events:none}.inspectionTwin>div small,.inspectionTwin>div b,.inspectionTwin>div span{display:block}.inspectionTwin>div small{color:#769096;font:800 12px ui-monospace,monospace;letter-spacing:.12em}.inspectionTwin>div b{margin-top:5px;color:#e8f5f6;font-size:14px}.inspectionTwin>div span{margin-top:4px;color:var(--accent);font:800 12px ui-monospace,monospace}.inspectionTwin :global(.orbitControls){display:none}
 
 .inspectionGrid {
   max-width: 1380px;

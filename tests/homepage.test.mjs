@@ -188,10 +188,11 @@ test("global mode dock exposes both game surfaces", async () => {
   assert.match(manual, /MILESTONE PLATES/);
   assert.match(manual, /LAST 24 RUNS/);
   assert.match(manual, /shop_log_open/);
-  assert.match(manual, /3D TWIN/);
-  assert.match(manual, /DIGITAL TWIN \/ VISUAL REVIEW/);
-  assert.match(manual, /RETURN TO CUT MAP/);
-  assert.match(manual, /view_3d_twin/);
+  assert.match(manual, /3D CUT/);
+  assert.match(manual, /LIVE MACHINING CELL/);
+  assert.match(manual, /PROCESS MAP/);
+  assert.match(manual, /G54 DATUM/);
+  assert.match(manual, /view_3d_cut/);
   assert.match(manual, /PRIMARY OBJECTIVE/);
   assert.match(manual, /FLOW PTS/);
   assert.match(manual, /RUN SIGNATURE/);
@@ -203,6 +204,7 @@ test("global mode dock exposes both game surfaces", async () => {
   assert.match(manual, /aria-pressed=\{index === toolIndex\}/);
   assert.doesNotMatch(manual, /disabled=\{spindle\}/);
   assert.match(machiningKit, /variant === "full"/);
+  assert.match(machiningKit, /variant === "hero"/);
   assert.match(machiningKit, /DRAG TO ORBIT/);
   assert.match(machiningKit, /AUTO ORBIT/);
   assert.match(machiningKit, /onPointerMove/);
