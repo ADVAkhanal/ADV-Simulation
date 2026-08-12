@@ -316,7 +316,7 @@ export default function ThreeMachiningStage(props: Props) {
     const onMove = (event: PointerEvent) => { if (cutting) { emitTool(event, true); return; } if (propsRef.current.inputMode === "cut" && !drag) { emitTool(event, false); return; } if (!drag) return; view.yaw += (event.clientX - drag.x) * 0.008; view.pitch = THREE.MathUtils.clamp(view.pitch + (event.clientY - drag.y) * 0.006, -0.9, 0.12); drag = { x: event.clientX, y: event.clientY }; };
     const onUp = () => { drag = null; cutting = false; };
     const onLeave = () => { stockHovered = false; };
-    const onWheel = (event: WheelEvent) => { if (!propsRef.current.interactive) return; event.preventDefault(); cameraLockedByPlayer = true; view.distance = THREE.MathUtils.clamp(view.distance + event.deltaY * 0.75, 760, 1900); };
+    const onWheel = (event: WheelEvent) => { if (!propsRef.current.interactive || propsRef.current.inputMode === "cut") return; event.preventDefault(); cameraLockedByPlayer = true; view.distance = THREE.MathUtils.clamp(view.distance + event.deltaY * 0.75, 760, 1900); };
     const onContextLost = (event: Event) => { event.preventDefault(); propsRef.current.onFailure(); };
     canvas.addEventListener("pointerdown", onDown); canvas.addEventListener("pointermove", onMove); canvas.addEventListener("pointerup", onUp); canvas.addEventListener("pointercancel", onUp); canvas.addEventListener("pointerleave", onLeave); canvas.addEventListener("wheel", onWheel, { passive: false }); canvas.addEventListener("webglcontextlost", onContextLost);
 
