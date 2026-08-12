@@ -317,7 +317,7 @@ export default function ThreeMachiningStage(props: Props) {
       const liveCut = live.spindle && live.load > 4;
       if (liveCut && !wasCutting) firstCutAt = performance.now();
       wasCutting = liveCut;
-      const requestedMode: MachineCameraMode = mood === "failure" || mood === "critical" ? "failure" : live.sceneCue === "tool-change" ? "tool-change" : live.sceneCue === "inspection" ? "inspection" : live.spindle && live.load > 4 && performance.now() - firstCutAt < 2600 ? "macro" : live.cameraMode ?? (live.spindle ? "machining" : "operator");
+      const requestedMode: MachineCameraMode = mood === "failure" || mood === "critical" ? "failure" : live.sceneCue === "tool-change" ? "tool-change" : live.sceneCue === "inspection" ? "inspection" : live.cameraMode === "release" ? "release" : live.spindle && live.load > 4 && performance.now() - firstCutAt < 2600 ? "macro" : live.cameraMode ?? (live.spindle ? "machining" : "operator");
       const preset = CAMERA_PRESETS[requestedMode];
       if (live.resetToken !== lastReset) { lastReset = live.resetToken; view.yaw = preset.yaw; view.pitch = preset.pitch; view.distance = preset.distance; view.target.copy(preset.target); }
       if (live.autoOrbit && live.inputMode !== "cut" && !matchMedia("(prefers-reduced-motion: reduce)").matches) view.yaw += dt * 0.045;
@@ -384,8 +384,8 @@ export default function ThreeMachiningStage(props: Props) {
       cutRing.visible = live.spindle; cutRing.position.copy(origin); cutRing.position.y += 2; cutRing.scale.setScalar(0.75 + Math.sin(now * 0.012) * 0.12 + live.load * 0.004);
       (cutRing.material as THREE.MeshBasicMaterial).opacity = live.spindle ? 0.26 + live.load * 0.003 : 0;
       workLight.intensity = live.spindle ? 14 + live.load * .09 : 7 + Math.sin(now * .0014) * .6;
-      workLight.color.setHex(mood === "critical" ? 0xff4938 : mood === "warning" ? 0xff9e54 : 0xffbd7c);
-      shop.lights.material.emissiveIntensity = live.spindle ? 3.4 + live.load * .018 : 2.25 + Math.sin(now * .0011) * .18;
+      workLight.color.setHex(live.cameraMode === "release" ? 0x72f6b6 : mood === "critical" ? 0xff4938 : mood === "warning" ? 0xff9e54 : 0xffbd7c);
+      shop.lights.material.emissiveIntensity = live.cameraMode === "release" ? 3.8 + Math.sin(now * .002) * .28 : live.spindle ? 3.4 + live.load * .018 : 2.25 + Math.sin(now * .0011) * .18;
       shop.warmScreen.emissiveIntensity = live.spindle ? 2.45 + live.load * .018 : 1.45 + Math.sin(now * .0017) * .15;
       shop.floorGrid.material.opacity = live.spindle ? .58 : .42;
       const shopMotion = live.spindle ? .00078 : .00021;

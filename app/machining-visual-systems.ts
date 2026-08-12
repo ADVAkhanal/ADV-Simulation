@@ -1,6 +1,6 @@
 import * as THREE from "three";
 
-export type MachineCameraMode = "establishing" | "operator" | "machining" | "macro" | "datum" | "inspection" | "tool-change" | "failure";
+export type MachineCameraMode = "establishing" | "operator" | "machining" | "macro" | "datum" | "inspection" | "tool-change" | "release" | "failure";
 export type ProcessVisualState = {
   spindle: boolean;
   load: number;
@@ -18,6 +18,7 @@ export const CAMERA_PRESETS: Record<MachineCameraMode, { yaw: number; pitch: num
   datum: { yaw: -.02, pitch: -.88, distance: 720, target: new THREE.Vector3(0, -150, 0) },
   inspection: { yaw: .05, pitch: -.72, distance: 610, target: new THREE.Vector3(0, -155, 0) },
   "tool-change": { yaw: .61, pitch: -.34, distance: 820, target: new THREE.Vector3(76, -118, -18) },
+  release: { yaw: -.48, pitch: -.48, distance: 700, target: new THREE.Vector3(0, -130, 0) },
   failure: { yaw: -.35, pitch: -.42, distance: 650, target: new THREE.Vector3(0, -135, 0) },
 };
 
