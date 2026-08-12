@@ -4,11 +4,15 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { ManualContract } from "./manual-campaign-engine";
+import { CAMERA_PRESETS, damp, deriveMachineMood, qualityBudget, surfaceState, type MachineCameraMode } from "./machining-visual-systems";
 
 type Props = {
   cursor: { x: number; y: number };
   spindle: boolean;
   load: number;
+  heat?: number;
+  condition?: number;
+  finishPenalty?: number;
   material?: string;
   accent?: string;
   cells?: Uint8Array;
@@ -18,6 +22,11 @@ type Props = {
   autoOrbit: boolean;
   resetToken: number;
   interactive: boolean;
+  cameraMode?: MachineCameraMode;
+  datumVisible?: boolean;
+  inspectionActive?: boolean;
+  inputMode?: "orbit" | "cut";
+  onToolInput?: (x: number, y: number, cutting: boolean) => void;
   onReady: () => void;
   onFailure: () => void;
 };
@@ -98,7 +107,8 @@ export default function ThreeMachiningStage(props: Props) {
     scene.background = new THREE.Color(0x050b0e);
     scene.fog = new THREE.FogExp2(0x071014, 0.00105);
     const camera = new THREE.PerspectiveCamera(34, 1, 1, 5000);
-    const view = { yaw: -0.72, pitch: -0.34, distance: 1280, target: new THREE.Vector3(0, -60, 0) };
+    const initial = CAMERA_PRESETS[propsRef.current.cameraMode ?? "establishing"];
+    const view = { yaw: initial.yaw, pitch: initial.pitch, distance: initial.distance, target: initial.target.clone() };
     let lastReset = propsRef.current.resetToken;
 
     scene.add(new THREE.HemisphereLight(0xccefff, 0x071014, 1.35));
@@ -140,6 +150,21 @@ export default function ThreeMachiningStage(props: Props) {
     );
     cutRing.rotation.x = -Math.PI / 2; root.add(cutRing);
 
+    const pathMaterial = new THREE.LineBasicMaterial({ color: 0x6feaff, transparent: true, opacity: .85, depthWrite: false });
+    const pathGeometry = new THREE.BufferGeometry();
+    const completedPath = new THREE.Line(pathGeometry, pathMaterial); completedPath.frustumCulled = false; root.add(completedPath);
+    const activePath = new THREE.Line(new THREE.BufferGeometry(), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .95, depthWrite: false })); activePath.frustumCulled = false; root.add(activePath);
+
+    const datum = new THREE.Group();
+    const datumPlaneMaterial = new THREE.MeshBasicMaterial({ color: 0x31ddff, transparent: true, opacity: .1, side: THREE.DoubleSide, depthWrite: false });
+    const datumPlane = new THREE.Mesh(new THREE.PlaneGeometry(270, 165), datumPlaneMaterial); datumPlane.rotation.x = -Math.PI / 2; datum.add(datumPlane);
+    datum.add(new THREE.AxesHelper(95));
+    const datumRing = new THREE.Mesh(new THREE.RingGeometry(7, 9, 32), new THREE.MeshBasicMaterial({ color: 0xffffff, side: THREE.DoubleSide })); datumRing.rotation.x = -Math.PI / 2; datum.add(datumRing);
+    datum.visible = false; root.add(datum);
+
+    const scanner = new THREE.Mesh(new THREE.PlaneGeometry(290, 180), new THREE.MeshBasicMaterial({ color: 0x85f5ff, transparent: true, opacity: .13, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
+    scanner.rotation.x = -Math.PI / 2; scanner.visible = false; root.add(scanner);
+
     const pocketMaterial = new THREE.MeshStandardMaterial({ color: 0x33494f, metalness: 0.58, roughness: 0.64 });
     const pocketGeometry = new THREE.BoxGeometry(1, 1, 1);
     let pockets: THREE.InstancedMesh | null = null;
@@ -174,27 +199,54 @@ export default function ThreeMachiningStage(props: Props) {
       propsRef.current.onReady();
     }, undefined, () => propsRef.current.onFailure());
 
-    let frame = 0, previous = performance.now(), drag: { x: number; y: number } | null = null;
+    let frame = 0, previous = performance.now(), drag: { x: number; y: number } | null = null, cutting = false, firstCutAt = 0, wasCutting = false, stockHovered = false;
+    const raycaster = new THREE.Raycaster(), pointer = new THREE.Vector2();
     const resize = () => {
-      const rect = canvas.getBoundingClientRect(), ratio = Math.min(devicePixelRatio || 1, 2);
+      const rect = canvas.getBoundingClientRect(), budget = qualityBudget(rect.width), ratio = Math.min(devicePixelRatio || 1, budget.dpr);
+      renderer.shadowMap.enabled = budget.shadows;
       renderer.setPixelRatio(ratio); renderer.setSize(Math.max(1, rect.width), Math.max(1, rect.height), false);
       camera.aspect = Math.max(1, rect.width) / Math.max(1, rect.height); camera.updateProjectionMatrix();
     };
     const observer = new ResizeObserver(resize); observer.observe(canvas); resize();
 
-    const onDown = (event: PointerEvent) => { if (!propsRef.current.interactive) return; drag = { x: event.clientX, y: event.clientY }; canvas.setPointerCapture(event.pointerId); };
-    const onMove = (event: PointerEvent) => { if (!drag) return; view.yaw += (event.clientX - drag.x) * 0.008; view.pitch = THREE.MathUtils.clamp(view.pitch + (event.clientY - drag.y) * 0.006, -0.9, 0.12); drag = { x: event.clientX, y: event.clientY }; };
-    const onUp = () => { drag = null; };
+    const emitTool = (event: PointerEvent, isCutting: boolean) => {
+      if (!stock || !stockBox) return;
+      const rect = canvas.getBoundingClientRect();
+      pointer.set((event.clientX - rect.left) / rect.width * 2 - 1, -((event.clientY - rect.top) / rect.height) * 2 + 1);
+      raycaster.setFromCamera(pointer, camera);
+      const hit = raycaster.intersectObject(stock, true)[0];
+      stockHovered = Boolean(hit);
+      if (!hit) return;
+      const size = stockBox.getSize(new THREE.Vector3());
+      propsRef.current.onToolInput?.(
+        THREE.MathUtils.clamp((hit.point.x - stockBox.min.x) / size.x, 0, 1),
+        THREE.MathUtils.clamp((hit.point.z - stockBox.min.z) / size.z, 0, 1),
+        isCutting,
+      );
+    };
+    const onDown = (event: PointerEvent) => { if (!propsRef.current.interactive) return; canvas.setPointerCapture(event.pointerId); if (propsRef.current.inputMode === "cut" && event.button === 0) { cutting = true; emitTool(event, true); } else drag = { x: event.clientX, y: event.clientY }; };
+    const onMove = (event: PointerEvent) => { if (cutting) { emitTool(event, true); return; } if (propsRef.current.inputMode === "cut" && !drag) { emitTool(event, false); return; } if (!drag) return; view.yaw += (event.clientX - drag.x) * 0.008; view.pitch = THREE.MathUtils.clamp(view.pitch + (event.clientY - drag.y) * 0.006, -0.9, 0.12); drag = { x: event.clientX, y: event.clientY }; };
+    const onUp = () => { drag = null; cutting = false; };
+    const onLeave = () => { stockHovered = false; };
     const onWheel = (event: WheelEvent) => { if (!propsRef.current.interactive) return; event.preventDefault(); view.distance = THREE.MathUtils.clamp(view.distance + event.deltaY * 0.75, 760, 1900); };
-    canvas.addEventListener("pointerdown", onDown); canvas.addEventListener("pointermove", onMove); canvas.addEventListener("pointerup", onUp); canvas.addEventListener("pointercancel", onUp); canvas.addEventListener("wheel", onWheel, { passive: false });
+    const onContextLost = (event: Event) => { event.preventDefault(); propsRef.current.onFailure(); };
+    canvas.addEventListener("pointerdown", onDown); canvas.addEventListener("pointermove", onMove); canvas.addEventListener("pointerup", onUp); canvas.addEventListener("pointercancel", onUp); canvas.addEventListener("pointerleave", onLeave); canvas.addEventListener("wheel", onWheel, { passive: false }); canvas.addEventListener("webglcontextlost", onContextLost);
 
     const animate = (now: number) => {
       const dt = Math.min(0.05, (now - previous) / 1000); previous = now;
       const live = propsRef.current;
-      if (live.resetToken !== lastReset) { lastReset = live.resetToken; view.yaw = -0.72; view.pitch = -0.34; view.distance = 1280; }
-      if (live.autoOrbit && !matchMedia("(prefers-reduced-motion: reduce)").matches) view.yaw += dt * 0.085;
+      const mood = deriveMachineMood({ spindle: live.spindle, load: live.load, heat: live.heat ?? 20, condition: live.condition ?? 100, finishPenalty: live.finishPenalty ?? 0, cameraMode: live.cameraMode ?? "establishing" });
+      const liveCut = live.spindle && live.load > 4;
+      if (liveCut && !wasCutting) firstCutAt = performance.now();
+      wasCutting = liveCut;
+      const requestedMode: MachineCameraMode = mood === "failure" || mood === "critical" ? "failure" : live.spindle && live.load > 4 && performance.now() - firstCutAt < 2600 ? "macro" : live.cameraMode ?? (live.spindle ? "machining" : "operator");
+      const preset = CAMERA_PRESETS[requestedMode];
+      if (live.resetToken !== lastReset) { lastReset = live.resetToken; view.yaw = preset.yaw; view.pitch = preset.pitch; view.distance = preset.distance; view.target.copy(preset.target); }
+      if (live.autoOrbit && live.inputMode !== "cut" && !matchMedia("(prefers-reduced-motion: reduce)").matches) view.yaw += dt * 0.045;
+      if (!drag) { view.yaw = damp(view.yaw, preset.yaw, 2.4, dt); view.pitch = damp(view.pitch, preset.pitch, 2.4, dt); view.distance = damp(view.distance, preset.distance, 2.2, dt); view.target.lerp(preset.target, 1 - Math.exp(-2.2 * dt)); }
+      const vibration = mood === "critical" ? Math.sin(now * .11) * 4.5 : mood === "warning" ? Math.sin(now * .075) * 1.35 : 0;
       camera.position.set(
-        view.target.x + Math.sin(view.yaw) * Math.cos(view.pitch) * view.distance,
+        view.target.x + Math.sin(view.yaw) * Math.cos(view.pitch) * view.distance + vibration,
         view.target.y + Math.sin(-view.pitch) * view.distance,
         view.target.z + Math.cos(view.yaw) * Math.cos(view.pitch) * view.distance,
       );
@@ -206,11 +258,22 @@ export default function ThreeMachiningStage(props: Props) {
       toolNodes.forEach((tool) => { tool.visible = tool.name === activeTool; if (live.spindle) tool.rotation.y += dt * 38; });
 
       model?.updateMatrixWorld(true);
+      stock?.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) return;
+        const materials = Array.isArray(object.material) ? object.material : [object.material];
+        materials.forEach((material) => {
+          if (!(material instanceof THREE.MeshStandardMaterial)) return;
+          material.emissive.setHex(stockHovered ? 0x0b4550 : 0x000000);
+          material.emissiveIntensity = stockHovered ? 0.42 : 0;
+        });
+      });
       const mountedTool = toolNodes.find((tool) => tool.name === activeTool);
       const origin = mountedTool ? mountedTool.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3(toolX, -5, toolZ);
+      if (requestedMode === "macro") view.target.lerp(origin.clone().add(new THREE.Vector3(0, -8, 0)), 1 - Math.exp(-4 * dt));
       const chipColors = CHIP_COLORS[live.material ?? "6061 AL"] ?? CHIP_COLORS["6061 AL"];
       chipMaterial.color.setHex(live.load > 78 ? chipColors[1] : chipColors[0]);
-      chips.visible = live.spindle;
+      const budget = qualityBudget(canvas.clientWidth), activeChipCount = Math.min(chipData.length, Math.round(budget.chips * (.24 + live.load / 90)));
+      chips.visible = live.spindle && live.load > 0; chips.count = activeChipCount;
       chipData.forEach((particle, index) => {
         const age = (now * 0.001 * particle.speed + particle.phase) % 1;
         const angle = particle.side * (0.35 + index * 2.399963);
@@ -221,8 +284,9 @@ export default function ThreeMachiningStage(props: Props) {
       });
       chips.instanceMatrix.needsUpdate = true;
 
-      mist.visible = live.spindle;
-      for (let index = 0; index < 180; index += 1) {
+      mist.visible = live.spindle; const mistCount = Math.min(180, budget.mist);
+      mist.geometry.setDrawRange(0, mistCount);
+      for (let index = 0; index < mistCount; index += 1) {
         const age = (now * 0.00022 + index * 0.037) % 1, angle = index * 2.399963;
         mistPositions[index * 3] = origin.x + Math.cos(angle) * age * 95;
         mistPositions[index * 3 + 1] = origin.y + 18 + age * 75;
@@ -231,6 +295,8 @@ export default function ThreeMachiningStage(props: Props) {
       (mist.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
       cutRing.visible = live.spindle; cutRing.position.copy(origin); cutRing.position.y += 2; cutRing.scale.setScalar(0.75 + Math.sin(now * 0.012) * 0.12 + live.load * 0.004);
       (cutRing.material as THREE.MeshBasicMaterial).opacity = live.spindle ? 0.26 + live.load * 0.003 : 0;
+      workLight.intensity = live.spindle ? 14 + live.load * .09 : 7 + Math.sin(now * .0014) * .6;
+      workLight.color.setHex(mood === "critical" ? 0xff4938 : mood === "warning" ? 0xff9e54 : 0xffbd7c);
 
       if (stockBox && live.cells) {
         const removed = Array.from(live.cells).filter((value) => value === 0).length;
@@ -242,6 +308,21 @@ export default function ThreeMachiningStage(props: Props) {
         let instance = 0;
         live.cells.forEach((value, index) => { if (value !== 0) return; const col = index % 28, row = Math.floor(index / 28); particleMatrix.compose(new THREE.Vector3(min.x + (col + 0.5) * cellX, stockBox!.max.y + 0.35, min.z + (row + 0.5) * cellZ), new THREE.Quaternion(), new THREE.Vector3(cellX * 0.92, 1.2, cellZ * 0.92)); pockets!.setMatrixAt(instance++, particleMatrix); });
         pockets.count = Math.max(1, instance); pockets.visible = instance > 0; pockets.instanceMatrix.needsUpdate = true;
+        const finish = surfaceState(live.finishPenalty ?? 0, live.load, live.heat ?? 20); pocketMaterial.color.copy(finish.color); pocketMaterial.roughness = finish.roughness; pocketMaterial.metalness = finish.metalness;
+      }
+
+      if (stockBox) {
+        const center = stockBox.getCenter(new THREE.Vector3()), top = stockBox.max.y + 3;
+        datum.position.set(center.x, top, center.z); datum.visible = live.datumVisible === true || requestedMode === "datum";
+        scanner.visible = live.inspectionActive === true || requestedMode === "inspection"; scanner.position.set(center.x, top + 2, center.z + Math.sin(now * .0014) * stockBox.getSize(new THREE.Vector3()).z * .48);
+        if (live.toolpath && live.toolpath.length > 1) {
+          const size = stockBox.getSize(new THREE.Vector3()), min = stockBox.min;
+          const points = live.toolpath.map(point => new THREE.Vector3(min.x + point.x / 27 * size.x, top + 2.5, min.z + point.y / 15 * size.z));
+          pathGeometry.setFromPoints(points); completedPath.visible = true;
+          activePath.geometry.dispose(); activePath.geometry = new THREE.BufferGeometry().setFromPoints(points.slice(-Math.min(18, points.length)));
+          activePath.visible = live.spindle;
+          pathMaterial.color.set(live.accent ?? "#6feaff"); pathMaterial.opacity = live.spindle ? .58 : .82;
+        } else { completedPath.visible = false; activePath.visible = false; }
       }
 
       renderer.render(scene, camera); frame = requestAnimationFrame(animate);
@@ -250,11 +331,11 @@ export default function ThreeMachiningStage(props: Props) {
 
     return () => {
       disposed = true; cancelAnimationFrame(frame); observer.disconnect();
-      canvas.removeEventListener("pointerdown", onDown); canvas.removeEventListener("pointermove", onMove); canvas.removeEventListener("pointerup", onUp); canvas.removeEventListener("pointercancel", onUp); canvas.removeEventListener("wheel", onWheel);
+      canvas.removeEventListener("pointerdown", onDown); canvas.removeEventListener("pointermove", onMove); canvas.removeEventListener("pointerup", onUp); canvas.removeEventListener("pointercancel", onUp); canvas.removeEventListener("pointerleave", onLeave); canvas.removeEventListener("wheel", onWheel); canvas.removeEventListener("webglcontextlost", onContextLost);
       scene.traverse((object) => { if (object instanceof THREE.Mesh || object instanceof THREE.Points) { object.geometry?.dispose(); const materials = Array.isArray(object.material) ? object.material : [object.material]; materials.forEach((material) => material?.dispose()); } });
       renderer.dispose();
     };
   }, []);
 
-  return <canvas ref={canvasRef} aria-label="Interactive Three.js machining cell with procedural shop environment, live chip flight, coolant mist, mounted tooling, and material removal" />;
+  return <canvas ref={canvasRef} aria-label="Interactive Three.js machining cell with cinematic camera states, live toolpath, datum reference, chip flight, coolant mist, surface condition, and material removal" />;
 }

@@ -102,3 +102,26 @@ test("Machining Kit v2 includes a domain-specific Three.js systems layer and pre
   assert.match(wrapper, /ThreeMachiningStage/);
   assert.match(integration, /No source files, textures, shaders, models, or brands/);
 });
+
+test("Machining Kit v3 makes the Three.js cell the playable process surface", async () => {
+  const [stage, wrapper, systems, campaign] = await Promise.all([
+    readFile(new URL("../app/three-machining-stage.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/flagship-machining-kit.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/machining-visual-systems.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/manual-campaign.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(stage, /Raycaster/);
+  assert.match(stage, /intersectObject\(stock, true\)/);
+  assert.match(stage, /webglcontextlost/);
+  assert.match(stage, /completedPath/);
+  assert.match(stage, /datumPlane/);
+  assert.match(stage, /scanner/);
+  assert.match(stage, /surfaceState/);
+  assert.match(systems, /CAMERA_PRESETS/);
+  assert.match(systems, /deriveMachineMood/);
+  assert.match(systems, /qualityBudget/);
+  assert.match(wrapper, /inputMode/);
+  assert.match(campaign, /variant="hero"/);
+  assert.match(campaign, /onToolInput=\{moveToolFromTwin\}/);
+  assert.match(campaign, /METROLOGY MODE/);
+});
