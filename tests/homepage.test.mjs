@@ -99,9 +99,10 @@ test("asset pipeline route exposes the privacy-safe machine capability atlas", a
 });
 
 test("global mode dock exposes both game surfaces", async () => {
-  const [template, dock, page, home, manual, machiningKit] = await Promise.all([
+  const [template, dock, dockCss, page, home, manual, machiningKit] = await Promise.all([
     readFile(new URL("../app/template.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/mode-dock.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/mode-dock.module.css", import.meta.url), "utf8"),
     readFile(new URL("../app/gcode/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/manual-campaign.tsx", import.meta.url), "utf8"),
@@ -113,6 +114,7 @@ test("global mode dock exposes both game surfaces", async () => {
   assert.match(dock, /ASSET LAB/);
   assert.match(dock, /CNC LATHE/);
   assert.match(dock, /href="\/turn"/);
+  assert.match(dockCss, /@media\(max-width:680px\).*small\{display:none\}/);
   assert.match(page, /INSPECTION FAILED/);
   assert.match(page, /toolpath-contracts/);
   assert.match(page, /scrollIntoView/);
