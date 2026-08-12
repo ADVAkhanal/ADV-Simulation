@@ -79,7 +79,19 @@ function proceduralShop(scene: THREE.Scene) {
     lights.setMatrixAt(index, matrix);
   }
   scene.add(lights);
-  return { slab, bays, lights };
+  const floorGrid = new THREE.GridHelper(1500, 30, 0x274148, 0x14282d);
+  floorGrid.position.y = -408;
+  floorGrid.material.transparent = true;
+  floorGrid.material.opacity = 0.42;
+  scene.add(floorGrid);
+
+  const backWall = new THREE.Mesh(
+    new THREE.PlaneGeometry(1500, 760),
+    new THREE.MeshStandardMaterial({ color: 0x081215, metalness: 0.36, roughness: 0.82 }),
+  );
+  backWall.position.set(0, -26, -550);
+  scene.add(backWall);
+  return { slab, bays, lights, floorGrid };
 }
 
 export default function ThreeMachiningStage(props: Props) {
@@ -119,7 +131,7 @@ export default function ThreeMachiningStage(props: Props) {
     workLight.position.set(-150, 120, 220); scene.add(workLight);
     const rim = new THREE.PointLight(0x27d9ff, 9, 1200, 2);
     rim.position.set(480, 180, -380); scene.add(rim);
-    proceduralShop(scene);
+    const shop = proceduralShop(scene);
 
     const root = new THREE.Group();
     scene.add(root);
@@ -297,6 +309,8 @@ export default function ThreeMachiningStage(props: Props) {
       (cutRing.material as THREE.MeshBasicMaterial).opacity = live.spindle ? 0.26 + live.load * 0.003 : 0;
       workLight.intensity = live.spindle ? 14 + live.load * .09 : 7 + Math.sin(now * .0014) * .6;
       workLight.color.setHex(mood === "critical" ? 0xff4938 : mood === "warning" ? 0xff9e54 : 0xffbd7c);
+      shop.lights.material.emissiveIntensity = live.spindle ? 3.4 + live.load * .018 : 2.25 + Math.sin(now * .0011) * .18;
+      shop.floorGrid.material.opacity = live.spindle ? .58 : .42;
 
       if (stockBox && live.cells) {
         const removed = Array.from(live.cells).filter((value) => value === 0).length;
