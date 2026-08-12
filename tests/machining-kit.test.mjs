@@ -125,6 +125,10 @@ test("Machining Kit v3 makes the Three.js cell the playable process surface", as
   assert.match(stage, /machine\.guard\.doors/);
   assert.match(stage, /const plunge/);
   assert.match(stage, /inputMode === "cut"\) return/);
+  const preview = await readFile(new URL("../app/gcode/part-preview.tsx", import.meta.url), "utf8");
+  assert.match(preview, /InstancedMesh/);
+  assert.match(preview, /cutDepth/);
+  assert.match(preview, /stockBlocks/);
   assert.match(systems, /CAMERA_PRESETS/);
   assert.match(systems, /deriveMachineMood/);
   assert.match(systems, /qualityBudget/);
