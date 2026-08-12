@@ -136,6 +136,7 @@ export default function ManualCampaign() {
   const [logOpen, setLogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"map" | "twin">("twin");
   const [datumVisible, setDatumVisible] = useState(false);
+  const [immersiveHud, setImmersiveHud] = useState(true);
   const [tourStep, setTourStep] = useState<number | null>(null);
   const [paused, setPaused] = useState(false);
   const [combo, setCombo] = useState(0);
@@ -580,7 +581,7 @@ export default function ManualCampaign() {
         <div className={styles.jobstats}><span>OP <b>{operation.label.toUpperCase()}</b></span><span>MAT <b>{contract.material}</b></span><span>PAR <b>{contract.par}s</b></span><span>TOL <b>{contract.tolerance} cells</b></span></div>
       </section>
 
-      {screen === "inspection" ? <InspectionBay contract={contract} material={material} toolId={tool.id} finishPenalty={finishPenalty} readings={readings} measured={measured} selectedCharacteristic={selectedCharacteristic} setSelectedCharacteristic={setSelectedCharacteristic} instrument={instrument} setInstrument={setInstrument} measureSelected={measureSelected} dispositionPart={dispositionPart} returnToCell={() => setScreen("play")}/> : <section className={styles.workspace}>
+      {screen === "inspection" ? <InspectionBay contract={contract} material={material} toolId={tool.id} finishPenalty={finishPenalty} readings={readings} measured={measured} selectedCharacteristic={selectedCharacteristic} setSelectedCharacteristic={setSelectedCharacteristic} instrument={instrument} setInstrument={setInstrument} measureSelected={measureSelected} dispositionPart={dispositionPart} returnToCell={() => setScreen("play")}/> : <section className={`${styles.workspace} ${immersiveHud ? styles.immersiveWorkspace : ""}`}>
         <aside className={styles.setup}>
           <div className={styles.panelTitle}><span>01</span><div><small>PROCESS PLAN</small><b>Sequence and tooling</b></div></div>
           <div className={styles.operationList}>{contract.operations.map((item, index) => {
@@ -601,7 +602,7 @@ export default function ManualCampaign() {
         </aside>
 
         <article className={styles.machine}>
-          <div className={styles.machineHead}><span><i className={spindle ? styles.machineLive : ""}/> VMC-01 / LIVE MACHINING CELL</span><span>G54 / 240 × 140 × 18 MM</span><div className={styles.viewSwitch} aria-label="Machine viewport mode"><button aria-pressed={viewMode === "twin"} onClick={() => { setViewMode("twin"); setMessage("3D MACHINING VIEW — drag over the stock to guide the cutter."); trackAnonymous("view_3d_cut", { contract: contract.id }); }}>3D CUT</button><button aria-pressed={viewMode === "map"} onClick={() => { setViewMode("map"); trackAnonymous("view_process_map", { contract: contract.id }); }}>PROCESS MAP</button><button aria-pressed={datumVisible} onClick={() => { setDatumVisible((value) => !value); setMessage("G54 DATUM — stock origin, axes, and work plane are spatially linked."); trackAnonymous("view_g54_datum", { contract: contract.id, visible: !datumVisible }); }}>G54</button></div><span>PROGRAM <b>{contract.program}</b></span></div>
+          <div className={styles.machineHead}><span><i className={spindle ? styles.machineLive : ""}/> VMC-01 / LIVE MACHINING CELL</span><div className={styles.viewSwitch} aria-label="Machine viewport mode"><button aria-pressed={viewMode === "twin"} onClick={() => { setViewMode("twin"); setMessage("3D MACHINING VIEW — drag over the stock to guide the cutter."); trackAnonymous("view_3d_cut", { contract: contract.id }); }}>3D CUT</button><button aria-pressed={viewMode === "map"} onClick={() => { setViewMode("map"); trackAnonymous("view_process_map", { contract: contract.id }); }}>PROCESS MAP</button><button aria-pressed={datumVisible} onClick={() => { setDatumVisible((value) => !value); setMessage("G54 DATUM — stock origin, axes, and work plane are spatially linked."); trackAnonymous("view_g54_datum", { contract: contract.id, visible: !datumVisible }); }}>G54</button><button aria-pressed={immersiveHud} onClick={() => { setImmersiveHud((value) => !value); trackAnonymous("view_hud_mode", { contract: contract.id, mode: immersiveHud ? "control" : "cell" }); }}>{immersiveHud ? "CELL VIEW" : "CONTROL VIEW"}</button></div><span>PROGRAM <b>{contract.program}</b></span></div>
           <div className={styles.viewport}>
             <canvas className={viewMode === "map" ? styles.mapVisible : styles.mapHidden} ref={canvasRef} width={1120} height={640} aria-label={`Interactive ${operation.label.toLowerCase()} process map`} onPointerDown={(event) => { dragging.current = true; event.currentTarget.setPointerCapture(event.pointerId); millAt(event.clientX, event.clientY); }} onPointerMove={(event) => dragging.current ? millAt(event.clientX, event.clientY) : moveCursor(event.clientX, event.clientY)} onPointerUp={() => { dragging.current = false; setLoad(0); }} onPointerCancel={() => { dragging.current = false; setLoad(0); }}/>
             {viewMode === "twin" && <FlagshipMachiningKit variant="hero" cursor={cursor} spindle={spindle} completion={completion} load={load} heat={heat} condition={condition} finishPenalty={finishPenalty} material={contract.material} accent={contract.color} verbose={learningLevel !== "easy"} cells={material} contractId={contract.id} toolpath={toolpath} toolId={tool.id} cameraMode={datumVisible ? "datum" : spindle ? "machining" : "operator"} datumVisible={datumVisible} inputMode="cut" onToolInput={moveToolFromTwin} interactive/>}
@@ -711,6 +712,7 @@ function ContractSelect({ save, startContract, learningLevel, setLearningLevel }
       </div>
       <figure className={styles.heroVisual} data-reveal>
         <img src="/assets/keyart/toolpath-cnc-keyart-v1.webp" alt="Carbide end mill over a fixtured aluminum plate inside a vertical machining center" fetchPriority="high"/>
+        <FlagshipMachiningKit variant="full" cursor={{ x: 13.5, y: 7.5 }} spindle={false} completion={0} load={0} heat={20} condition={100} cameraMode="establishing" material="6061 AL" accent="#00aeef" verbose={false}/>
         <div className={styles.heroReticle} aria-hidden="true"><i/><i/><b>G54</b></div>
         <div className={styles.heroVisualIndex} aria-hidden="true"><span>01</span><b>THE CUT</b><small>CONTROLLED ENERGY / VISIBLE EVIDENCE</small></div>
         <figcaption><span>SHOP THRESHOLD / VMC CELL</span><b>6061 AL · CARBIDE · FLOOD COOLANT</b><small>KEY ART / REPRESENTATIVE GAME WORLD</small></figcaption>
