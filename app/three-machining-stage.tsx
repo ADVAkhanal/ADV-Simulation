@@ -26,6 +26,8 @@ type Props = {
   datumVisible?: boolean;
   inspectionActive?: boolean;
   inputMode?: "orbit" | "cut";
+  soundEnabled?: boolean;
+  sceneCue?: "idle" | "tool-change" | "inspection";
   onToolInput?: (x: number, y: number, cutting: boolean) => void;
   onReady: () => void;
   onFailure: () => void;
@@ -79,7 +81,47 @@ function proceduralShop(scene: THREE.Scene) {
     lights.setMatrixAt(index, matrix);
   }
   scene.add(lights);
-  return { slab, bays, lights };
+  const floorGrid = new THREE.GridHelper(1500, 30, 0x274148, 0x14282d);
+  floorGrid.position.y = -408;
+  floorGrid.material.transparent = true;
+  floorGrid.material.opacity = 0.42;
+  scene.add(floorGrid);
+
+  const backWall = new THREE.Mesh(
+    new THREE.PlaneGeometry(1500, 760),
+    new THREE.MeshStandardMaterial({ color: 0x081215, metalness: 0.36, roughness: 0.82 }),
+  );
+  backWall.position.set(0, -26, -550);
+  scene.add(backWall);
+  const paintedSteel = new THREE.MeshStandardMaterial({ color: 0x1c343a, roughness: 0.58, metalness: 0.7 });
+  const safetyYellow = new THREE.MeshStandardMaterial({ color: 0xd58d2f, emissive: 0x341300, emissiveIntensity: .25, roughness: .46, metalness: .46 });
+  const warmScreen = new THREE.MeshStandardMaterial({ color: 0x101b1b, emissive: 0x65e6d3, emissiveIntensity: 1.45, roughness: .4, metalness: .2 });
+  const rack = new THREE.Group();
+  const uprightGeometry = new THREE.BoxGeometry(18, 270, 18), shelfGeometry = new THREE.BoxGeometry(250, 12, 62);
+  for (const x of [-118, 118]) { const upright = new THREE.Mesh(uprightGeometry, paintedSteel); upright.position.set(x, -270, 0); rack.add(upright); }
+  for (const y of [-350, -250, -150]) { const shelf = new THREE.Mesh(shelfGeometry, paintedSteel); shelf.position.set(0, y, 0); rack.add(shelf); }
+  for (let index = 0; index < 9; index += 1) { const bin = new THREE.Mesh(new THREE.BoxGeometry(42, 28, 52), index % 3 === 0 ? safetyYellow : steel); bin.position.set(-86 + (index % 3) * 86, -320 + Math.floor(index / 3) * 100, -12); rack.add(bin); }
+  rack.position.set(-510, 0, -405); scene.add(rack);
+  const cart = new THREE.Group();
+  const cartBody = new THREE.Mesh(new THREE.BoxGeometry(150, 18, 95), safetyYellow); cartBody.position.y = -285; cart.add(cartBody);
+  for (const x of [-57, 57]) for (const z of [-34, 34]) { const wheel = new THREE.Mesh(new THREE.CylinderGeometry(13, 13, 10, 16), steel); wheel.rotation.x = Math.PI / 2; wheel.position.set(x, -326, z); cart.add(wheel); }
+  const cartScreen = new THREE.Mesh(new THREE.BoxGeometry(76, 48, 7), warmScreen); cartScreen.position.set(0, -220, -12); cart.add(cartScreen); const cartNeck = new THREE.Mesh(new THREE.BoxGeometry(10, 68, 10), paintedSteel); cartNeck.position.set(0, -254, 0); cart.add(cartNeck);
+  cart.position.set(450, 0, -300); scene.add(cart);
+  const gantry = new THREE.Group();
+  const gantryMat = new THREE.MeshStandardMaterial({ color: 0x11262b, roughness: .62, metalness: .66 });
+  for (const x of [-510, 510]) { const column = new THREE.Mesh(new THREE.BoxGeometry(34, 670, 34), gantryMat); column.position.set(x, -76, -500); gantry.add(column); }
+  const beam = new THREE.Mesh(new THREE.BoxGeometry(1054, 34, 34), gantryMat); beam.position.set(0, 246, -500); gantry.add(beam); scene.add(gantry);
+  const trolley = new THREE.Group();
+  const trolleyBody = new THREE.Mesh(new THREE.BoxGeometry(104, 44, 66), safetyYellow); trolleyBody.position.y = 222; trolley.add(trolleyBody);
+  const cable = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 220, 12), new THREE.MeshStandardMaterial({ color: 0x0b1012, roughness: .42, metalness: .8 })); cable.position.y = 98; trolley.add(cable);
+  const hook = new THREE.Mesh(new THREE.TorusGeometry(21, 5, 10, 20, Math.PI * 1.25), safetyYellow); hook.rotation.z = Math.PI; hook.position.y = -26; trolley.add(hook);
+  trolley.position.set(-260, 0, -500); scene.add(trolley);
+  const palletRail = new THREE.Group();
+  const railMat = new THREE.MeshStandardMaterial({ color: 0x284248, roughness: .58, metalness: .72 });
+  for (const z of [-42, 42]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(470, 14, 12), railMat); rail.position.set(0, -394, z); palletRail.add(rail); }
+  for (let index = 0; index < 5; index += 1) { const roller = new THREE.Mesh(new THREE.CylinderGeometry(14, 14, 82, 12), steel); roller.rotation.x = Math.PI / 2; roller.position.set(-180 + index * 90, -379, 0); palletRail.add(roller); }
+  palletRail.position.set(0, 0, 350); scene.add(palletRail);
+  return { slab, bays, lights, floorGrid, warmScreen, trolley, cart, palletRail };
 }
 
 export default function ThreeMachiningStage(props: Props) {
@@ -119,11 +161,12 @@ export default function ThreeMachiningStage(props: Props) {
     workLight.position.set(-150, 120, 220); scene.add(workLight);
     const rim = new THREE.PointLight(0x27d9ff, 9, 1200, 2);
     rim.position.set(480, 180, -380); scene.add(rim);
-    proceduralShop(scene);
+    const shop = proceduralShop(scene);
 
     const root = new THREE.Group();
     scene.add(root);
     let model: THREE.Group | null = null;
+    let toolCrib: THREE.Group | null = null;
     const movingNodes: THREE.Object3D[] = [];
     const basePosition = new Map<THREE.Object3D, THREE.Vector3>();
     let stock: THREE.Object3D | null = null;
@@ -150,6 +193,11 @@ export default function ThreeMachiningStage(props: Props) {
     );
     cutRing.rotation.x = -Math.PI / 2; root.add(cutRing);
 
+    const sparkPositions = new Float32Array(84 * 3);
+    const sparkGeometry = new THREE.BufferGeometry().setAttribute("position", new THREE.BufferAttribute(sparkPositions, 3));
+    const sparks = new THREE.Points(sparkGeometry, new THREE.PointsMaterial({ color: 0xffb24a, size: 5, transparent: true, opacity: .82, depthWrite: false, blending: THREE.AdditiveBlending }));
+    sparks.frustumCulled = false; root.add(sparks);
+
     const pathMaterial = new THREE.LineBasicMaterial({ color: 0x6feaff, transparent: true, opacity: .85, depthWrite: false });
     const pathGeometry = new THREE.BufferGeometry();
     const completedPath = new THREE.Line(pathGeometry, pathMaterial); completedPath.frustumCulled = false; root.add(completedPath);
@@ -164,6 +212,8 @@ export default function ThreeMachiningStage(props: Props) {
 
     const scanner = new THREE.Mesh(new THREE.PlaneGeometry(290, 180), new THREE.MeshBasicMaterial({ color: 0x85f5ff, transparent: true, opacity: .13, side: THREE.DoubleSide, blending: THREE.AdditiveBlending, depthWrite: false }));
     scanner.rotation.x = -Math.PI / 2; scanner.visible = false; root.add(scanner);
+    const cueBeacon = new THREE.PointLight(0x70f5ff, 0, 520, 2);
+    cueBeacon.position.set(0, 120, 80); root.add(cueBeacon);
 
     const pocketMaterial = new THREE.MeshStandardMaterial({ color: 0x33494f, metalness: 0.58, roughness: 0.64 });
     const pocketGeometry = new THREE.BoxGeometry(1, 1, 1);
@@ -199,7 +249,24 @@ export default function ThreeMachiningStage(props: Props) {
       propsRef.current.onReady();
     }, undefined, () => propsRef.current.onFailure());
 
+    loader.load("/assets/workholding/toolpath-tool-crib-v1.glb", (gltf) => {
+      if (disposed) return;
+      toolCrib = gltf.scene;
+      toolCrib.traverse((object) => {
+        if (!(object instanceof THREE.Mesh)) return;
+        object.castShadow = true; object.receiveShadow = true;
+        const source = object.material as THREE.MeshStandardMaterial;
+        if (source?.isMeshStandardMaterial) { object.material = source.clone(); object.material.envMapIntensity = 1.3; }
+      });
+      const bounds = new THREE.Box3().setFromObject(toolCrib);
+      toolCrib.position.sub(bounds.getCenter(new THREE.Vector3()));
+      toolCrib.position.set(-495, -258, -438);
+      toolCrib.rotation.y = .16;
+      root.add(toolCrib);
+    }, undefined, () => { /* ambient authored asset is optional */ });
+
     let frame = 0, previous = performance.now(), drag: { x: number; y: number } | null = null, cutting = false, firstCutAt = 0, wasCutting = false, stockHovered = false;
+    let audio: AudioContext | null = null, motor: OscillatorNode | null = null, harmonic: OscillatorNode | null = null, motorGain: GainNode | null = null;
     const raycaster = new THREE.Raycaster(), pointer = new THREE.Vector2();
     const resize = () => {
       const rect = canvas.getBoundingClientRect(), budget = qualityBudget(rect.width), ratio = Math.min(devicePixelRatio || 1, budget.dpr);
@@ -224,7 +291,17 @@ export default function ThreeMachiningStage(props: Props) {
         isCutting,
       );
     };
-    const onDown = (event: PointerEvent) => { if (!propsRef.current.interactive) return; canvas.setPointerCapture(event.pointerId); if (propsRef.current.inputMode === "cut" && event.button === 0) { cutting = true; emitTool(event, true); } else drag = { x: event.clientX, y: event.clientY }; };
+    const armAudio = () => {
+      if (!propsRef.current.soundEnabled || audio) return;
+      const AudioCtor = window.AudioContext ?? (window as typeof window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+      if (!AudioCtor) return;
+      audio = new AudioCtor(); motorGain = audio.createGain(); motorGain.gain.value = .0001; motorGain.connect(audio.destination);
+      motor = audio.createOscillator(); motor.type = "sawtooth"; motor.frequency.value = 62;
+      harmonic = audio.createOscillator(); harmonic.type = "sine"; harmonic.frequency.value = 124;
+      const harmonicGain = audio.createGain(); harmonicGain.gain.value = .18;
+      motor.connect(motorGain); harmonic.connect(harmonicGain).connect(motorGain); motor.start(); harmonic.start();
+    };
+    const onDown = (event: PointerEvent) => { if (!propsRef.current.interactive) return; armAudio(); canvas.setPointerCapture(event.pointerId); if (propsRef.current.inputMode === "cut" && event.button === 0) { cutting = true; emitTool(event, true); } else drag = { x: event.clientX, y: event.clientY }; };
     const onMove = (event: PointerEvent) => { if (cutting) { emitTool(event, true); return; } if (propsRef.current.inputMode === "cut" && !drag) { emitTool(event, false); return; } if (!drag) return; view.yaw += (event.clientX - drag.x) * 0.008; view.pitch = THREE.MathUtils.clamp(view.pitch + (event.clientY - drag.y) * 0.006, -0.9, 0.12); drag = { x: event.clientX, y: event.clientY }; };
     const onUp = () => { drag = null; cutting = false; };
     const onLeave = () => { stockHovered = false; };
@@ -235,11 +312,12 @@ export default function ThreeMachiningStage(props: Props) {
     const animate = (now: number) => {
       const dt = Math.min(0.05, (now - previous) / 1000); previous = now;
       const live = propsRef.current;
+      if (audio && motor && harmonic && motorGain) { const target = live.soundEnabled && live.spindle ? .026 + live.load * .00048 : .0001; motorGain.gain.setTargetAtTime(target, audio.currentTime, .08); motor.frequency.setTargetAtTime(58 + live.load * .9, audio.currentTime, .07); harmonic.frequency.setTargetAtTime(116 + live.load * 2.4, audio.currentTime, .07); }
       const mood = deriveMachineMood({ spindle: live.spindle, load: live.load, heat: live.heat ?? 20, condition: live.condition ?? 100, finishPenalty: live.finishPenalty ?? 0, cameraMode: live.cameraMode ?? "establishing" });
       const liveCut = live.spindle && live.load > 4;
       if (liveCut && !wasCutting) firstCutAt = performance.now();
       wasCutting = liveCut;
-      const requestedMode: MachineCameraMode = mood === "failure" || mood === "critical" ? "failure" : live.spindle && live.load > 4 && performance.now() - firstCutAt < 2600 ? "macro" : live.cameraMode ?? (live.spindle ? "machining" : "operator");
+      const requestedMode: MachineCameraMode = mood === "failure" || mood === "critical" ? "failure" : live.sceneCue === "tool-change" ? "tool-change" : live.sceneCue === "inspection" ? "inspection" : live.spindle && live.load > 4 && performance.now() - firstCutAt < 2600 ? "macro" : live.cameraMode ?? (live.spindle ? "machining" : "operator");
       const preset = CAMERA_PRESETS[requestedMode];
       if (live.resetToken !== lastReset) { lastReset = live.resetToken; view.yaw = preset.yaw; view.pitch = preset.pitch; view.distance = preset.distance; view.target.copy(preset.target); }
       if (live.autoOrbit && live.inputMode !== "cut" && !matchMedia("(prefers-reduced-motion: reduce)").matches) view.yaw += dt * 0.045;
@@ -293,10 +371,29 @@ export default function ThreeMachiningStage(props: Props) {
         mistPositions[index * 3 + 2] = origin.z + Math.sin(angle) * age * 70;
       }
       (mist.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
+      const sparkCount = live.spindle && live.load > 66 ? Math.round((live.load - 62) * .95) : 0;
+      sparks.visible = sparkCount > 0;
+      sparks.geometry.setDrawRange(0, Math.min(84, sparkCount));
+      for (let index = 0; index < Math.min(84, sparkCount); index += 1) {
+        const age = (now * .0032 + index * .137) % 1, angle = index * 2.399963;
+        sparkPositions[index * 3] = origin.x + Math.cos(angle) * (12 + age * 54);
+        sparkPositions[index * 3 + 1] = origin.y - age * age * 38 + 8;
+        sparkPositions[index * 3 + 2] = origin.z + Math.sin(angle) * (12 + age * 42);
+      }
+      (sparks.geometry.attributes.position as THREE.BufferAttribute).needsUpdate = true;
       cutRing.visible = live.spindle; cutRing.position.copy(origin); cutRing.position.y += 2; cutRing.scale.setScalar(0.75 + Math.sin(now * 0.012) * 0.12 + live.load * 0.004);
       (cutRing.material as THREE.MeshBasicMaterial).opacity = live.spindle ? 0.26 + live.load * 0.003 : 0;
       workLight.intensity = live.spindle ? 14 + live.load * .09 : 7 + Math.sin(now * .0014) * .6;
       workLight.color.setHex(mood === "critical" ? 0xff4938 : mood === "warning" ? 0xff9e54 : 0xffbd7c);
+      shop.lights.material.emissiveIntensity = live.spindle ? 3.4 + live.load * .018 : 2.25 + Math.sin(now * .0011) * .18;
+      shop.warmScreen.emissiveIntensity = live.spindle ? 2.45 + live.load * .018 : 1.45 + Math.sin(now * .0017) * .15;
+      shop.floorGrid.material.opacity = live.spindle ? .58 : .42;
+      const shopMotion = live.spindle ? .00078 : .00021;
+      shop.trolley.position.x = Math.sin(now * shopMotion) * (live.spindle ? 260 : 92);
+      shop.trolley.position.y = Math.sin(now * shopMotion * 2.1) * 7;
+      shop.cart.rotation.y = Math.sin(now * .00028) * .014;
+      shop.palletRail.position.x = Math.sin(now * shopMotion * .6) * (live.spindle ? 34 : 11);
+      if (toolCrib) toolCrib.rotation.y = .16 + Math.sin(now * .00032) * .006;
 
       if (stockBox && live.cells) {
         const removed = Array.from(live.cells).filter((value) => value === 0).length;
@@ -314,7 +411,12 @@ export default function ThreeMachiningStage(props: Props) {
       if (stockBox) {
         const center = stockBox.getCenter(new THREE.Vector3()), top = stockBox.max.y + 3;
         datum.position.set(center.x, top, center.z); datum.visible = live.datumVisible === true || requestedMode === "datum";
-        scanner.visible = live.inspectionActive === true || requestedMode === "inspection"; scanner.position.set(center.x, top + 2, center.z + Math.sin(now * .0014) * stockBox.getSize(new THREE.Vector3()).z * .48);
+        const cue = live.sceneCue ?? "idle";
+        scanner.visible = live.inspectionActive === true || requestedMode === "inspection" || cue === "inspection"; scanner.position.set(center.x, top + 2, center.z + Math.sin(now * .0014) * stockBox.getSize(new THREE.Vector3()).z * .48);
+        cueBeacon.position.set(center.x, top + 86, center.z);
+        cueBeacon.color.setHex(cue === "tool-change" ? 0xffc15a : 0x70f5ff);
+        cueBeacon.intensity = cue === "idle" ? 0 : 5.5 + Math.sin(now * .02) * 1.8;
+        (scanner.material as THREE.MeshBasicMaterial).opacity = cue === "inspection" ? .22 + Math.sin(now * .015) * .06 : .13;
         if (live.toolpath && live.toolpath.length > 1) {
           const size = stockBox.getSize(new THREE.Vector3()), min = stockBox.min;
           const points = live.toolpath.map(point => new THREE.Vector3(min.x + point.x / 27 * size.x, top + 2.5, min.z + point.y / 15 * size.z));
@@ -331,6 +433,7 @@ export default function ThreeMachiningStage(props: Props) {
 
     return () => {
       disposed = true; cancelAnimationFrame(frame); observer.disconnect();
+      motor?.stop(); harmonic?.stop(); audio?.close();
       canvas.removeEventListener("pointerdown", onDown); canvas.removeEventListener("pointermove", onMove); canvas.removeEventListener("pointerup", onUp); canvas.removeEventListener("pointercancel", onUp); canvas.removeEventListener("pointerleave", onLeave); canvas.removeEventListener("wheel", onWheel); canvas.removeEventListener("webglcontextlost", onContextLost);
       scene.traverse((object) => { if (object instanceof THREE.Mesh || object instanceof THREE.Points) { object.geometry?.dispose(); const materials = Array.isArray(object.material) ? object.material : [object.material]; materials.forEach((material) => material?.dispose()); } });
       renderer.dispose();

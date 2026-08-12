@@ -67,6 +67,11 @@ const ROLE_LADDER = [
   { threshold: 165, level: "L2", role: "MACHINIST / SETUP ALIGNMENT", code: "O*NET 51-4041.00", focus: "Read geometry · select tooling · control tolerance", evidence: "165 best-run XP" },
   { threshold: 250, level: "L3", role: "CNC PROGRAMMER ALIGNMENT", code: "O*NET 51-9162.00", focus: "Plan sequence · define paths · verify simulation", evidence: "250 best-run XP" },
 ] as const;
+const CELL_SIGNALS = [
+  { code: "CELL 01 / READY", message: "The spindle is parked. Your first part is waiting." },
+  { code: "WORKLIGHT / LIVE", message: "One controlled cut is enough to begin." },
+  { code: "G54 / LOCKED", message: "The part has a home. Now give it a shape." },
+] as const;
 const CONTRACT_VISUALS = {
   drive: { artifact: "DRIVE INTERFACE", route: "PROFILE + BORE", stock: "PLATE / 18 MM", finish: "MILL / BRUSH", image: "/assets/2d/contracts/emergency-drive-plate-v1.webp" },
   rib: { artifact: "LIGHTWEIGHT RIB", route: "WEBS + CONTOUR", stock: "PLATE / 22 MM", finish: "MILL / BLEND", image: "/assets/2d/contracts/orbital-structural-rib-v1.webp" },
@@ -136,12 +141,14 @@ export default function ManualCampaign() {
   const [logOpen, setLogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"map" | "twin">("twin");
   const [datumVisible, setDatumVisible] = useState(false);
+  const [immersiveHud, setImmersiveHud] = useState(true);
   const [tourStep, setTourStep] = useState<number | null>(null);
   const [paused, setPaused] = useState(false);
   const [combo, setCombo] = useState(0);
   const [bestCombo, setBestCombo] = useState(0);
   const [flowScore, setFlowScore] = useState(0);
   const [gameEvent, setGameEvent] = useState<GameEvent | null>(null);
+  const [sceneCue, setSceneCue] = useState<"idle" | "tool-change" | "inspection">("idle");
 
   const contract = MANUAL_CONTRACTS[contractIndex];
   const operation = contract.operations[Math.min(operationIndex, contract.operations.length - 1)];
@@ -334,6 +341,11 @@ export default function ManualCampaign() {
     eventTimerRef.current = window.setTimeout(() => setGameEvent(null), event.kind === "warning" ? 1800 : 2400);
   }, []);
 
+  const triggerSceneCue = useCallback((cue: "tool-change" | "inspection") => {
+    setSceneCue(cue);
+    window.setTimeout(() => setSceneCue("idle"), cue === "inspection" ? 1100 : 850);
+  }, []);
+
   const toolForOperation = (operationId: ManualOperationId) => Math.max(0, MILL_TOOLS.findIndex((item) => item.operations.includes(operationId)));
 
   const resetRun = useCallback((nextContract = contractIndex) => {
@@ -461,7 +473,7 @@ export default function ManualCampaign() {
     if (cutting) cutAt(x, y); else setCursor({ x, y });
   };
 
-  const restoreTool = () => { setCondition(100); setHeat(25); setSpindle(false); setMessage("Fresh cutter loaded. Verify the active operation before restart."); };
+  const restoreTool = () => { setCondition(100); setHeat(25); setSpindle(false); triggerSceneCue("tool-change"); tone(420, .11, "square", .018); setMessage("Fresh cutter loaded. Verify the active operation before restart."); };
 
   const toggleSpindle = () => {
     if (condition <= 0) { restoreTool(); return; }
@@ -479,7 +491,7 @@ export default function ManualCampaign() {
       setMessage(`${operation.label.toUpperCase()} SIGNED OFF — ${nextOperation.label.toLowerCase()} is now active.`);
     } else {
       setMeasured({}); setInspectionMistakes(0); setSelectedCharacteristic(contract.inspection[0].id); setInstrument(contract.inspection[0].instrument);
-      setViewMode("map"); setScreen("inspection"); setMessage("INSPECTION BAY — measure every characteristic, then disposition the part.");
+      setViewMode("map"); triggerSceneCue("inspection"); setScreen("inspection"); setMessage("INSPECTION BAY — measure every characteristic, then disposition the part.");
     }
   };
 
@@ -489,6 +501,7 @@ export default function ManualCampaign() {
     if (instrument !== reading.instrument) { setInspectionMistakes((value) => value + 1); setMessage(`NO VALID READING — ${reading.label.toLowerCase()} requires the ${reading.instrumentLabel.toLowerCase()}.`); return; }
     setMeasured((current) => ({ ...current, [reading.id]: reading }));
     setElapsed((value) => value + 2);
+    triggerSceneCue("inspection"); tone(reading.pass ? 520 : 135, .12, reading.pass ? "sine" : "sawtooth", .022);
     setMessage(`${reading.label.toUpperCase()} — ${reading.actual.toFixed(3)} ${reading.unit}, ${reading.pass ? "WITHIN" : "OUTSIDE"} ±${reading.tolerance.toFixed(2)}.`);
   };
 
@@ -555,7 +568,7 @@ export default function ManualCampaign() {
     if (condition >= 98 && heat <= 30) { setMessage("Cutter is already fresh and cool. No swap needed."); return; }
     if (save.credits < SWAP_TOOL_COST) { setMessage(`Not enough credits for a tool swap — need ${SWAP_TOOL_COST} CR.`); return; }
     setSave((current) => ({ ...current, credits: current.credits - SWAP_TOOL_COST }));
-    setCondition(100); setHeat(20);
+    setCondition(100); setHeat(20); triggerSceneCue("tool-change"); tone(420, .11, "square", .018);
     setMessage(`Cutter swapped for ${SWAP_TOOL_COST} CR — fresh edge, safe temperature.`);
     trackAnonymous("manual_tool_swap", { contract: contract.id, tool: tool.id, cost: SWAP_TOOL_COST });
   };
@@ -580,7 +593,7 @@ export default function ManualCampaign() {
         <div className={styles.jobstats}><span>OP <b>{operation.label.toUpperCase()}</b></span><span>MAT <b>{contract.material}</b></span><span>PAR <b>{contract.par}s</b></span><span>TOL <b>{contract.tolerance} cells</b></span></div>
       </section>
 
-      {screen === "inspection" ? <InspectionBay contract={contract} material={material} toolId={tool.id} finishPenalty={finishPenalty} readings={readings} measured={measured} selectedCharacteristic={selectedCharacteristic} setSelectedCharacteristic={setSelectedCharacteristic} instrument={instrument} setInstrument={setInstrument} measureSelected={measureSelected} dispositionPart={dispositionPart} returnToCell={() => setScreen("play")}/> : <section className={styles.workspace}>
+      {screen === "inspection" ? <InspectionBay contract={contract} material={material} toolId={tool.id} finishPenalty={finishPenalty} readings={readings} measured={measured} selectedCharacteristic={selectedCharacteristic} setSelectedCharacteristic={setSelectedCharacteristic} instrument={instrument} setInstrument={setInstrument} measureSelected={measureSelected} dispositionPart={dispositionPart} returnToCell={() => setScreen("play")}/> : <section className={`${styles.workspace} ${immersiveHud ? styles.immersiveWorkspace : ""}`}>
         <aside className={styles.setup}>
           <div className={styles.panelTitle}><span>01</span><div><small>PROCESS PLAN</small><b>Sequence and tooling</b></div></div>
           <div className={styles.operationList}>{contract.operations.map((item, index) => {
@@ -601,10 +614,10 @@ export default function ManualCampaign() {
         </aside>
 
         <article className={styles.machine}>
-          <div className={styles.machineHead}><span><i className={spindle ? styles.machineLive : ""}/> VMC-01 / LIVE MACHINING CELL</span><span>G54 / 240 × 140 × 18 MM</span><div className={styles.viewSwitch} aria-label="Machine viewport mode"><button aria-pressed={viewMode === "twin"} onClick={() => { setViewMode("twin"); setMessage("3D MACHINING VIEW — drag over the stock to guide the cutter."); trackAnonymous("view_3d_cut", { contract: contract.id }); }}>3D CUT</button><button aria-pressed={viewMode === "map"} onClick={() => { setViewMode("map"); trackAnonymous("view_process_map", { contract: contract.id }); }}>PROCESS MAP</button><button aria-pressed={datumVisible} onClick={() => { setDatumVisible((value) => !value); setMessage("G54 DATUM — stock origin, axes, and work plane are spatially linked."); trackAnonymous("view_g54_datum", { contract: contract.id, visible: !datumVisible }); }}>G54</button></div><span>PROGRAM <b>{contract.program}</b></span></div>
+          <div className={styles.machineHead}><span><i className={spindle ? styles.machineLive : ""}/> VMC-01 / LIVE MACHINING CELL</span><div className={styles.viewSwitch} aria-label="Machine viewport mode"><button aria-pressed={viewMode === "twin"} onClick={() => { setViewMode("twin"); setMessage("3D MACHINING VIEW — drag over the stock to guide the cutter."); trackAnonymous("view_3d_cut", { contract: contract.id }); }}>3D CUT</button><button aria-pressed={viewMode === "map"} onClick={() => { setViewMode("map"); trackAnonymous("view_process_map", { contract: contract.id }); }}>PROCESS MAP</button><button aria-pressed={datumVisible} onClick={() => { setDatumVisible((value) => !value); setMessage("G54 DATUM — stock origin, axes, and work plane are spatially linked."); trackAnonymous("view_g54_datum", { contract: contract.id, visible: !datumVisible }); }}>G54</button><button aria-pressed={immersiveHud} onClick={() => { setImmersiveHud((value) => !value); trackAnonymous("view_hud_mode", { contract: contract.id, mode: immersiveHud ? "control" : "cell" }); }}>{immersiveHud ? "CELL VIEW" : "CONTROL VIEW"}</button></div><span>PROGRAM <b>{contract.program}</b></span></div>
           <div className={styles.viewport}>
             <canvas className={viewMode === "map" ? styles.mapVisible : styles.mapHidden} ref={canvasRef} width={1120} height={640} aria-label={`Interactive ${operation.label.toLowerCase()} process map`} onPointerDown={(event) => { dragging.current = true; event.currentTarget.setPointerCapture(event.pointerId); millAt(event.clientX, event.clientY); }} onPointerMove={(event) => dragging.current ? millAt(event.clientX, event.clientY) : moveCursor(event.clientX, event.clientY)} onPointerUp={() => { dragging.current = false; setLoad(0); }} onPointerCancel={() => { dragging.current = false; setLoad(0); }}/>
-            {viewMode === "twin" && <FlagshipMachiningKit variant="hero" cursor={cursor} spindle={spindle} completion={completion} load={load} heat={heat} condition={condition} finishPenalty={finishPenalty} material={contract.material} accent={contract.color} verbose={learningLevel !== "easy"} cells={material} contractId={contract.id} toolpath={toolpath} toolId={tool.id} cameraMode={datumVisible ? "datum" : spindle ? "machining" : "operator"} datumVisible={datumVisible} inputMode="cut" onToolInput={moveToolFromTwin} interactive/>}
+            {viewMode === "twin" && <FlagshipMachiningKit variant="hero" cursor={cursor} spindle={spindle} completion={completion} load={load} heat={heat} condition={condition} finishPenalty={finishPenalty} material={contract.material} accent={contract.color} verbose={learningLevel !== "easy"} cells={material} contractId={contract.id} toolpath={toolpath} toolId={tool.id} cameraMode={datumVisible ? "datum" : spindle ? "machining" : "operator"} datumVisible={datumVisible} inputMode="cut" soundEnabled={soundOn} sceneCue={sceneCue} onToolInput={moveToolFromTwin} interactive/>}
             {learningLevel !== "easy" && <div className={styles.coordinates}><small>G54 POSITION / MM</small><b>X {machinePosition.x.toFixed(2)}</b><b>Y {machinePosition.y.toFixed(2)}</b><b>Z {spindle ? "-1.80" : "+4.00"}</b></div>}
             <div className={styles.processPlate}><small>PROCESS ESTIMATE / SIM</small><span><b>S</b>{spindleRpm.toLocaleString()} RPM</span><span><b>F</b>{programmedFeed} MM/MIN</span>{learningLevel !== "easy" && <span><b>Ra</b>{surfaceRa.toFixed(1)} µm</span>}{learningLevel === "hard" && <><span><b>fz</b>{chipLoad.toFixed(3)} MM</span><span><b>ae</b>{engagementAngle}°</span><span><b>MRR</b>{removalIndex}</span><span><b>WCS</b>G54</span><span><b>OP</b>{operation.label.toUpperCase()}</span></>}</div>
             <section className={styles.missionHud} aria-label="Active mission objective"><header><Target/><span>PRIMARY OBJECTIVE / 0{mission.step}</span><b>{completion}% / {mission.target}%</b></header><h3>{mission.title}</h3><p>{mission.detail}</p><i><em style={{ width: `${Math.min(100, completion / mission.target * 100)}%` }}/></i></section>
@@ -693,6 +706,7 @@ type ShowcaseTab = "machine" | "doctrine" | "lens" | "capability" | "ladder";
 function ContractSelect({ save, startContract, learningLevel, setLearningLevel }: { save: ManualSaveData; startContract: (index: number) => void; learningLevel: LearningLevel; setLearningLevel: (level: LearningLevel) => void }) {
   const lens = LEARNING_LENSES[learningLevel];
   const [showcaseTab, setShowcaseTab] = useState<ShowcaseTab>("machine");
+  const [signalIndex, setSignalIndex] = useState(0);
   const selectRef = useRef<HTMLElement>(null);
   useEffect(() => {
     if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
@@ -701,22 +715,33 @@ function ContractSelect({ save, startContract, learningLevel, setLearningLevel }
     const entrance = animate(targets, { opacity: { from: 0 }, y: { from: 22 }, delay: stagger(85), duration: 720, ease: "out(3)" });
     return () => entrance.cancel();
   }, []);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const timer = window.setInterval(() => setSignalIndex((value) => (value + 1) % CELL_SIGNALS.length), 4600);
+    return () => window.clearInterval(timer);
+  }, []);
+  const signal = CELL_SIGNALS[signalIndex];
   return <section ref={selectRef} className={styles.select}>
     <div className={styles.selectIntro}>
       <div className={styles.heroCopy} data-reveal>
-        <p>DIRECTOR DEMO / MULTI-OPERATION VERTICAL SLICE</p>
-        <h1>PLAN THE CUT.<br/><em>PROVE THE QUALITY.</em></h1>
-        <span>Profile, pocket, drill, and finish in order. Match each tool to the operation it is rated for, then measure the part in the inspection bay before you disposition it.</span>
-        <div className={styles.heroActions}><button onClick={() => startContract(0)}><Play/> START FLAGSHIP CONTRACT</button><small>NO ACCOUNT · FICTIONAL TRAINING VALUES · KEYBOARD, MOUSE &amp; TOUCH</small></div>
+        <p>AFTER HOURS / WELCOME TO YOUR FIRST SHIFT</p>
+        <h1>THE CELL IS<br/><em>WAITING.</em></h1>
+        <span>Learn precision machining by making a real part—one satisfying cut at a time. We’ll guide your first run, and you can reveal the engineering detail whenever you’re ready.</span>
+        <div className={styles.heroActions}><button onClick={() => startContract(0)}><Play/> START FIRST PART</button><small>NO ACCOUNT NEEDED · ABOUT 3 MINUTES · SAFE CREATIVE SIMULATION</small></div>
+        <div className={styles.welcomeSteps} aria-label="Your first shift in three steps"><span><b>1</b> Choose a tool</span><span><b>2</b> Shape the part</span><span><b>3</b> Check your work</span></div>
+        <div className={styles.cellSignal} aria-live="polite"><i/><small>{signal.code}</small><b>{signal.message}</b></div>
       </div>
       <figure className={styles.heroVisual} data-reveal>
         <img src="/assets/keyart/toolpath-cnc-keyart-v1.webp" alt="Carbide end mill over a fixtured aluminum plate inside a vertical machining center" fetchPriority="high"/>
+        <FlagshipMachiningKit variant="full" cursor={{ x: 13.5, y: 7.5 }} spindle={false} completion={0} load={0} heat={20} condition={100} cameraMode="establishing" material="6061 AL" accent="#00aeef" verbose={false}/>
         <div className={styles.heroReticle} aria-hidden="true"><i/><i/><b>G54</b></div>
-        <div className={styles.heroVisualIndex} aria-hidden="true"><span>01</span><b>THE CUT</b><small>CONTROLLED ENERGY / VISIBLE EVIDENCE</small></div>
-        <figcaption><span>SHOP THRESHOLD / VMC CELL</span><b>6061 AL · CARBIDE · FLOOD COOLANT</b><small>KEY ART / REPRESENTATIVE GAME WORLD</small></figcaption>
+        <div className={styles.heroVisualIndex} aria-hidden="true"><span>01</span><b>THE LIGHTS ARE ON</b><small>GUIDED · HANDS-ON · REPLAYABLE</small></div>
+        <div className={styles.cellAlert} aria-hidden="true"><i/> MACHINE STANDBY <b>01</b></div>
+        <figcaption><span>AFTER-HOURS CELL / READY</span><b>ALUMINUM · THREE-AXIS MILL</b><small>DRAG TO EXPLORE THE MACHINE</small></figcaption>
       </figure>
-      <dl className={styles.heroMetrics} data-reveal aria-label="Flagship experience signals"><div><dt>GEOMETRY</dt><dd>DATUM-DRIVEN</dd></div><div><dt>PROCESS</dt><dd>OPERATION-SEQUENCED</dd></div><div><dt>INSPECTION</dt><dd>EVIDENCE-GATED</dd></div><div><dt>RECOVERY</dt><dd>&lt; 3 SECOND RETRY</dd></div></dl>
+      <dl className={styles.heroMetrics} data-reveal aria-label="What to expect"><div><dt>LEARN</dt><dd>AS YOU PLAY</dd></div><div><dt>MAKE</dt><dd>THREE REAL PARTS</dd></div><div><dt>IMPROVE</dt><dd>WITH CLEAR FEEDBACK</dd></div><div><dt>RETRY</dt><dd>IN UNDER 3 SECONDS</dd></div></dl>
     </div>
+    <header className={styles.contractWelcome}><small>CHOOSE YOUR NEXT PART</small><h2>Start simple. Build confidence.</h2><p>Every contract teaches one new idea. The first is always open, and there’s no penalty for experimenting.</p></header>
     <div className={styles.contractGrid}>{MANUAL_CONTRACTS.map((contract, index) => {
       const visual = CONTRACT_VISUALS[contract.id];
       const best = save.bests[contract.id];
@@ -730,8 +755,9 @@ function ContractSelect({ save, startContract, learningLevel, setLearningLevel }
         <footer><span>{contract.par}S PAR</span><span>{contract.reward.toLocaleString()} CR</span><strong>{!unlocked ? <><LockKeyhole/> LOCKED</> : index === 0 ? "FLAGSHIP / ENTER CELL" : "ENTER CELL"} &rarr;</strong></footer>
       </button>;
     })}</div>
-    <div className={styles.principles}><span><b>01</b> PLAN THE OPERATIONS</span><span><b>02</b> MATCH TOOL TO CUT</span><span><b>03</b> MEASURE BEFORE RELEASE</span></div>
-    <div className={styles.publicSafety}><ShieldCheck/><span><b>SAFE PUBLIC DEMO</b>This is a creative game, not machine-operating guidance. It contains no real shop inventory, controller procedure, customer data, or production parameters.</span><ol><li><b>01</b> Start spindle</li><li><b>02</b> Sign off each operation</li><li><b>03</b> Inspect and disposition</li></ol></div>
+    <div className={styles.publicSafety}><ShieldCheck/><span><b>EXPLORE SAFELY</b>This is a creative game with fictional training values—not instructions for operating physical equipment.</span><ol><li>Guided first run</li><li>No account</li><li>Progress stays on this device</li></ol></div>
+    <details className={styles.advancedHome}>
+      <summary><span>CURIOUS ABOUT THE ENGINEERING?</span><b>Explore the machine, visual doctrine, learning levels, and skill ladder</b></summary>
     <section className={styles.showcaseTabs} aria-label="Machine, process, and skill reference">
       <nav aria-label="Reference section">
         <button aria-pressed={showcaseTab === "machine"} onClick={() => setShowcaseTab("machine")}>THE MACHINE</button>
@@ -746,6 +772,7 @@ function ContractSelect({ save, startContract, learningLevel, setLearningLevel }
       {showcaseTab === "capability" && <div className={styles.disciplineRail}><span>PROCESS CAPABILITY / FICTIONAL ARCHETYPES</span><div><i className={styles.millGlyph}/><b>3-AXIS MILLING</b><small>PROFILE · POCKET · DATUM</small></div><div><i className={styles.turnGlyph}/><b>TURNING</b><small>OD · ID · GROOVE</small></div><div><i className={styles.axisGlyph}/><b>5-AXIS</b><small>VECTOR · TILT · BLEND</small></div><div><i className={styles.edmGlyph}/><b>WIRE EDM</b><small>CONTOUR · TAPER · SKIM</small></div></div>}
       {showcaseTab === "ladder" && <ShopSkillLadder save={save}/>}
     </section>
+    </details>
   </section>;
 }
 

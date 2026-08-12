@@ -19,7 +19,7 @@ test("server-renders the finished Project Toolpath game surface", async () => {
   assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
   const html = await response.text();
   assert.match(html, /<title>Project Toolpath \| Precision Manufacturing Game Prototype<\/title>/i);
-  assert.match(html, /PLAN THE CUT/);
+  assert.match(html, /THE CELL IS/);
   assert.match(html, /Emergency drive plate/);
   assert.match(html, /Flight rib prototype/);
   assert.match(html, /Sensor bracket/);
