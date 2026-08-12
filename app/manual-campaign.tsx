@@ -705,20 +705,22 @@ function ContractSelect({ save, startContract, learningLevel, setLearningLevel }
   return <section ref={selectRef} className={styles.select}>
     <div className={styles.selectIntro}>
       <div className={styles.heroCopy} data-reveal>
-        <p>DIRECTOR DEMO / MULTI-OPERATION VERTICAL SLICE</p>
-        <h1>PLAN THE CUT.<br/><em>PROVE THE QUALITY.</em></h1>
-        <span>Profile, pocket, drill, and finish in order. Match each tool to the operation it is rated for, then measure the part in the inspection bay before you disposition it.</span>
-        <div className={styles.heroActions}><button onClick={() => startContract(0)}><Play/> START FLAGSHIP CONTRACT</button><small>NO ACCOUNT · FICTIONAL TRAINING VALUES · KEYBOARD, MOUSE &amp; TOUCH</small></div>
+        <p>WELCOME TO YOUR FIRST SHIFT</p>
+        <h1>MAKE SOMETHING<br/><em>REMARKABLE.</em></h1>
+        <span>Learn precision machining by making a real part—one satisfying cut at a time. We’ll guide your first run, and you can reveal the engineering detail whenever you’re ready.</span>
+        <div className={styles.heroActions}><button onClick={() => startContract(0)}><Play/> START FIRST PART</button><small>NO ACCOUNT NEEDED · ABOUT 3 MINUTES · SAFE CREATIVE SIMULATION</small></div>
+        <div className={styles.welcomeSteps} aria-label="Your first shift in three steps"><span><b>1</b> Choose a tool</span><span><b>2</b> Shape the part</span><span><b>3</b> Check your work</span></div>
       </div>
       <figure className={styles.heroVisual} data-reveal>
         <img src="/assets/keyart/toolpath-cnc-keyart-v1.webp" alt="Carbide end mill over a fixtured aluminum plate inside a vertical machining center" fetchPriority="high"/>
         <FlagshipMachiningKit variant="full" cursor={{ x: 13.5, y: 7.5 }} spindle={false} completion={0} load={0} heat={20} condition={100} cameraMode="establishing" material="6061 AL" accent="#00aeef" verbose={false}/>
         <div className={styles.heroReticle} aria-hidden="true"><i/><i/><b>G54</b></div>
-        <div className={styles.heroVisualIndex} aria-hidden="true"><span>01</span><b>THE CUT</b><small>CONTROLLED ENERGY / VISIBLE EVIDENCE</small></div>
-        <figcaption><span>SHOP THRESHOLD / VMC CELL</span><b>6061 AL · CARBIDE · FLOOD COOLANT</b><small>KEY ART / REPRESENTATIVE GAME WORLD</small></figcaption>
+        <div className={styles.heroVisualIndex} aria-hidden="true"><span>01</span><b>YOUR FIRST PART</b><small>GUIDED · HANDS-ON · REPLAYABLE</small></div>
+        <figcaption><span>TRAINING CELL / READY</span><b>ALUMINUM · THREE-AXIS MILL</b><small>DRAG TO EXPLORE THE MACHINE</small></figcaption>
       </figure>
-      <dl className={styles.heroMetrics} data-reveal aria-label="Flagship experience signals"><div><dt>GEOMETRY</dt><dd>DATUM-DRIVEN</dd></div><div><dt>PROCESS</dt><dd>OPERATION-SEQUENCED</dd></div><div><dt>INSPECTION</dt><dd>EVIDENCE-GATED</dd></div><div><dt>RECOVERY</dt><dd>&lt; 3 SECOND RETRY</dd></div></dl>
+      <dl className={styles.heroMetrics} data-reveal aria-label="What to expect"><div><dt>LEARN</dt><dd>AS YOU PLAY</dd></div><div><dt>MAKE</dt><dd>THREE REAL PARTS</dd></div><div><dt>IMPROVE</dt><dd>WITH CLEAR FEEDBACK</dd></div><div><dt>RETRY</dt><dd>IN UNDER 3 SECONDS</dd></div></dl>
     </div>
+    <header className={styles.contractWelcome}><small>CHOOSE YOUR NEXT PART</small><h2>Start simple. Build confidence.</h2><p>Every contract teaches one new idea. The first is always open, and there’s no penalty for experimenting.</p></header>
     <div className={styles.contractGrid}>{MANUAL_CONTRACTS.map((contract, index) => {
       const visual = CONTRACT_VISUALS[contract.id];
       const best = save.bests[contract.id];
@@ -732,8 +734,9 @@ function ContractSelect({ save, startContract, learningLevel, setLearningLevel }
         <footer><span>{contract.par}S PAR</span><span>{contract.reward.toLocaleString()} CR</span><strong>{!unlocked ? <><LockKeyhole/> LOCKED</> : index === 0 ? "FLAGSHIP / ENTER CELL" : "ENTER CELL"} &rarr;</strong></footer>
       </button>;
     })}</div>
-    <div className={styles.principles}><span><b>01</b> PLAN THE OPERATIONS</span><span><b>02</b> MATCH TOOL TO CUT</span><span><b>03</b> MEASURE BEFORE RELEASE</span></div>
-    <div className={styles.publicSafety}><ShieldCheck/><span><b>SAFE PUBLIC DEMO</b>This is a creative game, not machine-operating guidance. It contains no real shop inventory, controller procedure, customer data, or production parameters.</span><ol><li><b>01</b> Start spindle</li><li><b>02</b> Sign off each operation</li><li><b>03</b> Inspect and disposition</li></ol></div>
+    <div className={styles.publicSafety}><ShieldCheck/><span><b>EXPLORE SAFELY</b>This is a creative game with fictional training values—not instructions for operating physical equipment.</span><ol><li>Guided first run</li><li>No account</li><li>Progress stays on this device</li></ol></div>
+    <details className={styles.advancedHome}>
+      <summary><span>CURIOUS ABOUT THE ENGINEERING?</span><b>Explore the machine, visual doctrine, learning levels, and skill ladder</b></summary>
     <section className={styles.showcaseTabs} aria-label="Machine, process, and skill reference">
       <nav aria-label="Reference section">
         <button aria-pressed={showcaseTab === "machine"} onClick={() => setShowcaseTab("machine")}>THE MACHINE</button>
@@ -748,6 +751,7 @@ function ContractSelect({ save, startContract, learningLevel, setLearningLevel }
       {showcaseTab === "capability" && <div className={styles.disciplineRail}><span>PROCESS CAPABILITY / FICTIONAL ARCHETYPES</span><div><i className={styles.millGlyph}/><b>3-AXIS MILLING</b><small>PROFILE · POCKET · DATUM</small></div><div><i className={styles.turnGlyph}/><b>TURNING</b><small>OD · ID · GROOVE</small></div><div><i className={styles.axisGlyph}/><b>5-AXIS</b><small>VECTOR · TILT · BLEND</small></div><div><i className={styles.edmGlyph}/><b>WIRE EDM</b><small>CONTOUR · TAPER · SKIM</small></div></div>}
       {showcaseTab === "ladder" && <ShopSkillLadder save={save}/>}
     </section>
+    </details>
   </section>;
 }
 

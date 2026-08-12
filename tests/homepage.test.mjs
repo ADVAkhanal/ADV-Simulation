@@ -56,12 +56,12 @@ test("root URL renders the hands-on machine floor", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /MULTI-OPERATION VERTICAL SLICE/);
-  assert.match(html, /START FLAGSHIP CONTRACT/);
-  assert.match(html, /SAFE PUBLIC DEMO/);
-  assert.match(html, /PLAN THE CUT/);
+  assert.match(html, /WELCOME TO YOUR FIRST SHIFT/);
+  assert.match(html, /START FIRST PART/);
+  assert.match(html, /EXPLORE SAFELY/);
+  assert.match(html, /MAKE SOMETHING/);
   assert.match(html, /toolpath-cnc-keyart-v1\.webp/);
-  assert.match(html, /SHOP THRESHOLD/);
+  assert.match(html, /TRAINING CELL/);
   assert.match(html, /Emergency drive plate/);
   assert.match(html, /Flight rib prototype/);
   assert.match(html, /Sensor bracket/);
@@ -126,7 +126,7 @@ test("global mode dock exposes both game surfaces", async () => {
   assert.match(manual, /LOCKOUT/);
   assert.match(manual, /LockKeyhole/);
   assert.match(manual, /REVIEW FINDINGS/);
-  assert.match(manual, /START FLAGSHIP CONTRACT/);
+  assert.match(manual, /START FIRST PART/);
   assert.match(manual, /FlagshipMachiningKit/);
   assert.match(manual, /SHARE RESULT CARD/);
   assert.match(manual, /COOLANT FIELD/);
