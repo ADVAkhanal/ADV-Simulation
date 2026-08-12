@@ -111,7 +111,17 @@ function proceduralShop(scene: THREE.Scene) {
   const gantryMat = new THREE.MeshStandardMaterial({ color: 0x11262b, roughness: .62, metalness: .66 });
   for (const x of [-510, 510]) { const column = new THREE.Mesh(new THREE.BoxGeometry(34, 670, 34), gantryMat); column.position.set(x, -76, -500); gantry.add(column); }
   const beam = new THREE.Mesh(new THREE.BoxGeometry(1054, 34, 34), gantryMat); beam.position.set(0, 246, -500); gantry.add(beam); scene.add(gantry);
-  return { slab, bays, lights, floorGrid, warmScreen };
+  const trolley = new THREE.Group();
+  const trolleyBody = new THREE.Mesh(new THREE.BoxGeometry(104, 44, 66), safetyYellow); trolleyBody.position.y = 222; trolley.add(trolleyBody);
+  const cable = new THREE.Mesh(new THREE.CylinderGeometry(3, 3, 220, 12), new THREE.MeshStandardMaterial({ color: 0x0b1012, roughness: .42, metalness: .8 })); cable.position.y = 98; trolley.add(cable);
+  const hook = new THREE.Mesh(new THREE.TorusGeometry(21, 5, 10, 20, Math.PI * 1.25), safetyYellow); hook.rotation.z = Math.PI; hook.position.y = -26; trolley.add(hook);
+  trolley.position.set(-260, 0, -500); scene.add(trolley);
+  const palletRail = new THREE.Group();
+  const railMat = new THREE.MeshStandardMaterial({ color: 0x284248, roughness: .58, metalness: .72 });
+  for (const z of [-42, 42]) { const rail = new THREE.Mesh(new THREE.BoxGeometry(470, 14, 12), railMat); rail.position.set(0, -394, z); palletRail.add(rail); }
+  for (let index = 0; index < 5; index += 1) { const roller = new THREE.Mesh(new THREE.CylinderGeometry(14, 14, 82, 12), steel); roller.rotation.x = Math.PI / 2; roller.position.set(-180 + index * 90, -379, 0); palletRail.add(roller); }
+  palletRail.position.set(0, 0, 350); scene.add(palletRail);
+  return { slab, bays, lights, floorGrid, warmScreen, trolley, cart, palletRail };
 }
 
 export default function ThreeMachiningStage(props: Props) {
@@ -378,6 +388,11 @@ export default function ThreeMachiningStage(props: Props) {
       shop.lights.material.emissiveIntensity = live.spindle ? 3.4 + live.load * .018 : 2.25 + Math.sin(now * .0011) * .18;
       shop.warmScreen.emissiveIntensity = live.spindle ? 2.45 + live.load * .018 : 1.45 + Math.sin(now * .0017) * .15;
       shop.floorGrid.material.opacity = live.spindle ? .58 : .42;
+      const shopMotion = live.spindle ? .00078 : .00021;
+      shop.trolley.position.x = Math.sin(now * shopMotion) * (live.spindle ? 260 : 92);
+      shop.trolley.position.y = Math.sin(now * shopMotion * 2.1) * 7;
+      shop.cart.rotation.y = Math.sin(now * .00028) * .014;
+      shop.palletRail.position.x = Math.sin(now * shopMotion * .6) * (live.spindle ? 34 : 11);
       if (toolCrib) toolCrib.rotation.y = .16 + Math.sin(now * .00032) * .006;
 
       if (stockBox && live.cells) {
