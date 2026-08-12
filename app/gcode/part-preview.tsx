@@ -1,49 +1,29 @@
 "use client";
-
+import { useEffect, useRef } from "react";
+import * as THREE from "three";
 import type { ToolPoint } from "./gcode-engine";
 import styles from "./part-preview.module.css";
-
 type Props = { points: ToolPoint[]; frame: number; accent: string; material: string; tool: number; passes: number; finalDepth: number };
+const clamp = (value:number,min:number,max:number) => Math.max(min, Math.min(max, value));
 
-const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
-
-function project(point: ToolPoint, depth = 0) {
-  const x = 128 + point.x * 8.1 - point.y * 3.25;
-  const y = 220 + point.x * 2.15 + point.y * 1.88 - depth * 15;
-  return `${x.toFixed(1)},${y.toFixed(1)}`;
-}
-
-export default function PartPreview({ points, frame, accent, material, tool, passes, finalDepth }: Props) {
-  const visible = points.slice(0, Math.max(1, frame));
-  const cut = visible.filter((point) => point.cut && point.z < 0);
-  const head = visible.at(-1) ?? points[0] ?? { x: 0, y: 0, z: 5, cut: false, line: 0, feed: 0 };
-  const liveDepth = clamp(Math.abs(head.z), 0, Math.abs(finalDepth));
-  const path = cut.map((point) => project(point, Math.abs(point.z))).join(" ");
-  const trace = points.filter((point) => point.cut && point.z < 0).map((point) => project(point, Math.abs(point.z))).join(" ");
-  const toolPoint = project(head, Math.max(0, liveDepth));
-  const completed = Math.round(cut.length / Math.max(1, points.filter((point) => point.cut).length) * 100);
-
-  return <div className={styles.preview} aria-label="Live isometric part preview generated from the current G-code path">
-    <svg viewBox="0 0 520 360" role="img" aria-label={`Machined ${material} part preview, ${completed}% complete`}>
-      <defs>
-        <linearGradient id="stock" x1="0" y1="0" x2="1" y2="1"><stop stopColor="#eff8fa"/><stop offset=".46" stopColor="#718b93"/><stop offset="1" stopColor="#23383f"/></linearGradient>
-        <linearGradient id="front" x1="0" y1="0" x2="0" y2="1"><stop stopColor="#506871"/><stop offset="1" stopColor="#122127"/></linearGradient>
-        <filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-        <clipPath id="top"><polygon points="128,220 452,306 323,354 0,267"/></clipPath>
-      </defs>
-      <g className={styles.grid} opacity=".52"><path d="M128 220 452 306 323 354 0 267Z"/><path d="M52 238 376 324M105 252 429 338M77 235 205 283M142 252 270 300M207 269 335 317"/></g>
-      <polygon className={styles.front} points="0,267 323,354 323,330 0,243"/>
-      <polygon className={styles.side} points="323,354 452,306 452,282 323,330"/>
-      <polygon className={styles.top} points="128,196 452,282 323,330 0,243"/>
-      <g clipPath="url(#top)">
-        <polyline className={styles.future} points={trace}/>
-        {path && <polyline className={styles.cut} points={path} style={{ stroke: accent }}/>} 
-      </g>
-      <g className={styles.tool} transform={`translate(${toolPoint})`} style={{ color: accent }}>
-        <line x1="0" y1="-78" x2="0" y2="-14"/><rect x="-10" y="-92" width="20" height="25" rx="3"/><circle r="12" cy="-5"/><circle r="4" cy="-5" fill="currentColor" filter="url(#glow)"/>
-      </g>
-      <g className={styles.callout}><text x="24" y="38">LIVE PART / SIM</text><text x="24" y="58">{material.toUpperCase()} · T{tool} · {passes} PASS</text><text x="24" y="327">Z {head.z.toFixed(2)} MM</text><text x="24" y="345">{completed}% TOOLPATH EXECUTED</text></g>
-    </svg>
-    <div className={styles.caption}><span><i style={{ background: accent }}/> CUT PATH</span><span>SCROLL PAGE NORMALLY</span></div>
-  </div>;
+export default function PartPreview(props: Props) {
+  const canvasRef = useRef<HTMLCanvasElement>(null), propsRef = useRef(props);
+  useEffect(() => { propsRef.current = props; }, [props]);
+  useEffect(() => {
+    const canvas = canvasRef.current; if (!canvas) return; let renderer: THREE.WebGLRenderer;
+    try { renderer = new THREE.WebGLRenderer({ canvas, antialias:true, alpha:false, powerPreference:"high-performance" }); } catch { return; }
+    renderer.outputColorSpace=THREE.SRGBColorSpace; renderer.toneMapping=THREE.ACESFilmicToneMapping; renderer.toneMappingExposure=1.25;
+    const scene=new THREE.Scene(); scene.background=new THREE.Color(0x03090b); scene.fog=new THREE.FogExp2(0x061418,.035);
+    const camera=new THREE.PerspectiveCamera(37,1,.1,100); scene.add(new THREE.HemisphereLight(0xdaf8ff,0x091114,2.1));
+    const key=new THREE.DirectionalLight(0xffffff,4.7); key.position.set(10,18,8); scene.add(key); const rim=new THREE.PointLight(0x19d8ff,15,34,2); rim.position.set(-10,7,-9); scene.add(rim);
+    const floor=new THREE.GridHelper(44,26,0x1d6675,0x102a31); floor.position.y=-2.8; (floor.material as THREE.Material).transparent=true; (floor.material as THREE.Material).opacity=.44; scene.add(floor);
+    const stock=new THREE.Mesh(new THREE.BoxGeometry(13,2.7,10),new THREE.MeshStandardMaterial({color:0x9ab7bf,metalness:.86,roughness:.27})); stock.position.y=-1.3; scene.add(stock); const edge=new THREE.LineSegments(new THREE.EdgesGeometry(stock.geometry),new THREE.LineBasicMaterial({color:0xdafaff,transparent:true,opacity:.6})); edge.position.copy(stock.position); scene.add(edge);
+    const traces=new THREE.Group(); scene.add(traces); const cutter=new THREE.Group(); const holder=new THREE.Mesh(new THREE.CylinderGeometry(.62,.72,2.8,18),new THREE.MeshStandardMaterial({color:0x1b3138,metalness:.9,roughness:.22})); holder.position.y=2.2; cutter.add(holder); const bit=new THREE.Mesh(new THREE.CylinderGeometry(.25,.35,2.6,12),new THREE.MeshStandardMaterial({color:0x7de6ff,metalness:.95,roughness:.16,emissive:0x07323e})); bit.position.y=-.42; cutter.add(bit); scene.add(cutter); const contact=new THREE.PointLight(0x6aeaff,0,10,2); scene.add(contact);
+    const drag={active:false,x:0,y:0,yaw:-.55,pitch:.45}; const down=(event:PointerEvent)=>{drag.active=true;drag.x=event.clientX;drag.y=event.clientY;canvas.setPointerCapture(event.pointerId);}; const move=(event:PointerEvent)=>{if(!drag.active)return;drag.yaw+=(event.clientX-drag.x)*.008;drag.pitch=clamp(drag.pitch+(event.clientY-drag.y)*.006,.12,1.08);drag.x=event.clientX;drag.y=event.clientY;}; const up=()=>{drag.active=false;}; canvas.addEventListener("pointerdown",down);canvas.addEventListener("pointermove",move);canvas.addEventListener("pointerup",up);canvas.addEventListener("pointercancel",up);
+    const resize=()=>{const rect=canvas.getBoundingClientRect();renderer.setPixelRatio(Math.min(devicePixelRatio||1,2));renderer.setSize(Math.max(1,rect.width),Math.max(1,rect.height),false);camera.aspect=Math.max(1,rect.width)/Math.max(1,rect.height);camera.updateProjectionMatrix();}; const observer=new ResizeObserver(resize);observer.observe(canvas);resize();let animation=0;
+    const draw=(time:number)=>{const live=propsRef.current,visible=live.points.slice(0,Math.max(1,live.frame)),done=visible.filter(point=>point.cut&&point.z<0),all=live.points.filter(point=>point.cut&&point.z<0);traces.clear();const line=(points:ToolPoint[],color:string,opacity:number)=>{if(points.length<2)return;const geo=new THREE.BufferGeometry().setFromPoints(points.map(point=>new THREE.Vector3((point.x-20)*.31,.12+point.z*.24,(point.y-20)*.31)));traces.add(new THREE.Line(geo,new THREE.LineBasicMaterial({color,transparent:true,opacity})));};line(all,"#17414d",.8);line(done,live.accent,1);const head=visible.at(-1)??live.points[0]??{x:0,y:0,z:4,cut:false,line:0,feed:0};cutter.position.set((head.x-20)*.31,.9+Math.max(head.z,-2.6)*.3,(head.y-20)*.31);cutter.rotation.y=time*.02;contact.position.copy(cutter.position);contact.position.y-=1.8;contact.color.set(live.accent);contact.intensity=head.cut?6:1.5;const radius=22;camera.position.set(Math.sin(drag.yaw)*Math.cos(drag.pitch)*radius,Math.sin(drag.pitch)*radius+1.5,Math.cos(drag.yaw)*Math.cos(drag.pitch)*radius);camera.lookAt(0,-1,0);renderer.render(scene,camera);animation=requestAnimationFrame(draw);};animation=requestAnimationFrame(draw);
+    return()=>{cancelAnimationFrame(animation);observer.disconnect();canvas.removeEventListener("pointerdown",down);canvas.removeEventListener("pointermove",move);canvas.removeEventListener("pointerup",up);canvas.removeEventListener("pointercancel",up);scene.traverse(object=>{if(object instanceof THREE.Mesh||object instanceof THREE.Line){object.geometry.dispose();const mats=Array.isArray(object.material)?object.material:[object.material];mats.forEach(mat=>mat.dispose());}});renderer.dispose();};
+  },[]);
+  const visible=props.points.slice(0,Math.max(1,props.frame)),head=visible.at(-1)??props.points[0],complete=Math.round(visible.filter(point=>point.cut).length/Math.max(1,props.points.filter(point=>point.cut).length)*100);
+  return <div className={styles.preview} aria-label="Live WebGL part preview generated from the current G-code path"><canvas ref={canvasRef} aria-label="Interactive 3D aluminum stock and cutter simulation. Drag to orbit; use normal page scrolling."/><div className={styles.readout}><b>LIVE WEBGL PART / SIM</b><span>{props.material} · T{props.tool} · {props.passes} PASS</span><span>Z {head?.z.toFixed(2)??"0.00"} MM · {complete}% EXECUTED</span></div><div className={styles.caption}><span><i style={{background:props.accent}}/> LIVE CUT PATH</span><span>DRAG TO ORBIT · SCROLL PAGE</span></div></div>;
 }
