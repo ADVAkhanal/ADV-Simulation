@@ -307,7 +307,7 @@ export default function ThreeMachiningStage(props: Props) {
       const liveCut = live.spindle && live.load > 4;
       if (liveCut && !wasCutting) firstCutAt = performance.now();
       wasCutting = liveCut;
-      const requestedMode: MachineCameraMode = mood === "failure" || mood === "critical" ? "failure" : live.spindle && live.load > 4 && performance.now() - firstCutAt < 2600 ? "macro" : live.cameraMode ?? (live.spindle ? "machining" : "operator");
+      const requestedMode: MachineCameraMode = mood === "failure" || mood === "critical" ? "failure" : live.sceneCue === "tool-change" ? "tool-change" : live.sceneCue === "inspection" ? "inspection" : live.spindle && live.load > 4 && performance.now() - firstCutAt < 2600 ? "macro" : live.cameraMode ?? (live.spindle ? "machining" : "operator");
       const preset = CAMERA_PRESETS[requestedMode];
       if (live.resetToken !== lastReset) { lastReset = live.resetToken; view.yaw = preset.yaw; view.pitch = preset.pitch; view.distance = preset.distance; view.target.copy(preset.target); }
       if (live.autoOrbit && live.inputMode !== "cut" && !matchMedia("(prefers-reduced-motion: reduce)").matches) view.yaw += dt * 0.045;
