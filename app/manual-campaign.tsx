@@ -68,9 +68,9 @@ const ROLE_LADDER = [
   { threshold: 250, level: "L3", role: "CNC PROGRAMMER ALIGNMENT", code: "O*NET 51-9162.00", focus: "Plan sequence · define paths · verify simulation", evidence: "250 best-run XP" },
 ] as const;
 const CONTRACT_VISUALS = {
-  drive: { artifact: "DRIVE INTERFACE", route: "PROFILE + BORE", stock: "PLATE / 18 MM", finish: "MILL / BRUSH", image: "/assets/2d/contracts/emergency-drive-plate-v1.webp" },
-  rib: { artifact: "LIGHTWEIGHT RIB", route: "WEBS + CONTOUR", stock: "PLATE / 22 MM", finish: "MILL / BLEND", image: "/assets/2d/contracts/orbital-structural-rib-v1.webp" },
-  bracket: { artifact: "OPTICAL BRACKET", route: "BOSS + DATUM", stock: "BLOCK / 32 MM", finish: "MILL / SATIN", image: "/assets/2d/contracts/sensor-bracket-v1.webp" },
+  drive: { artifact: "DRIVE INTERFACE", route: "PROFILE + BORE", stock: "PLATE / 18 MM", finish: "MILL / BRUSH", image: "/assets/2d/contracts/emergency-drive-plate-v2.webp" },
+  rib: { artifact: "LIGHTWEIGHT RIB", route: "WEBS + CONTOUR", stock: "PLATE / 22 MM", finish: "MILL / BLEND", image: "/assets/2d/contracts/orbital-structural-rib-v2.webp" },
+  bracket: { artifact: "OPTICAL BRACKET", route: "BOSS + DATUM", stock: "BLOCK / 32 MM", finish: "MILL / SATIN", image: "/assets/2d/contracts/sensor-bracket-v2.webp" },
 } as const;
 const TOUR_STEPS = [
   { code: "01", eyebrow: "NAVIGATION", title: "Three surfaces. One shop.", body: "Use the bottom dock to move between hands-on milling, G-code programming, and the 3D asset lab. Your current mode is always highlighted." },
@@ -685,12 +685,32 @@ function ContractSelect({ save, startContract, learningLevel, setLearningLevel }
   const lens = LEARNING_LENSES[learningLevel];
   const [showcaseTab, setShowcaseTab] = useState<ShowcaseTab>("machine");
   const selectRef = useRef<HTMLElement>(null);
+  const reducedMotion = useRef(false);
   useEffect(() => {
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    reducedMotion.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reducedMotion.current) return;
     const targets = selectRef.current?.querySelectorAll<HTMLElement>("[data-reveal]");
     if (!targets?.length) return;
     const entrance = animate(targets, { opacity: { from: 0 }, y: { from: 22 }, delay: stagger(85), duration: 720, ease: "out(3)" });
     return () => entrance.cancel();
+  }, []);
+
+  // Cursor-tracked tilt/parallax: mutate CSS custom properties directly on
+  // the hovered card rather than React state, so the card follows the
+  // pointer at full frame rate with zero re-renders.
+  const handleCardPointerMove = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    if (reducedMotion.current) return;
+    const card = event.currentTarget;
+    const rect = card.getBoundingClientRect();
+    const mx = ((event.clientX - rect.left) / rect.width - 0.5) * 2;
+    const my = ((event.clientY - rect.top) / rect.height - 0.5) * 2;
+    card.style.setProperty("--mx", mx.toFixed(3));
+    card.style.setProperty("--my", my.toFixed(3));
+  }, []);
+  const handleCardPointerLeave = useCallback((event: React.PointerEvent<HTMLButtonElement>) => {
+    const card = event.currentTarget;
+    card.style.setProperty("--mx", "0");
+    card.style.setProperty("--my", "0");
   }, []);
   return <section ref={selectRef} className={styles.select}>
     <div className={styles.selectIntro}>
@@ -708,11 +728,24 @@ function ContractSelect({ save, startContract, learningLevel, setLearningLevel }
       </figure>
       <dl className={styles.heroMetrics} data-reveal aria-label="Flagship experience signals"><div><dt>GEOMETRY</dt><dd>DATUM-DRIVEN</dd></div><div><dt>PROCESS</dt><dd>OPERATION-SEQUENCED</dd></div><div><dt>INSPECTION</dt><dd>EVIDENCE-GATED</dd></div><div><dt>RECOVERY</dt><dd>&lt; 3 SECOND RETRY</dd></div></dl>
     </div>
+    <figure className={styles.partsLineup} data-reveal aria-hidden="true">
+      <img src="/assets/keyart/toolpath-parts-lineup-v1.webp" alt="" loading="lazy"/>
+      <figcaption><span>SHOP FLOOR</span><b>AVAILABLE WORK</b></figcaption>
+    </figure>
     <div className={styles.contractGrid}>{MANUAL_CONTRACTS.map((contract, index) => {
       const visual = CONTRACT_VISUALS[contract.id];
       const best = save.bests[contract.id];
       const unlocked = index === 0 || MANUAL_CONTRACTS.slice(0, index).every((item) => save.cleared.includes(item.id));
-      return <button key={contract.id} data-contract={contract.id} style={{ "--card-accent": contract.color } as React.CSSProperties} onClick={() => startContract(index)}>
+      return <button
+        key={contract.id}
+        data-contract={contract.id}
+        data-flagship={index === 0 ? "true" : undefined}
+        style={{ "--card-accent": contract.color } as React.CSSProperties}
+        onClick={() => startContract(index)}
+        onPointerMove={handleCardPointerMove}
+        onPointerLeave={handleCardPointerLeave}
+      >
+        <i className={styles.cardShine} aria-hidden="true"/>
         <header><span>0{index + 1}</span><b>{save.cleared.includes(contract.id) ? "CLEARED" : unlocked ? "AVAILABLE" : "CHALLENGE"}</b>{best && <em style={{ color: contract.color }}>{deriveMasteryRank(best.score)} MASTERY · {best.score}</em>}</header>
         <div className={styles.geometry}><div className={styles.artifactPlate}><span>{visual.artifact}</span><b>{contract.program}</b></div><div className={styles.geometryPart}><img src={visual.image} alt="" loading="lazy"/><GeometryPreview contract={contract}/><i aria-hidden="true"/></div><div className={styles.geometryDatum} aria-hidden="true"><i/><b>G54</b><span>X0 Y0</span></div><div className={styles.geometrySpec}><span>{visual.route}</span><span>{visual.stock}</span><span>PROFILE ±{contract.tolerance}</span></div></div>
         <small>{contract.client}</small><h2>{contract.title}</h2><p>{contract.brief}</p>

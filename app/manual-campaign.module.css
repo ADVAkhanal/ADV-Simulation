@@ -63,6 +63,44 @@
 /* Guided tour: the page stays visible while the active system receives a clear focus ring. */
 .tourLayer{position:fixed;z-index:290;inset:0;pointer-events:none;background:linear-gradient(90deg,#00000018,#00000008)}.tourCard{position:absolute;right:28px;bottom:98px;width:min(430px,calc(100vw - 32px));padding:0;border:1px solid #6f8990;background:linear-gradient(145deg,#152429f7,#071013fa);box-shadow:0 30px 90px #000,0 0 0 1px #00aeef1c;pointer-events:auto;clip-path:polygon(0 0,calc(100% - 18px) 0,100% 18px,100% 100%,18px 100%,0 calc(100% - 18px))}.tourCard>header{height:48px;padding:0 16px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #3a5259;background:#0b171a}.tourCard>header span{color:var(--accent);font:850 12px var(--font-mono),monospace;letter-spacing:.14em}.tourCard>header button{width:30px;height:30px;display:grid;place-items:center;color:#9eb2b6;border:1px solid #415b62;background:#101f23;cursor:pointer}.tourCard>header button svg{width:14px}.tourCard>small{display:block;margin:24px 24px 0;color:var(--accent);font:850 12px var(--font-mono),monospace;letter-spacing:.15em}.tourCard h2{margin:10px 24px 14px;color:#edf6f7;font:880 34px/.95 var(--display),"Arial Narrow",sans-serif;letter-spacing:-.035em}.tourCard p{margin:0 24px;color:#a8b9bd;font-size:14px;line-height:1.65}.tourProgress{margin:22px 24px;display:grid;grid-template-columns:repeat(6,1fr);gap:6px}.tourProgress i{height:4px;background:#30474d}.tourProgress i[data-active="true"]{background:var(--accent);box-shadow:0 0 10px color-mix(in srgb,var(--accent) 55%,transparent)}.tourCard>footer{padding:14px 16px;display:grid;grid-template-columns:auto 1fr auto;gap:10px;align-items:center;border-top:1px solid #3a5259}.tourCard>footer button{height:38px;padding:0 13px;color:#b3c3c6;border:1px solid #40585f;background:#101e22;font:850 12px var(--font-mono),monospace;letter-spacing:.08em;cursor:pointer}.tourCard>footer button:disabled{opacity:.35;cursor:not-allowed}.tourCard>footer b{color:#627a80;font:750 12px var(--font-mono),monospace;text-align:center}.tourCard>footer .tourNext{color:#061014;border-color:var(--accent);background:var(--accent)}.shell[data-tour-step="0"] .header,.shell[data-tour-step="1"] .jobbar,.shell[data-tour-step="2"] .setup,.shell[data-tour-step="3"] .machine,.shell[data-tour-step="4"] .telemetry,.shell[data-tour-step="5"] .controls{position:relative;z-index:285;box-shadow:0 0 0 3px var(--accent),0 0 55px color-mix(in srgb,var(--accent) 38%,transparent)!important}.shell[data-tour-step="3"] .twinReview{z-index:286}
 @media(max-width:850px){.profile>span{display:none}.helpButton{width:34px;padding:0;justify-content:center;font-size:0}.helpButton svg{width:15px}.tourCard{right:16px;bottom:88px}.tourCard h2{font-size:29px}.tourCard p{font-size:13px}.tourCard>footer b{display:none}.tourCard>footer{grid-template-columns:1fr 1fr}.tourCard>footer button{width:100%}}
+
+/* Concept-art integration: atmosphere backdrop, parts-lineup banner, and a
+   real cursor-tracked tilt/glow/shine pass on the contract cards. Everything
+   here reads --mx/--my (set by JS in 0.1 steps on pointermove) and the
+   existing --card-accent var, so it composes with the tokens already in
+   use rather than introducing a second design language. */
+.select{background-image:linear-gradient(180deg,#05090bf6 0%,#05090bd2 38%,#05090bf8 100%),url(/assets/2d/environment/night-shift-factory-floor-v1.webp);background-size:cover;background-position:50% 30%;background-repeat:no-repeat}
+.partsLineup{position:relative;max-width:1500px;margin:0 auto 22px;overflow:hidden;border:1px solid #223136;filter:saturate(.88) brightness(.82)}
+.partsLineup img{display:block;width:100%;height:auto;max-height:180px;object-fit:cover;object-position:50% 42%}
+.partsLineup:after{content:"";position:absolute;inset:0;background:linear-gradient(90deg,#05090bf0 0%,transparent 22% 78%,#05090bf0 100%),linear-gradient(180deg,transparent 55%,#05090be6 100%)}
+.partsLineup figcaption{position:absolute;left:22px;bottom:14px;display:grid;color:#dbe7e9}
+.partsLineup figcaption span{color:var(--accent);font:800 12px var(--font-mono),monospace;letter-spacing:.2em}
+.partsLineup figcaption b{margin-top:3px;font-size:15px;letter-spacing:.04em}
+
+.contractGrid>button{position:relative;--mx:0;--my:0;transition:transform .45s cubic-bezier(.16,1,.3,1),border-color .2s,background .2s,box-shadow .45s}
+.contractGrid>button:hover,.contractGrid>button:focus-visible{transform:translateY(-12px) scale(1.045);box-shadow:0 30px 80px #000c,0 0 46px color-mix(in srgb,var(--card-accent) 32%,transparent),inset 0 0 0 1px color-mix(in srgb,var(--card-accent) 55%,transparent)}
+.cardShine{position:absolute;z-index:6;inset:0;overflow:hidden;pointer-events:none;opacity:0}
+.cardShine:before{content:"";position:absolute;top:-40%;bottom:-40%;left:-60%;width:45%;background:linear-gradient(100deg,transparent,#ffffff2e 45%,#ffffff4a 50%,#ffffff2e 55%,transparent);translate:0 0;rotate:8deg}
+.contractGrid>button:hover .cardShine,.contractGrid>button:focus-visible .cardShine{opacity:1}
+.contractGrid>button:hover .cardShine:before,.contractGrid>button:focus-visible .cardShine:before{animation:cardShineSweep .85s ease forwards}
+@keyframes cardShineSweep{from{translate:-20% 0}to{translate:260% 0}}
+.contractGrid>button:hover .geometryPart,.contractGrid>button:focus-visible .geometryPart{transform:perspective(900px) rotateX(calc(var(--my) * -9deg)) rotateY(calc(var(--mx) * 9deg)) translateY(-4px) translateZ(18px) scale(1.05);filter:brightness(1.16) saturate(1.08)}
+.contractGrid>button:hover .geometryPart img,.contractGrid>button:focus-visible .geometryPart img{translate:calc(var(--mx) * -6px) calc(var(--my) * -6px)}
+.contractGrid>button:hover .geometryDatum,.contractGrid>button:focus-visible .geometryDatum{box-shadow:0 0 30px color-mix(in srgb,var(--card-accent) 45%,transparent);scale:1.08}
+.geometryPart img{transition:translate .35s ease}
+.contractGrid>button[data-flagship="true"]{animation:flagshipPulse 3.6s ease-in-out infinite}
+@keyframes flagshipPulse{0%,100%{box-shadow:0 0 0 1px color-mix(in srgb,var(--card-accent) 25%,transparent),0 18px 46px #0007}50%{box-shadow:0 0 0 1px color-mix(in srgb,var(--card-accent) 55%,transparent),0 18px 46px #0007,0 0 38px color-mix(in srgb,var(--card-accent) 30%,transparent)}}
+.contractGrid>button[data-flagship="true"]:hover,.contractGrid>button[data-flagship="true"]:focus-visible{animation-play-state:paused}
+
+@media(max-width:760px){.partsLineup{display:none}.select{background-position:50% 20%}}
+@media(prefers-reduced-motion:reduce){
+  .contractGrid>button{transition:border-color .2s,background .2s}
+  .contractGrid>button:hover,.contractGrid>button:focus-visible{transform:none;box-shadow:0 22px 60px #0009}
+  .contractGrid>button:hover .geometryPart,.contractGrid>button:focus-visible .geometryPart{transform:rotateX(4deg) rotateZ(-1deg)}
+  .contractGrid>button:hover .geometryPart img,.contractGrid>button:focus-visible .geometryPart img{translate:0 0}
+  .cardShine,.cardShine:before{display:none}
+  .contractGrid>button[data-flagship="true"]{animation:none}
+}
 @media(min-width:1181px) and (max-width:1499px){.workspace{grid-template-columns:233px minmax(620px,1.618fr) 233px}}
 
 /* Game director: visible objectives, momentum, milestone callouts, keyboard language, and pause flow. */
