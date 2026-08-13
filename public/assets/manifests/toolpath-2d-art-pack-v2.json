@@ -6,6 +6,15 @@
   "runtimeFormat": "WebP",
   "assets": [
     {
+      "id": "contract.drive-plate.v2",
+      "source": "assets-src/2d/contracts/emergency-drive-plate-v2.png",
+      "path": "/assets/2d/contracts/emergency-drive-plate-v2.webp",
+      "width": 960,
+      "height": 640,
+      "bytes": 24304,
+      "sha256": "0F3F96169A68DB2C8EB9851D4C096F3CA59DFD72A0941467CA41E01FDF564DAA"
+    },
+    {
       "id": "contract.orbital-rib.v2",
       "source": "assets-src/2d/contracts/orbital-structural-rib-v2.png",
       "path": "/assets/2d/contracts/orbital-structural-rib-v2.webp",
@@ -13,6 +22,15 @@
       "height": 640,
       "bytes": 57500,
       "sha256": "BC6779BDAA45E96B5316E28B1F67B39C75D1B120C36628B786ADE7D69E28C0CB"
+    },
+    {
+      "id": "contract.sensor-bracket.v2",
+      "source": "assets-src/2d/contracts/sensor-bracket-v2.png",
+      "path": "/assets/2d/contracts/sensor-bracket-v2.webp",
+      "width": 960,
+      "height": 640,
+      "bytes": 26830,
+      "sha256": "082F8567D5DF2F183430246BBCE693E67AA431CC997B0A8F83654338AAE6669D"
     },
     {
       "id": "environment.night-shift-factory-floor",
@@ -31,34 +49,7 @@
       "height": 1024,
       "bytes": 150636,
       "sha256": "C13E6B8D9E296570A5F0544B13B597006D80B66CDDEC15FE6A409D6BA2AD69B7"
-    },
-    {
-      "id": "keyart.parts-lineup",
-      "source": "assets-src/keyart/toolpath-parts-lineup-v1.png",
-      "path": "/assets/keyart/toolpath-parts-lineup-v1.webp",
-      "width": 1920,
-      "height": 454,
-      "bytes": 65710,
-      "sha256": "8D97DB326CBFFE5FDE48B0BBCCFD03D63981E157D0185DE9CD527C6E06D95099"
-    },
-    {
-      "id": "contract.drive.v2",
-      "source": "assets-src/2d/contracts/emergency-drive-plate-v2.png",
-      "path": "/assets/2d/contracts/emergency-drive-plate-v2.webp",
-      "width": 960,
-      "height": 640,
-      "bytes": 24304,
-      "sha256": "0F3F96169A68DB2C8EB9851D4C096F3CA59DFD72A0941467CA41E01FDF564DAA"
-    },
-    {
-      "id": "contract.bracket.v2",
-      "source": "assets-src/2d/contracts/sensor-bracket-v2.png",
-      "path": "/assets/2d/contracts/sensor-bracket-v2.webp",
-      "width": 960,
-      "height": 640,
-      "bytes": 26830,
-      "sha256": "082F8567D5DF2F183430246BBCE693E67AA431CC997B0A8F83654338AAE6669D"
     }
   ],
-  "totalBytes": 441894
+  "totalBytes": 376184
 }

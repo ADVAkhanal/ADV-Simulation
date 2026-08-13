@@ -3,13 +3,15 @@
 import { useEffect, useRef, useState } from "react";
 import { trackAnonymous } from "./anonymous-analytics";
 import { MILL_COLS, MILL_ROWS, isManualTarget, type ManualContract } from "./manual-campaign-engine";
+import ThreeMachiningStage from "./three-machining-stage";
+import type { MachineCameraMode } from "./machining-visual-systems";
 import styles from "./flagship-machining-kit.module.css";
 
 type Vec3 = [number, number, number];
 type Mat4 = [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
 type Face = { vertices: [Vec3, Vec3, Vec3]; color: string; node: string; metallic: number; roughness: number };
 type Scene = { faces: Face[]; bytes: number };
-type Props = { cursor: { x: number; y: number }; spindle: boolean; completion: number; load: number; variant?: "mini" | "full"; material?: string; accent?: string; verbose?: boolean; cells?: Uint8Array; contractId?: ManualContract["id"]; toolpath?: Array<{ x: number; y: number }>; interactive?: boolean; toolId?: number };
+type Props = { cursor: { x: number; y: number }; spindle: boolean; completion: number; load: number; heat?: number; condition?: number; finishPenalty?: number; variant?: "mini" | "full" | "hero"; material?: string; accent?: string; verbose?: boolean; cells?: Uint8Array; contractId?: ManualContract["id"]; toolpath?: Array<{ x: number; y: number }>; interactive?: boolean; toolId?: number; cameraMode?: MachineCameraMode; datumVisible?: boolean; inspectionActive?: boolean; inputMode?: "orbit" | "cut"; soundEnabled?: boolean; sceneCue?: "idle" | "tool-change" | "inspection"; onToolInput?: (x: number, y: number, cutting: boolean) => void };
 type ViewState = { yaw: number; pitch: number; zoom: number; autoOrbit: boolean };
 
 // Node names for every cutting tool the Blender kit ships (see
@@ -240,16 +242,17 @@ export default function FlagshipMachiningKit(props: Props) {
   const reducedMotionRef = useRef(false);
   const [status, setStatus] = useState<"loading" | "ready" | "fallback">("loading");
   const [autoOrbit, setAutoOrbit] = useState(true);
-  propsRef.current = props;
-  viewRef.current.autoOrbit = autoOrbit;
+  const [resetToken, setResetToken] = useState(0);
+  useEffect(() => { propsRef.current = props; }, [props]);
+  useEffect(() => { viewRef.current.autoOrbit = autoOrbit; }, [autoOrbit]);
   useEffect(() => { reducedMotionRef.current = window.matchMedia("(prefers-reduced-motion: reduce)").matches; }, []);
   useEffect(() => {
     const controller = new AbortController();
     const forced = new URLSearchParams(location.search).has("assetFallback");
-    if (forced) { setStatus("fallback"); trackAnonymous("asset_fallback", { asset: "machining-kit-v1", reason: "forced" }); return () => controller.abort(); }
+    if (forced) { sceneRef.current = null; return () => controller.abort(); }
     fetch("/assets/workholding/toolpath-machining-kit-v1.glb", { signal: controller.signal }).then((response) => {
       if (!response.ok) throw new Error(`HTTP ${response.status}`); return response.arrayBuffer();
-    }).then(parseGlb).then((scene) => { sceneRef.current = scene; setStatus("ready"); trackAnonymous("asset_ready", { asset: "machining-kit-v1", kb: Math.round(scene.bytes / 1024) }); }).catch((reason: Error) => {
+    }).then(parseGlb).then((scene) => { sceneRef.current = scene; }).catch((reason: Error) => {
       if (reason.name === "AbortError") return;
       console.error("toolpath.asset_load_error", { assetId: "toolpath.machining-kit.v1", reason: reason.message });
       setStatus("fallback"); trackAnonymous("asset_fallback", { asset: "machining-kit-v1", reason: "load" });
@@ -261,13 +264,14 @@ export default function FlagshipMachiningKit(props: Props) {
     const render = (time: number) => { const canvas = canvasRef.current; if (canvas) draw(canvas, sceneRef.current, propsRef.current, status === "fallback", viewRef.current, time, reducedMotionRef.current); frame = requestAnimationFrame(render); };
     frame = requestAnimationFrame(render); return () => cancelAnimationFrame(frame);
   }, [status]);
-  const resetView = () => { viewRef.current = { yaw: -.72, pitch: -.42, zoom: 1, autoOrbit: true }; setAutoOrbit(true); trackAnonymous("twin_view_reset", { surface: props.variant ?? "mini" }); };
-  const draggable = props.variant === "full" || props.interactive === true;
-  return <aside className={`${styles.kit} ${props.variant === "full" ? styles.full : ""} ${draggable ? styles.interactive : ""}`} aria-label="Live 3D machining kit visualization">
-    <canvas ref={canvasRef} tabIndex={draggable ? 0 : -1} aria-label={draggable ? "Interactive 3D machine assembly. Drag to orbit and use the mouse wheel to zoom." : "Live 3D machine assembly preview"} onPointerDown={(event) => { if (!draggable) return; dragRef.current = { x: event.clientX, y: event.clientY }; event.currentTarget.setPointerCapture(event.pointerId); setAutoOrbit(false); }} onPointerMove={(event) => { const start = dragRef.current; if (!start || !draggable) return; viewRef.current.yaw += (event.clientX - start.x) * .008; viewRef.current.pitch = clamp(viewRef.current.pitch + (event.clientY - start.y) * .006, -.95, .2); dragRef.current = { x: event.clientX, y: event.clientY }; }} onPointerUp={() => { dragRef.current = null; }} onPointerCancel={() => { dragRef.current = null; }} onWheel={(event) => { if (!draggable) return; event.preventDefault(); viewRef.current.zoom = clamp(viewRef.current.zoom - event.deltaY * .001, .72, 1.55); }} onDoubleClick={resetView}/><div className={styles.label}><i className={status === "ready" ? styles.live : ""} style={status === "ready" && props.accent ? { background: props.accent, boxShadow: `0 0 12px ${props.accent}` } : undefined}/><span>MACHINING KIT V1</span><b>{status === "loading" ? "DECODING" : status === "ready" ? "LIVE GLB" : "SAFE FALLBACK"}</b></div>
+  const resetView = () => { viewRef.current = { yaw: -.72, pitch: -.42, zoom: 1, autoOrbit: true }; setResetToken((value) => value + 1); setAutoOrbit(true); trackAnonymous("twin_view_reset", { surface: props.variant ?? "mini" }); };
+  const draggable = props.variant === "full" || props.variant === "hero" || props.interactive === true;
+  return <aside className={`${styles.kit} ${props.variant === "full" ? styles.full : ""} ${props.variant === "hero" ? styles.hero : ""} ${draggable ? styles.interactive : ""}`} aria-label="Live 3D machining kit visualization">
+    {status !== "fallback" && <ThreeMachiningStage {...props} autoOrbit={autoOrbit} resetToken={resetToken} interactive={draggable} onReady={() => { setStatus("ready"); trackAnonymous("asset_ready", { asset: "machining-kit-v1", renderer: "three" }); }} onFailure={() => { setStatus("fallback"); trackAnonymous("asset_fallback", { asset: "machining-kit-v1", reason: "webgl" }); }}/>} 
+    {status === "fallback" && <canvas ref={canvasRef} tabIndex={draggable ? 0 : -1} aria-label="Safe canvas fallback for the interactive machining assembly" onPointerDown={(event) => { if (!draggable) return; dragRef.current = { x: event.clientX, y: event.clientY }; event.currentTarget.setPointerCapture(event.pointerId); setAutoOrbit(false); }} onPointerMove={(event) => { const start = dragRef.current; if (!start || !draggable) return; viewRef.current.yaw += (event.clientX - start.x) * .008; viewRef.current.pitch = clamp(viewRef.current.pitch + (event.clientY - start.y) * .006, -.95, .2); dragRef.current = { x: event.clientX, y: event.clientY }; }} onPointerUp={() => { dragRef.current = null; }} onPointerCancel={() => { dragRef.current = null; }} onWheel={(event) => { if (!draggable) return; event.preventDefault(); viewRef.current.zoom = clamp(viewRef.current.zoom - event.deltaY * .001, .72, 1.55); }} onDoubleClick={resetView}/>}<div className={styles.label}><i className={status === "ready" ? styles.live : ""} style={status === "ready" && props.accent ? { background: props.accent, boxShadow: `0 0 12px ${props.accent}` } : undefined}/><span>MACHINING KIT V2</span><b>{status === "loading" ? "INITIALIZING THREE.JS" : status === "ready" ? "LIVE WEBGL" : "SAFE FALLBACK"}</b></div>
     <div className={styles.signal}><span>{props.material ?? "XYZ BIND"}</span><b>{props.spindle ? "CUTTING" : "SAFE Z"}</b><em>{props.load}% LOAD</em></div>
     <div className={styles.signal}><span>{TOOL_LABEL_BY_ID[props.toolId ?? 1] ?? TOOL_LABEL_BY_ID[1]}</span><b>MOUNTED</b></div>
-    {props.verbose !== false && draggable && <div className={styles.renderSpec}><span>HIERARCHY</span><i/> <span>LIVE CUT FX</span><i/> <span>METAL PBR</span></div>}
-    {draggable && <div className={styles.orbitControls}><span>DRAG TO ORBIT · WHEEL TO ZOOM</span><button aria-pressed={autoOrbit} onClick={() => setAutoOrbit((value) => !value)}>{autoOrbit ? "PAUSE ORBIT" : "AUTO ORBIT"}</button><button onClick={resetView}>RESET VIEW</button></div>}
+    {props.verbose !== false && draggable && <div className={styles.renderSpec}><span>GLB HIERARCHY</span><i/> <span>LIVE CUT FX</span><i/> <span>METAL PBR</span></div>}
+    {draggable && props.inputMode !== "cut" && <div className={styles.orbitControls}><span>DRAG TO ORBIT · WHEEL TO ZOOM</span><button aria-pressed={autoOrbit} onClick={() => setAutoOrbit((value) => !value)}>{autoOrbit ? "PAUSE ORBIT" : "AUTO ORBIT"}</button><button onClick={resetView}>RESET VIEW</button></div>}
   </aside>;
 }

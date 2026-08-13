@@ -10,7 +10,7 @@
     "build": "node ./node_modules/vinext/dist/cli.js build",
     "factory": "node tools/game-factory.mjs",
     "start": "node ./node_modules/vinext/dist/cli.js start",
-    "test": "npm run build && node --test tests/homepage.test.mjs tests/rendered-html.test.mjs tests/gcode-engine.test.mjs tests/manual-campaign.test.mjs tests/glb-asset.test.mjs tests/machining-kit.test.mjs tests/tool-crib.test.mjs tests/2d-art-pack.test.mjs",
+    "test": "npm run build && node --test tests/homepage.test.mjs tests/rendered-html.test.mjs tests/gcode-engine.test.mjs tests/manual-campaign.test.mjs tests/glb-asset.test.mjs tests/machining-kit.test.mjs tests/tool-crib.test.mjs tests/2d-art-pack.test.mjs tests/turning-cell.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"
   },
@@ -23,7 +23,8 @@
     "react": "19.2.6",
     "react-dom": "19.2.6",
     "replicad": "^0.23.1",
-    "replicad-opencascadejs": "^0.23.0"
+    "replicad-opencascadejs": "^0.23.0",
+    "three": "^0.179.1"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "1.37.1",
@@ -31,6 +32,7 @@
     "@types/node": "22.19.19",
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
+    "@types/three": "^0.179.0",
     "@vitejs/plugin-react": "6.0.2",
     "@vitejs/plugin-rsc": "0.5.26",
     "drizzle-kit": "0.31.10",

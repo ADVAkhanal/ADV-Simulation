@@ -67,6 +67,11 @@ const ROLE_LADDER = [
   { threshold: 165, level: "L2", role: "MACHINIST / SETUP ALIGNMENT", code: "O*NET 51-4041.00", focus: "Read geometry · select tooling · control tolerance", evidence: "165 best-run XP" },
   { threshold: 250, level: "L3", role: "CNC PROGRAMMER ALIGNMENT", code: "O*NET 51-9162.00", focus: "Plan sequence · define paths · verify simulation", evidence: "250 best-run XP" },
 ] as const;
+const CELL_SIGNALS = [
+  { code: "CELL 01 / READY", message: "The spindle is parked. Your first part is waiting." },
+  { code: "WORKLIGHT / LIVE", message: "One controlled cut is enough to begin." },
+  { code: "G54 / LOCKED", message: "The part has a home. Now give it a shape." },
+] as const;
 const CONTRACT_VISUALS = {
   drive: { artifact: "DRIVE INTERFACE", route: "PROFILE + BORE", stock: "PLATE / 18 MM", finish: "MILL / BRUSH", image: "/assets/2d/contracts/emergency-drive-plate-v2.webp" },
   rib: { artifact: "LIGHTWEIGHT RIB", route: "WEBS + CONTOUR", stock: "PLATE / 22 MM", finish: "MILL / BLEND", image: "/assets/2d/contracts/orbital-structural-rib-v2.webp" },
@@ -134,13 +139,20 @@ export default function ManualCampaign() {
   const [soundOn, setSoundOn] = useState(true);
   const [learningLevel, setLearningLevel] = useState<LearningLevel>("easy");
   const [logOpen, setLogOpen] = useState(false);
-  const [viewMode, setViewMode] = useState<"map" | "twin">("map");
+  const [viewMode, setViewMode] = useState<"map" | "twin">("twin");
+  const [datumVisible, setDatumVisible] = useState(false);
+  const [immersiveHud, setImmersiveHud] = useState(true);
   const [tourStep, setTourStep] = useState<number | null>(null);
   const [paused, setPaused] = useState(false);
   const [combo, setCombo] = useState(0);
   const [bestCombo, setBestCombo] = useState(0);
   const [flowScore, setFlowScore] = useState(0);
   const [gameEvent, setGameEvent] = useState<GameEvent | null>(null);
+  const [sceneCue, setSceneCue] = useState<"idle" | "tool-change" | "inspection">("idle");
+  const [fixtureConfirmed, setFixtureConfirmed] = useState(false);
+  const [zeroConfirmed, setZeroConfirmed] = useState(false);
+  const [toolLengthConfirmed, setToolLengthConfirmed] = useState(false);
+  const [workOffsetError, setWorkOffsetError] = useState<0 | 2.5>(0);
 
   const contract = MANUAL_CONTRACTS[contractIndex];
   const operation = contract.operations[Math.min(operationIndex, contract.operations.length - 1)];
@@ -151,7 +163,9 @@ export default function ManualCampaign() {
   const readings = useMemo(() => buildManualMeasurements(material, finished, contract, overcut, finishPenalty, breaks), [breaks, contract, finishPenalty, finished, material, overcut]);
   const surfaceRa = clamp(.8 + finishPenalty * .42 + Math.max(0, feed - 85) * .025, .8, 12.5);
   const removalIndex = spindle ? Math.round(parseFloat(tool.diameter) * feed * Math.max(1, load) / 100) : 0;
-  const machinePosition = { x: cursor.x / (MILL_COLS - 1) * 240, y: cursor.y / (MILL_ROWS - 1) * 140 };
+  // The displayed machine coordinate is the physical location, including any deliberate G54 error.
+  // The target cursor remains the programmed coordinate so an incorrect zero is immediately legible.
+  const machinePosition = { x: clamp(cursor.x + workOffsetError, 0, MILL_COLS - 1) / (MILL_COLS - 1) * 240, y: cursor.y / (MILL_ROWS - 1) * 140 };
   const spindleRpm = contract.material.includes("Ti") ? 2380 : contract.material.includes("7075") ? 6120 : 7480;
   const programmedFeed = Math.round((contract.material.includes("Ti") ? 310 : contract.material.includes("7075") ? 780 : 940) * feed / 100);
   const chipLoad = programmedFeed / Math.max(1, spindleRpm * 3);
@@ -160,6 +174,7 @@ export default function ManualCampaign() {
   const mission = deriveManualMission(completion);
   const comboMultiplier = deriveFlowPoints(0, combo).multiplier;
   const toolCompatible = tool.operations.includes(operation.id);
+  const setupReady = fixtureConfirmed && zeroConfirmed && toolLengthConfirmed;
 
   useEffect(() => {
     let migrated = DEFAULT_MANUAL_SAVE;
@@ -333,6 +348,11 @@ export default function ManualCampaign() {
     eventTimerRef.current = window.setTimeout(() => setGameEvent(null), event.kind === "warning" ? 1800 : 2400);
   }, []);
 
+  const triggerSceneCue = useCallback((cue: "tool-change" | "inspection") => {
+    setSceneCue(cue);
+    window.setTimeout(() => setSceneCue("idle"), cue === "inspection" ? 1100 : 850);
+  }, []);
+
   const toolForOperation = (operationId: ManualOperationId) => Math.max(0, MILL_TOOLS.findIndex((item) => item.operations.includes(operationId)));
 
   const resetRun = useCallback((nextContract = contractIndex) => {
@@ -341,8 +361,8 @@ export default function ManualCampaign() {
     materialRef.current = freshStock; finishedRef.current = freshFinish; milestoneRef.current.clear();
     setContractIndex(nextContract); setOperationIndex(0); setToolIndex(toolForOperation(next.operations[0].id));
     setMaterial(freshStock); setFinished(freshFinish); setSpindle(false); setHeat(20); setCondition(100);
-    setLoad(0); setOvercut(0); setFixtureStrikes(0); setFinishPenalty(0); setBreaks(0); setElapsed(0); setCursor({ x: 3, y: 3 }); setResult(null); setShareStatus(""); setViewMode("map"); firstCutTracked.current = false; toolpathRef.current = []; setToolpath([]); chipsRef.current = [];
-    setMeasured({}); setInspectionMistakes(0); setSelectedCharacteristic(next.inspection[0].id); setInstrument(next.inspection[0].instrument);
+    setLoad(0); setOvercut(0); setFixtureStrikes(0); setFinishPenalty(0); setBreaks(0); setElapsed(0); setCursor({ x: 3, y: 3 }); setResult(null); setShareStatus(""); setViewMode("twin"); setDatumVisible(false); firstCutTracked.current = false; toolpathRef.current = []; setToolpath([]); chipsRef.current = [];
+    setMeasured({}); setInspectionMistakes(0); setSelectedCharacteristic(next.inspection[0].id); setInstrument(next.inspection[0].instrument); setFixtureConfirmed(false); setZeroConfirmed(false); setToolLengthConfirmed(false); setWorkOffsetError(0);
     comboRef.current = 0; setCombo(0); setBestCombo(0); setFlowScore(0); setPaused(false); setGameEvent(null);
   }, [contractIndex]);
 
@@ -357,6 +377,7 @@ export default function ManualCampaign() {
     const compatible = nextTool.operations.includes(operation.id);
     setLoad(0);
     setToolIndex(index);
+    setToolLengthConfirmed(false);
     setMessage(`SAFE TOOL CHANGE — T${nextTool.id} ${nextTool.name} selected. ${compatible ? nextTool.role : nextTool.limitation}`);
     trackAnonymous("manual_tool_change", { contract: contract.id, tool: nextTool.id, duringCycle: spindle });
   };
@@ -389,8 +410,9 @@ export default function ManualCampaign() {
 
   const cutAt = (x: number, y: number) => {
     setCursor({ x, y });
-    if (!spindle || condition <= 0 || paused || viewMode === "twin") return;
-    const cut = machineManualStock(materialRef.current, finishedRef.current, contract.id, operation.id, tool, x, y);
+    if (!spindle || condition <= 0 || paused) return;
+    const programmedX = clamp(x + workOffsetError, 0, MILL_COLS - 1);
+    const cut = machineManualStock(materialRef.current, finishedRef.current, contract.id, operation.id, tool, programmedX, y);
     if (!cut.compatible) { setLoad(0); setMessage(`T${tool.id} LOCKOUT — ${tool.name.toLowerCase()} cannot perform ${operation.label.toLowerCase()}.`); return; }
     if (!cut.engagement) { setLoad(0); if (cut.mismatch) setMessage(`${operation.label.toUpperCase()} ACTIVE — that stock belongs to another operation.`); return; }
     toolpathRef.current.push({ x, y }); toolpathRef.current = toolpathRef.current.slice(-320); setToolpath(toolpathRef.current);
@@ -455,15 +477,25 @@ export default function ManualCampaign() {
     });
   };
 
-  const restoreTool = () => { setCondition(100); setHeat(25); setSpindle(false); setMessage("Fresh cutter loaded. Verify the active operation before restart."); };
+  const moveToolFromTwin = (xRatio: number, yRatio: number, cutting: boolean) => {
+    const x = clamp(xRatio * (MILL_COLS - 1), 0, MILL_COLS - 1), y = clamp(yRatio * (MILL_ROWS - 1), 0, MILL_ROWS - 1);
+    if (cutting) cutAt(x, y); else setCursor({ x, y });
+  };
+
+  const restoreTool = () => { setCondition(100); setHeat(25); setSpindle(false); triggerSceneCue("tool-change"); tone(420, .11, "square", .018); setMessage("Fresh cutter loaded. Verify the active operation before restart."); };
 
   const toggleSpindle = () => {
-    if (viewMode === "twin") { setViewMode("map"); setMessage("CUT MAP ACTIVE — verify position, then start the cycle."); return; }
     if (condition <= 0) { restoreTool(); return; }
+    if (toolCompatible && !fixtureConfirmed) { setFixtureConfirmed(true); tone(350, .07, "sine", .018); setMessage("FIXTURE CONFIRMED - vise jaws and clamp margin are live."); return; }
+    if (toolCompatible && !zeroConfirmed) { setZeroConfirmed(true); setDatumVisible(true); tone(440, .07, "sine", .018); setMessage(workOffsetError ? "G54 CONFIRMED WITH A +2.5 CELL SHIFT - this can ruin the part." : "G54 ESTABLISHED - work zero is locked to the stock datum."); return; }
+    if (toolCompatible && !toolLengthConfirmed) { setToolLengthConfirmed(true); tone(520, .07, "sine", .018); setMessage(`T${tool.id} LENGTH VERIFIED - safe Z is armed.`); return; }
     if (!toolCompatible) { setMessage(`SETUP HOLD — choose a tool rated for ${operation.label.toLowerCase()}.`); return; }
+    if (!setupReady) { setMessage(`SETUP HOLD — ${!fixtureConfirmed ? "confirm fixture" : !zeroConfirmed ? "establish G54 work zero" : "confirm tool length"} before cycle start.`); return; }
     if (!spindle) { trackAnonymous("cycle_start", { contract: contract.id, feed, tool: tool.id }); tone(185, .14, "triangle", .032); window.setTimeout(() => tone(310, .09, "sine", .018), 70); } else tone(120, .09, "triangle", .018);
     setSpindle((value) => !value); setMessage(spindle ? "FEED HOLD — spindle stopped." : `${operation.label.toUpperCase()} LIVE — ${operation.instruction}`);
   };
+
+  const cycleAction = spindle ? "FEED HOLD" : condition <= 0 ? "CHANGE TOOL" : !toolCompatible ? "SELECT VALID TOOL" : !fixtureConfirmed ? "CONFIRM FIXTURE" : !zeroConfirmed ? "SET G54 ZERO" : !toolLengthConfirmed ? `VERIFY T${tool.id} LENGTH` : "CYCLE START";
 
   const advanceOperation = () => {
     if (operationProgress < operation.requiredProgress) { setMessage(`${operation.label.toUpperCase()} HOLD — reach ${operation.requiredProgress}% before signoff.`); return; }
@@ -474,7 +506,7 @@ export default function ManualCampaign() {
       setMessage(`${operation.label.toUpperCase()} SIGNED OFF — ${nextOperation.label.toLowerCase()} is now active.`);
     } else {
       setMeasured({}); setInspectionMistakes(0); setSelectedCharacteristic(contract.inspection[0].id); setInstrument(contract.inspection[0].instrument);
-      setViewMode("map"); setScreen("inspection"); setMessage("INSPECTION BAY — measure every characteristic, then disposition the part.");
+      setViewMode("map"); triggerSceneCue("inspection"); setScreen("inspection"); setMessage("INSPECTION BAY — measure every characteristic, then disposition the part.");
     }
   };
 
@@ -484,6 +516,7 @@ export default function ManualCampaign() {
     if (instrument !== reading.instrument) { setInspectionMistakes((value) => value + 1); setMessage(`NO VALID READING — ${reading.label.toLowerCase()} requires the ${reading.instrumentLabel.toLowerCase()}.`); return; }
     setMeasured((current) => ({ ...current, [reading.id]: reading }));
     setElapsed((value) => value + 2);
+    triggerSceneCue("inspection"); tone(reading.pass ? 520 : 135, .12, reading.pass ? "sine" : "sawtooth", .022);
     setMessage(`${reading.label.toUpperCase()} — ${reading.actual.toFixed(3)} ${reading.unit}, ${reading.pass ? "WITHIN" : "OUTSIDE"} ±${reading.tolerance.toFixed(2)}.`);
   };
 
@@ -550,7 +583,7 @@ export default function ManualCampaign() {
     if (condition >= 98 && heat <= 30) { setMessage("Cutter is already fresh and cool. No swap needed."); return; }
     if (save.credits < SWAP_TOOL_COST) { setMessage(`Not enough credits for a tool swap — need ${SWAP_TOOL_COST} CR.`); return; }
     setSave((current) => ({ ...current, credits: current.credits - SWAP_TOOL_COST }));
-    setCondition(100); setHeat(20);
+    setCondition(100); setHeat(20); triggerSceneCue("tool-change"); tone(420, .11, "square", .018);
     setMessage(`Cutter swapped for ${SWAP_TOOL_COST} CR — fresh edge, safe temperature.`);
     trackAnonymous("manual_tool_swap", { contract: contract.id, tool: tool.id, cost: SWAP_TOOL_COST });
   };
@@ -575,9 +608,10 @@ export default function ManualCampaign() {
         <div className={styles.jobstats}><span>OP <b>{operation.label.toUpperCase()}</b></span><span>MAT <b>{contract.material}</b></span><span>PAR <b>{contract.par}s</b></span><span>TOL <b>{contract.tolerance} cells</b></span></div>
       </section>
 
-      {screen === "inspection" ? <InspectionBay readings={readings} measured={measured} selectedCharacteristic={selectedCharacteristic} setSelectedCharacteristic={setSelectedCharacteristic} instrument={instrument} setInstrument={setInstrument} measureSelected={measureSelected} dispositionPart={dispositionPart} returnToCell={() => setScreen("play")}/> : <section className={styles.workspace}>
+      {screen === "inspection" ? <InspectionBay contract={contract} material={material} toolId={tool.id} finishPenalty={finishPenalty} readings={readings} measured={measured} selectedCharacteristic={selectedCharacteristic} setSelectedCharacteristic={setSelectedCharacteristic} instrument={instrument} setInstrument={setInstrument} measureSelected={measureSelected} dispositionPart={dispositionPart} returnToCell={() => setScreen("play")}/> : <section className={`${styles.workspace} ${immersiveHud ? styles.immersiveWorkspace : ""} ${setupReady ? styles.setupArmed : ""}`}>
         <aside className={styles.setup}>
           <div className={styles.panelTitle}><span>01</span><div><small>PROCESS PLAN</small><b>Sequence and tooling</b></div></div>
+          <section className={styles.setupGate} aria-label="Pre-cycle setup verification"><header><span>SETUP GATE</span><b>{setupReady ? "ARMED" : "HOLD"}</b></header><button aria-pressed={fixtureConfirmed} onClick={() => { setFixtureConfirmed((value) => !value); setMessage(fixtureConfirmed ? "Fixture verification cleared." : "Fixture confirmed — vise jaws and clamp margin are live."); }}>01 / FIXTURE {fixtureConfirmed ? "CONFIRMED" : "CONFIRM"}</button><button aria-pressed={zeroConfirmed} onClick={() => { setZeroConfirmed(true); setDatumVisible(true); setMessage(workOffsetError ? "G54 CONFIRMED WITH A +2.5 CELL SHIFT — this can ruin the part." : "G54 established at the stock datum."); }}>02 / G54 {zeroConfirmed ? workOffsetError ? "SHIFTED" : "SET" : "SET ZERO"}</button><button aria-pressed={Boolean(workOffsetError)} onClick={() => { setWorkOffsetError((value) => value ? 0 : 2.5); setZeroConfirmed(false); setMessage(workOffsetError ? "G54 nominal offset restored." : "Offset fault injected: confirm G54 to run the shifted program."); }}>G54 OFFSET {workOffsetError ? "+2.5 CELLS" : "NOMINAL"}</button><button aria-pressed={toolLengthConfirmed} onClick={() => { if (!toolCompatible) { setMessage(`Tool length cannot be confirmed: T${tool.id} is not rated for ${operation.label.toLowerCase()}.`); return; } setToolLengthConfirmed((value) => !value); setMessage(toolLengthConfirmed ? "Tool length check cleared." : `T${tool.id} length verified at safe Z.`); }}>03 / T{tool.id} LENGTH {toolLengthConfirmed ? "VERIFIED" : "VERIFY"}</button></section>
           <div className={styles.operationList}>{contract.operations.map((item, index) => {
             const progress = manualOperationProgress(material, finished, contract.id, item.id);
             return <div key={item.id} className={index < operationIndex ? styles.operationDone : index === operationIndex ? styles.operationActive : ""}><span>0{index + 1}</span><div><b>{item.label}</b><small>{index < operationIndex ? "SIGNED OFF" : index === operationIndex ? `${progress}% / ${item.requiredProgress}% required` : "LOCKED"}</small></div><em>{index < operationIndex ? "✓" : `${progress}%`}</em></div>;
@@ -596,24 +630,24 @@ export default function ManualCampaign() {
         </aside>
 
         <article className={styles.machine}>
-          <div className={styles.machineHead}><span><i/> VMC-01 / MULTI-OP TRAINING CELL</span><span>G54 / 240 × 140 × 18 MM</span><div className={styles.viewSwitch} aria-label="Machine viewport mode"><button aria-pressed={viewMode === "map"} onClick={() => setViewMode("map")}>CUT MAP</button><button aria-pressed={viewMode === "twin"} onClick={() => { setSpindle(false); setLoad(0); setViewMode("twin"); setMessage("3D TWIN — spindle held at safe Z for visual review."); trackAnonymous("view_3d_twin", { contract: contract.id, completion }); }}>3D TWIN</button></div><span>PROGRAM <b>{contract.program}</b></span></div>
+          <div className={styles.machineHead}><span><i className={spindle ? styles.machineLive : ""}/> VMC-01 / LIVE MACHINING CELL</span><div className={styles.viewSwitch} aria-label="Machine viewport mode"><button aria-pressed={viewMode === "twin"} onClick={() => { setViewMode("twin"); setMessage("3D MACHINING VIEW — drag over the stock to guide the cutter."); trackAnonymous("view_3d_cut", { contract: contract.id }); }}>3D CUT</button><button aria-pressed={viewMode === "map"} onClick={() => { setViewMode("map"); trackAnonymous("view_process_map", { contract: contract.id }); }}>PROCESS MAP</button><button aria-pressed={datumVisible} onClick={() => { setDatumVisible((value) => !value); setMessage("G54 DATUM — stock origin, axes, and work plane are spatially linked."); trackAnonymous("view_g54_datum", { contract: contract.id, visible: !datumVisible }); }}>G54</button><button aria-pressed={immersiveHud} onClick={() => { setImmersiveHud((value) => !value); trackAnonymous("view_hud_mode", { contract: contract.id, mode: immersiveHud ? "control" : "cell" }); }}>{immersiveHud ? "TECHNICAL VIEW" : "GAME VIEW"}</button></div><span>PROGRAM <b>{contract.program}</b></span></div>
           <div className={styles.viewport}>
-            <canvas ref={canvasRef} width={1120} height={640} aria-label={`Interactive ${operation.label.toLowerCase()} operation`} onPointerDown={(event) => { dragging.current = true; event.currentTarget.setPointerCapture(event.pointerId); millAt(event.clientX, event.clientY); }} onPointerMove={(event) => dragging.current ? millAt(event.clientX, event.clientY) : moveCursor(event.clientX, event.clientY)} onPointerUp={() => { dragging.current = false; setLoad(0); }} onPointerCancel={() => { dragging.current = false; setLoad(0); }}/>
-            {learningLevel !== "easy" && <div className={styles.coordinates}><small>G54 POSITION / MM</small><b>X {machinePosition.x.toFixed(2)}</b><b>Y {machinePosition.y.toFixed(2)}</b><b>Z {spindle ? "-1.80" : "+4.00"}</b></div>}
+            <canvas className={viewMode === "map" ? styles.mapVisible : styles.mapHidden} ref={canvasRef} width={1120} height={640} aria-label={`Interactive ${operation.label.toLowerCase()} process map`} onPointerDown={(event) => { dragging.current = true; event.currentTarget.setPointerCapture(event.pointerId); millAt(event.clientX, event.clientY); }} onPointerMove={(event) => dragging.current ? millAt(event.clientX, event.clientY) : moveCursor(event.clientX, event.clientY)} onPointerUp={() => { dragging.current = false; setLoad(0); }} onPointerCancel={() => { dragging.current = false; setLoad(0); }}/>
+            {viewMode === "twin" && <FlagshipMachiningKit variant="hero" cursor={cursor} spindle={spindle} completion={completion} load={load} heat={heat} condition={condition} finishPenalty={finishPenalty} material={contract.material} accent={contract.color} verbose={learningLevel !== "easy"} cells={material} contractId={contract.id} toolpath={toolpath} toolId={tool.id} cameraMode={datumVisible ? "datum" : spindle ? "machining" : "operator"} datumVisible={datumVisible} inputMode="cut" soundEnabled={soundOn} sceneCue={sceneCue} onToolInput={moveToolFromTwin} interactive/>}
+            {learningLevel !== "easy" && <div className={styles.coordinates}><small>G54 POSITION / MM</small><b>X {machinePosition.x.toFixed(2)}</b><b>Y {machinePosition.y.toFixed(2)}</b><b>Z {spindle ? "-1.80" : "+4.00"}</b>{workOffsetError > 0 && <em>OFFSET +{workOffsetError.toFixed(1)} CELLS</em>}</div>}
             <div className={styles.processPlate}><small>PROCESS ESTIMATE / SIM</small><span><b>S</b>{spindleRpm.toLocaleString()} RPM</span><span><b>F</b>{programmedFeed} MM/MIN</span>{learningLevel !== "easy" && <span><b>Ra</b>{surfaceRa.toFixed(1)} µm</span>}{learningLevel === "hard" && <><span><b>fz</b>{chipLoad.toFixed(3)} MM</span><span><b>ae</b>{engagementAngle}°</span><span><b>MRR</b>{removalIndex}</span><span><b>WCS</b>G54</span><span><b>OP</b>{operation.label.toUpperCase()}</span></>}</div>
             <section className={styles.missionHud} aria-label="Active mission objective"><header><Target/><span>PRIMARY OBJECTIVE / 0{mission.step}</span><b>{completion}% / {mission.target}%</b></header><h3>{mission.title}</h3><p>{mission.detail}</p><i><em style={{ width: `${Math.min(100, completion / mission.target * 100)}%` }}/></i></section>
             {learningLevel !== "easy" && <div className={styles.flowHud} data-active={combo > 1}><Zap/><span>FLOW</span><strong>×{comboMultiplier.toFixed(2)}</strong><small>{combo} CHAIN · {flowScore.toLocaleString()} PTS</small></div>}
             {gameEvent && <div key={gameEvent.id} className={styles.gameEvent} data-kind={gameEvent.kind} role="status"><Sparkles/><span>{gameEvent.kind === "warning" ? "PROCESS WARNING" : "MISSION UPDATE"}</span><strong>{gameEvent.title}</strong><small>{gameEvent.detail}</small></div>}
             <div className={styles.legend}><span><i className={styles.keep}/> PART</span><span><i className={styles.waste}/> ACTIVE OP</span><span><i className={styles.damage}/> OVERCUT</span><span><i className={styles.fixtureSwatch}/> VISE CLAMP</span></div>
             {!spindle && <div className={styles.prompt}><Crosshair/><b>{operationProgress ? "OPERATION PAUSED" : `${operation.label.toUpperCase()} SETUP`}</b><span>{operation.instruction}</span></div>}
-            <FlagshipMachiningKit cursor={cursor} spindle={spindle} completion={completion} load={load} material={contract.material} accent={contract.color} verbose={learningLevel !== "easy"} cells={material} contractId={contract.id} toolpath={toolpath} toolId={tool.id} interactive/>
-            {viewMode === "twin" && <section className={styles.twinReview} aria-label="Full-frame 3D machining twin review"><FlagshipMachiningKit cursor={cursor} spindle={false} completion={completion} load={load} variant="full" material={contract.material} accent={contract.color} verbose={learningLevel !== "easy"} cells={material} contractId={contract.id} toolpath={toolpath} toolId={tool.id}/><div className={styles.twinTitle}><small>DIGITAL TWIN / VISUAL REVIEW</small><b>FIXTURE + TOOL + STOCK</b><span>LIVE GLB / SAFE Z</span></div><div className={styles.twinCoordinates}><span>X <b>{machinePosition.x.toFixed(2)}</b></span><span>Y <b>{machinePosition.y.toFixed(2)}</b></span><span>Z <b>+4.00</b></span><small>G54 / MM</small></div><div className={styles.twinProgress}><span>STOCK REMOVAL</span><strong>{completion}%</strong><i><em style={{ width: `${completion}%` }}/></i><div><small>TOOL</small><b>T{tool.id} / {tool.diameter}</b><small>FIXTURE</small><b>VISE / PARALLELS</b><small>STATE</small><b>REVIEW HOLD</b></div></div><div className={styles.twinCallouts} aria-hidden="true"><span className={styles.twinSpindle}>01 / SPINDLE BODY</span><span className={styles.twinTool}>02 / CUTTER CENTER</span><span className={styles.twinStock}>03 / STOCK ENVELOPE</span><span className={styles.twinFixture}>04 / FIXTURE STACK</span></div><button className={styles.returnMap} onClick={() => { setViewMode("map"); setMessage("CUT MAP ACTIVE — resume from the recorded tool position."); }}>RETURN TO CUT MAP <Crosshair/></button></section>}
+            {viewMode === "twin" && <div className={styles.cinematicState} data-state={condition <= 0 ? "failure" : load > 92 ? "critical" : load > 78 ? "warning" : spindle ? "cutting" : "ready"}><small>{datumVisible ? "DATUM SYSTEM / G54" : spindle ? "CUTTING SYSTEM / LIVE" : "MACHINE SYSTEM / READY"}</small><b>{condition <= 0 ? "EDGE FAILURE" : load > 92 ? "LOAD CRITICAL" : load > 78 ? "PROCESS STRAIN" : spindle ? "MAKE THE PART." : "PROTECT THE EDGE."}</b><span>{datumVisible ? "Work origin and stock plane revealed" : spindle ? "The tool head plunges into the lit work envelope; drag across stock to cut." : "Cycle start to close the guard and bring the tool into the work envelope."}</span></div>}
             {showCoach && <div className={styles.coach} role="dialog" aria-label="First run briefing"><small>FIRST CUT / 20 SECONDS</small><b>SILVER GOES. CYAN STAYS.</b><ol><li>Press cycle start.</li><li>Drag through silver stock.</li><li>Sign off each operation, then inspect.</li></ol><button onClick={() => { localStorage.setItem("toolpath-first-run-complete-v1", "yes"); setShowCoach(false); cycleButtonRef.current?.focus(); }}>I&apos;M READY</button></div>}
           </div>
           <div className={styles.controls}>
-            <button ref={cycleButtonRef} className={spindle ? styles.hold : styles.start} onClick={toggleSpindle}>{spindle ? <Pause/> : <Play/>}<span>{viewMode === "twin" ? "RETURN TO MAP" : spindle ? "FEED HOLD" : condition <= 0 ? "CHANGE TOOL" : !toolCompatible ? "SELECT VALID TOOL" : "CYCLE START"}</span></button>
+            <button ref={cycleButtonRef} className={spindle ? styles.hold : styles.start} onClick={toggleSpindle}>{spindle ? <Pause/> : <Play/>}<span>{cycleAction}</span></button>
             <div className={styles.timeline}><i style={{ width: `${operationProgress}%` }}/><span>{operation.label.toUpperCase()} {operationProgress}% / OVERALL {completion}%</span></div>
-            <button className={styles.inspect} onClick={advanceOperation}><ScanLine/> {operationIndex < contract.operations.length - 1 ? "SIGN OFF OP" : "OPEN INSPECTION"}</button>
+            {operationProgress >= operation.requiredProgress ? <button className={styles.inspect} onClick={advanceOperation}><ScanLine/> {operationIndex < contract.operations.length - 1 ? "SIGN OFF OP" : "OPEN INSPECTION"}</button> : <span className={styles.actionHint}>CLEAR {operation.requiredProgress - operationProgress}% MORE TO UNLOCK SIGN-OFF</span>}
           </div>
           <div className={styles.message} role="status"><Activity/>{message}<span className={styles.keyHints}><kbd>WASD</kbd> MOVE <kbd>SPACE</kbd> SPINDLE <kbd>I</kbd> SIGN OFF <kbd>ESC</kbd> PAUSE</span>{retryMs !== null && <b className={retryMs < 3000 ? styles.readyFast : styles.readySlow}>RESET READY {retryMs}MS</b>}</div>
         </article>
@@ -634,6 +668,7 @@ export default function ManualCampaign() {
     {screen === "result" && result && <section className={styles.resultBackdrop}>
       <article className={styles.resultCard} data-verdict={result.accepted ? "accepted" : "hold"}>
         <div className={styles.resultHero}><div className={styles.rank}><Award/><span>{result.disposition === "scrap" ? "SCRAP DECISION CONFIRMED" : result.accepted ? "INSPECTION ACCEPTED" : "INSPECTION HOLD"}</span><strong>{result.disposition === "scrap" ? "X" : result.rank}</strong><small>{result.score} / 100</small></div><section className={styles.inspectionMap} aria-label="Simulated dimensional inspection visualization"><header><span>CMM PROFILE REPORT / SIM</span><b>{contract.program}</b><i>{result.accepted ? "RELEASE" : "REWORK"}</i></header><div className={styles.inspectionGeometry}><GeometryPreview contract={contract}/><i className={styles.inspectionX}/><i className={styles.inspectionY}/><span>G54</span><b>PROFILE TRACE<br/>240 × 140 MM FIELD</b></div><div className={styles.deviationBands}>{inspectionBands.map((band) => <div key={band.label}><span>{band.label}</span><i><em style={{ width: `${clamp(band.value, 0, 100)}%` }}/></i><b>{band.reading}</b></div>)}</div><footer><span>MAT <b>{contract.material}</b></span><span>WCS <b>G54</b></span><span>TOOL <b>T{tool.id}</b></span><span>TRACE <b>{result.accepted ? "IN BAND" : "OUT OF BAND"}</b></span></footer></section></div>
+        <section className={styles.resultReleaseScene} aria-label="Three-dimensional release view of the completed machining cell"><FlagshipMachiningKit variant="full" cursor={cursor} spindle={false} completion={completion} load={0} heat={20} condition={100} finishPenalty={finishPenalty} material={contract.material} accent={result.accepted ? "#72f6b6" : "#ff6b75"} cells={material} contractId={contract.id} toolpath={toolpath} toolId={tool.id} cameraMode="release" verbose={false}/><div><small>{result.accepted ? "PART RELEASE / 3D CELL" : "PART HOLD / 3D REVIEW"}</small><b>{result.accepted ? "THE PART LEAVES THE CELL." : "THE CELL REMEMBERS THE MISS."}</b><span>{result.accepted ? "Orbit the finished setup. Your exact toolpath is preserved above the stock." : "Review the finished state, then return for a controlled recovery."}</span></div></section>
         <div className={styles.resultData}><div><span>GEOMETRY</span><b>{result.geometry}/46</b><small>{result.completion}% waste cleared</small></div><div><span>PRECISION</span><b>{result.precision}/30</b><small>{overcut}/{contract.tolerance} overcut cells</small></div><div><span>FINISH</span><b>{result.finish}/14</b><small>{finishPenalty.toFixed(1)} risk index</small></div><div><span>INSPECTION</span><b>{result.inspection}/10</b><small>{inspectionMistakes} inspection mistakes</small></div></div>
         <div className={styles.scoreProof}><span>SCORE PROOF</span><code>{result.geometry} + {result.precision} + {result.finish} + {result.time} + {result.inspection} − {result.breakPenalty} = <b>{result.score}</b></code><i>{result.completion >= 90 ? "✓" : "×"} COMPLETION ≥90%</i><i>{overcut <= contract.tolerance ? "✓" : "×"} OVERCUT ≤{contract.tolerance}</i><i>{fixtureStrikes === 0 ? "✓" : "×"} NO FIXTURE STRIKES</i></div>
         <div className={styles.runSignature}><Gamepad2/><span>RUN SIGNATURE</span><b>{flowScore.toLocaleString()} FLOW PTS</b><i>BEST CHAIN ×{bestCombo}</i><small>Flow rewards controlled consecutive cuts; it never changes the inspection grade.</small></div>
@@ -650,7 +685,11 @@ export default function ManualCampaign() {
   </main>;
 }
 
-function InspectionBay({ readings, measured, selectedCharacteristic, setSelectedCharacteristic, instrument, setInstrument, measureSelected, dispositionPart, returnToCell }: {
+function InspectionBay({ contract, material, toolId, finishPenalty, readings, measured, selectedCharacteristic, setSelectedCharacteristic, instrument, setInstrument, measureSelected, dispositionPart, returnToCell }: {
+  contract: ManualContract;
+  material: Uint8Array;
+  toolId: number;
+  finishPenalty: number;
   readings: ManualMeasurement[];
   measured: Record<string, ManualMeasurement>;
   selectedCharacteristic: string;
@@ -673,7 +712,7 @@ function InspectionBay({ readings, measured, selectedCharacteristic, setSelected
     <header><div><small>QUALITY GAMEPLAY / FICTIONALIZED VALUES</small><h1>ACTIVE INSPECTION</h1><p>Select each characteristic, choose a suitable instrument, reveal the tolerance result, then accept, rework, or scrap.</p></div><button onClick={returnToCell}>← RETURN TO CELL</button></header>
     <div className={styles.inspectionGrid}>
       <aside className={styles.characteristics}><h2>01 / CHARACTERISTICS</h2>{readings.map((reading, index) => <button key={reading.id} className={active.id === reading.id ? styles.inspectionActive : ""} onClick={() => { setSelectedCharacteristic(reading.id); setInstrument(reading.instrument); }}><span>0{index + 1}</span><div><b>{reading.label}</b><small>0.000 ± {reading.tolerance.toFixed(2)} {reading.unit}</small></div><em>{measured[reading.id] ? measured[reading.id].pass ? "PASS" : "FAIL" : "OPEN"}</em></button>)}</aside>
-      <article className={styles.measurementStation}><div className={styles.panelTitle}><span>02</span><div><small>MEASUREMENT PLAN</small><b>{active.label}</b></div></div><div className={styles.toleranceBand}><span>LOWER<br/><b>{(-active.tolerance).toFixed(2)}</b></span><div><i style={{ left: revealed ? `${clamp(50 + revealed.actual / active.tolerance * 46, 2, 98)}%` : "50%" }}/><em/></div><span>UPPER<br/><b>+{active.tolerance.toFixed(2)}</b></span></div><div className={styles.readout}><small>OBSERVED DEVIATION</small><strong>{revealed ? `${revealed.actual.toFixed(3)} ${revealed.unit}` : "---.---"}</strong><span className={revealed ? revealed.pass ? styles.pass : styles.fail : ""}>{revealed ? revealed.pass ? "WITHIN TOLERANCE" : "OUT OF TOLERANCE" : "NO READING"}</span></div><h3>SELECT INSTRUMENT</h3><div className={styles.instrumentGrid}>{instruments.map((item) => <button key={item.id} className={instrument === item.id ? styles.inspectionActive : ""} onClick={() => setInstrument(item.id)}><b>{item.label}</b><small>{item.use}</small></button>)}</div><button className={styles.measureButton} onClick={measureSelected}><ScanLine/> CAPTURE READING</button></article>
+      <article className={styles.measurementStation}><div className={styles.panelTitle}><span>02</span><div><small>MEASUREMENT PLAN</small><b>{active.label}</b></div></div><div className={styles.inspectionTwin}><FlagshipMachiningKit variant="full" cursor={{ x: 13.5, y: 7.5 }} spindle={false} completion={manualCompletion(material, contract.id)} load={0} heat={20} condition={100} finishPenalty={finishPenalty} material={contract.material} accent={contract.color} cells={material} contractId={contract.id} toolId={toolId} cameraMode="inspection" inspectionActive datumVisible interactive/><div><small>METROLOGY MODE</small><b>SCANNING {active.label.toUpperCase()}</b><span>{revealed ? revealed.pass ? "DEVIATION IN BAND" : "DEVIATION OUT OF BAND" : "SELECT INSTRUMENT · CAPTURE READING"}</span></div></div><div className={styles.toleranceBand}><span>LOWER<br/><b>{(-active.tolerance).toFixed(2)}</b></span><div><i style={{ left: revealed ? `${clamp(50 + revealed.actual / active.tolerance * 46, 2, 98)}%` : "50%" }}/><em/></div><span>UPPER<br/><b>+{active.tolerance.toFixed(2)}</b></span></div><div className={styles.readout}><small>OBSERVED DEVIATION</small><strong>{revealed ? `${revealed.actual.toFixed(3)} ${revealed.unit}` : "---.---"}</strong><span className={revealed ? revealed.pass ? styles.pass : styles.fail : ""}>{revealed ? revealed.pass ? "WITHIN TOLERANCE" : "OUT OF TOLERANCE" : "NO READING"}</span></div><h3>SELECT INSTRUMENT</h3><div className={styles.instrumentGrid}>{instruments.map((item) => <button key={item.id} className={instrument === item.id ? styles.inspectionActive : ""} onClick={() => setInstrument(item.id)}><b>{item.label}</b><small>{item.use}</small></button>)}</div><button className={styles.measureButton} onClick={measureSelected}><ScanLine/> CAPTURE READING</button></article>
       <aside className={styles.findings}><h2>03 / FINDINGS</h2><div className={styles.findingList}>{readings.map((reading) => <div key={reading.id}><span>{reading.label}</span><b>{measured[reading.id] ? `${measured[reading.id].actual.toFixed(3)} / ±${reading.tolerance.toFixed(2)}` : "PENDING"}</b><em className={measured[reading.id] ? measured[reading.id].pass ? styles.pass : styles.fail : ""}>{measured[reading.id] ? measured[reading.id].pass ? "PASS" : "FAIL" : "—"}</em></div>)}</div><div className={styles.disposition}><small>FINAL DISPOSITION</small><p>{allMeasured ? "Use the evidence. An incorrect disposition is blocked and costs inspection mastery." : "All characteristics must be measured."}</p><button onClick={() => dispositionPart("accept")}>ACCEPT</button><button onClick={() => dispositionPart("rework")}>REWORK</button><button onClick={() => dispositionPart("scrap")}>SCRAP</button></div><div className={styles.safety}><ShieldCheck/><p><b>SIMULATION BOUNDARY</b>Readings use fictional SIM units and do not define a real inspection plan.</p></div></aside>
     </div>
   </section>;
@@ -684,6 +723,7 @@ type ShowcaseTab = "machine" | "doctrine" | "lens" | "capability" | "ladder";
 function ContractSelect({ save, startContract, learningLevel, setLearningLevel }: { save: ManualSaveData; startContract: (index: number) => void; learningLevel: LearningLevel; setLearningLevel: (level: LearningLevel) => void }) {
   const lens = LEARNING_LENSES[learningLevel];
   const [showcaseTab, setShowcaseTab] = useState<ShowcaseTab>("machine");
+  const [signalIndex, setSignalIndex] = useState(0);
   const selectRef = useRef<HTMLElement>(null);
   const reducedMotion = useRef(false);
   useEffect(() => {
@@ -694,6 +734,12 @@ function ContractSelect({ save, startContract, learningLevel, setLearningLevel }
     const entrance = animate(targets, { opacity: { from: 0 }, y: { from: 22 }, delay: stagger(85), duration: 720, ease: "out(3)" });
     return () => entrance.cancel();
   }, []);
+  useEffect(() => {
+    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+    const timer = window.setInterval(() => setSignalIndex((value) => (value + 1) % CELL_SIGNALS.length), 4600);
+    return () => window.clearInterval(timer);
+  }, []);
+  const signal = CELL_SIGNALS[signalIndex];
 
   // Cursor-tracked tilt/parallax: mutate CSS custom properties directly on
   // the hovered card rather than React state, so the card follows the
@@ -715,19 +761,24 @@ function ContractSelect({ save, startContract, learningLevel, setLearningLevel }
   return <section ref={selectRef} className={styles.select}>
     <div className={styles.selectIntro}>
       <div className={styles.heroCopy} data-reveal>
-        <p>DIRECTOR DEMO / MULTI-OPERATION VERTICAL SLICE</p>
-        <h1>PLAN THE CUT.<br/><em>PROVE THE QUALITY.</em></h1>
-        <span>Profile, pocket, drill, and finish in order. Match each tool to the operation it is rated for, then measure the part in the inspection bay before you disposition it.</span>
-        <div className={styles.heroActions}><button onClick={() => startContract(0)}><Play/> START FLAGSHIP CONTRACT</button><small>NO ACCOUNT · FICTIONAL TRAINING VALUES · KEYBOARD, MOUSE &amp; TOUCH</small></div>
+        <p>AFTER HOURS / WELCOME TO YOUR FIRST SHIFT</p>
+        <h1>THE CELL IS<br/><em>WAITING.</em></h1>
+        <span>Learn precision machining by making a real part—one satisfying cut at a time. We’ll guide your first run, and you can reveal the engineering detail whenever you’re ready.</span>
+        <div className={styles.heroActions}><button onClick={() => startContract(0)}><Play/> START FIRST PART</button><small>NO ACCOUNT NEEDED · ABOUT 3 MINUTES · SAFE CREATIVE SIMULATION</small></div>
+        <div className={styles.welcomeSteps} aria-label="Your first shift in three steps"><span><b>1</b> Choose a tool</span><span><b>2</b> Shape the part</span><span><b>3</b> Check your work</span></div>
+        <div className={styles.cellSignal} aria-live="polite"><i/><small>{signal.code}</small><b>{signal.message}</b></div>
       </div>
       <figure className={styles.heroVisual} data-reveal>
         <img src="/assets/keyart/toolpath-cnc-keyart-v1.webp" alt="Carbide end mill over a fixtured aluminum plate inside a vertical machining center" fetchPriority="high"/>
+        <FlagshipMachiningKit variant="full" cursor={{ x: 13.5, y: 7.5 }} spindle={false} completion={0} load={0} heat={20} condition={100} cameraMode="establishing" material="6061 AL" accent="#00aeef" verbose={false}/>
         <div className={styles.heroReticle} aria-hidden="true"><i/><i/><b>G54</b></div>
-        <div className={styles.heroVisualIndex} aria-hidden="true"><span>01</span><b>THE CUT</b><small>CONTROLLED ENERGY / VISIBLE EVIDENCE</small></div>
-        <figcaption><span>SHOP THRESHOLD / VMC CELL</span><b>6061 AL · CARBIDE · FLOOD COOLANT</b><small>KEY ART / REPRESENTATIVE GAME WORLD</small></figcaption>
+        <div className={styles.heroVisualIndex} aria-hidden="true"><span>01</span><b>THE LIGHTS ARE ON</b><small>GUIDED · HANDS-ON · REPLAYABLE</small></div>
+        <div className={styles.cellAlert} aria-hidden="true"><i/> MACHINE STANDBY <b>01</b></div>
+        <figcaption><span>AFTER-HOURS CELL / READY</span><b>ALUMINUM · THREE-AXIS MILL</b><small>DRAG TO EXPLORE THE MACHINE</small></figcaption>
       </figure>
-      <dl className={styles.heroMetrics} data-reveal aria-label="Flagship experience signals"><div><dt>GEOMETRY</dt><dd>DATUM-DRIVEN</dd></div><div><dt>PROCESS</dt><dd>OPERATION-SEQUENCED</dd></div><div><dt>INSPECTION</dt><dd>EVIDENCE-GATED</dd></div><div><dt>RECOVERY</dt><dd>&lt; 3 SECOND RETRY</dd></div></dl>
+      <dl className={styles.heroMetrics} data-reveal aria-label="What to expect"><div><dt>LEARN</dt><dd>AS YOU PLAY</dd></div><div><dt>MAKE</dt><dd>THREE REAL PARTS</dd></div><div><dt>IMPROVE</dt><dd>WITH CLEAR FEEDBACK</dd></div><div><dt>RETRY</dt><dd>IN UNDER 3 SECONDS</dd></div></dl>
     </div>
+    <header className={styles.contractWelcome}><small>CHOOSE YOUR NEXT PART</small><h2>Start simple. Build confidence.</h2><p>Every contract teaches one new idea. The first is always open, and there’s no penalty for experimenting.</p></header>
     <figure className={styles.partsLineup} data-reveal aria-hidden="true">
       <img src="/assets/keyart/toolpath-parts-lineup-v1.webp" alt="" loading="lazy"/>
       <figcaption><span>SHOP FLOOR</span><b>AVAILABLE WORK</b></figcaption>
@@ -754,8 +805,9 @@ function ContractSelect({ save, startContract, learningLevel, setLearningLevel }
         <footer><span>{contract.par}S PAR</span><span>{contract.reward.toLocaleString()} CR</span><strong>{!unlocked ? <><LockKeyhole/> LOCKED</> : index === 0 ? "FLAGSHIP / ENTER CELL" : "ENTER CELL"} &rarr;</strong></footer>
       </button>;
     })}</div>
-    <div className={styles.principles}><span><b>01</b> PLAN THE OPERATIONS</span><span><b>02</b> MATCH TOOL TO CUT</span><span><b>03</b> MEASURE BEFORE RELEASE</span></div>
-    <div className={styles.publicSafety}><ShieldCheck/><span><b>SAFE PUBLIC DEMO</b>This is a creative game, not machine-operating guidance. It contains no real shop inventory, controller procedure, customer data, or production parameters.</span><ol><li><b>01</b> Start spindle</li><li><b>02</b> Sign off each operation</li><li><b>03</b> Inspect and disposition</li></ol></div>
+    <div className={styles.publicSafety}><ShieldCheck/><span><b>EXPLORE SAFELY</b>This is a creative game with fictional training values—not instructions for operating physical equipment.</span><ol><li>Guided first run</li><li>No account</li><li>Progress stays on this device</li></ol></div>
+    <details className={styles.advancedHome}>
+      <summary><span>CURIOUS ABOUT THE ENGINEERING?</span><b>Explore the machine, visual doctrine, learning levels, and skill ladder</b></summary>
     <section className={styles.showcaseTabs} aria-label="Machine, process, and skill reference">
       <nav aria-label="Reference section">
         <button aria-pressed={showcaseTab === "machine"} onClick={() => setShowcaseTab("machine")}>THE MACHINE</button>
@@ -770,6 +822,7 @@ function ContractSelect({ save, startContract, learningLevel, setLearningLevel }
       {showcaseTab === "capability" && <div className={styles.disciplineRail}><span>PROCESS CAPABILITY / FICTIONAL ARCHETYPES</span><div><i className={styles.millGlyph}/><b>3-AXIS MILLING</b><small>PROFILE · POCKET · DATUM</small></div><div><i className={styles.turnGlyph}/><b>TURNING</b><small>OD · ID · GROOVE</small></div><div><i className={styles.axisGlyph}/><b>5-AXIS</b><small>VECTOR · TILT · BLEND</small></div><div><i className={styles.edmGlyph}/><b>WIRE EDM</b><small>CONTOUR · TAPER · SKIM</small></div></div>}
       {showcaseTab === "ladder" && <ShopSkillLadder save={save}/>}
     </section>
+    </details>
   </section>;
 }
 

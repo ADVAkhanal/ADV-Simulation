@@ -84,3 +84,59 @@ test("Machining Kit v1 ships a reproducible, budgeted production asset", async (
   assert.equal(new Set(toolNodeNames).size, toolNodeNames.length, "tool nodes must be geometrically distinct");
   for (const node of toolNodeNames) assert.ok(nodeNames.includes(node), `missing tool node ${node}`);
 });
+
+test("Machining Kit v2 includes a domain-specific Three.js systems layer and preserves fallback", async () => {
+  const [stage, wrapper, packageJson, integration] = await Promise.all([
+    readFile(new URL("../app/three-machining-stage.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/flagship-machining-kit.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../package.json", import.meta.url), "utf8").then(JSON.parse),
+    readFile(new URL("../THREE_SYSTEMS_INTEGRATION.md", import.meta.url), "utf8"),
+  ]);
+  assert.ok(packageJson.dependencies.three, "Three.js must be a pinned runtime dependency");
+  assert.match(stage, /GLTFLoader/);
+  assert.match(stage, /InstancedMesh/);
+  assert.match(stage, /CHIP_COLORS/);
+  assert.match(stage, /PointsMaterial/);
+  assert.match(stage, /ACESFilmicToneMapping/);
+  assert.match(wrapper, /SAFE FALLBACK/);
+  assert.match(wrapper, /ThreeMachiningStage/);
+  assert.match(integration, /No source files, textures, shaders, models, or brands/);
+});
+
+test("Machining Kit v3 makes the Three.js cell the playable process surface", async () => {
+  const [stage, wrapper, systems, campaign] = await Promise.all([
+    readFile(new URL("../app/three-machining-stage.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/flagship-machining-kit.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/machining-visual-systems.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/manual-campaign.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(stage, /Raycaster/);
+  assert.match(stage, /voxelStock/);
+  assert.match(stage, /cavityFloor/);
+  assert.match(stage, /stockRaycast/);
+  assert.match(stage, /intersectObject\(stockRaycast, true\)/);
+  assert.match(stage, /webglcontextlost/);
+  assert.match(stage, /completedPath/);
+  assert.match(stage, /datumPlane/);
+  assert.match(stage, /scanner/);
+  assert.match(stage, /surfaceState/);
+  assert.match(stage, /cameraLockedByPlayer/);
+  assert.match(stage, /cameraLockedByPlayer = true/);
+  assert.match(stage, /cameraLockedByPlayer = false/);
+  assert.match(stage, /contactLight/);
+  assert.match(stage, /workEnvelope/);
+  assert.match(stage, /machine\.guard\.doors/);
+  assert.match(stage, /const plunge/);
+  assert.match(stage, /inputMode === "cut"\) return/);
+  const preview = await readFile(new URL("../app/gcode/part-preview.tsx", import.meta.url), "utf8");
+  assert.match(preview, /InstancedMesh/);
+  assert.match(preview, /cutDepth/);
+  assert.match(preview, /stockBlocks/);
+  assert.match(systems, /CAMERA_PRESETS/);
+  assert.match(systems, /deriveMachineMood/);
+  assert.match(systems, /qualityBudget/);
+  assert.match(wrapper, /inputMode/);
+  assert.match(campaign, /variant="hero"/);
+  assert.match(campaign, /onToolInput=\{moveToolFromTwin\}/);
+  assert.match(campaign, /METROLOGY MODE/);
+});

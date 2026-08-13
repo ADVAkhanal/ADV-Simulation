@@ -3,18 +3,18 @@ import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { readFile, stat } from "node:fs/promises";
 
-const manifestUrl = new URL("../public/assets/manifests/toolpath-2d-art-pack-v1.json", import.meta.url);
+const manifestUrl = new URL("../public/assets/manifests/toolpath-2d-art-pack-v2.json", import.meta.url);
 const expectedIds = [
-  "contract.drive-plate",
-  "contract.orbital-rib",
-  "contract.sensor-bracket",
-  "environment.night-shift-vmc",
-  "ui.achievement-atlas",
+  "contract.drive-plate.v2",
+  "contract.orbital-rib.v2",
+  "contract.sensor-bracket.v2",
+  "environment.night-shift-factory-floor",
+  "ui.process-emblem-atlas",
 ];
 
 test("2D art pack ships optimized runtime images with source masters", async () => {
   const manifest = JSON.parse(await readFile(manifestUrl, "utf8"));
-  assert.equal(manifest.id, "toolpath.2d-art-pack.v1");
+  assert.equal(manifest.id, "toolpath.2d-art-pack.v2");
   assert.deepEqual(manifest.assets.map((asset) => asset.id), expectedIds);
   assert.equal(manifest.runtimeFormat, "WebP");
 
@@ -39,9 +39,9 @@ test("2D art pack ships optimized runtime images with source masters", async () 
 
 test("contract selector consumes all three first-article images", async () => {
   const manual = await readFile(new URL("../app/manual-campaign.tsx", import.meta.url), "utf8");
-  assert.match(manual, /emergency-drive-plate-v1\.webp/);
-  assert.match(manual, /orbital-structural-rib-v1\.webp/);
-  assert.match(manual, /sensor-bracket-v1\.webp/);
+  assert.match(manual, /emergency-drive-plate-v2\.webp/);
+  assert.match(manual, /orbital-structural-rib-v2\.webp/);
+  assert.match(manual, /sensor-bracket-v2\.webp/);
   assert.match(manual, /<GeometryPreview contract=\{contract\}\/>/);
 });
 

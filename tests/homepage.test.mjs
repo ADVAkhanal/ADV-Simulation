@@ -56,12 +56,12 @@ test("root URL renders the hands-on machine floor", async () => {
   const response = await render();
   assert.equal(response.status, 200);
   const html = await response.text();
-  assert.match(html, /MULTI-OPERATION VERTICAL SLICE/);
-  assert.match(html, /START FLAGSHIP CONTRACT/);
-  assert.match(html, /SAFE PUBLIC DEMO/);
-  assert.match(html, /PLAN THE CUT/);
+  assert.match(html, /AFTER HOURS \/ WELCOME TO YOUR FIRST SHIFT/);
+  assert.match(html, /START FIRST PART/);
+  assert.match(html, /EXPLORE SAFELY/);
+  assert.match(html, /THE CELL IS/);
   assert.match(html, /toolpath-cnc-keyart-v1\.webp/);
-  assert.match(html, /SHOP THRESHOLD/);
+  assert.match(html, /CELL 01 \/ READY/);
   assert.match(html, /Emergency drive plate/);
   assert.match(html, /Flight rib prototype/);
   assert.match(html, /Sensor bracket/);
@@ -99,9 +99,10 @@ test("asset pipeline route exposes the privacy-safe machine capability atlas", a
 });
 
 test("global mode dock exposes both game surfaces", async () => {
-  const [template, dock, page, home, manual, machiningKit] = await Promise.all([
+  const [template, dock, dockCss, page, home, manual, machiningKit] = await Promise.all([
     readFile(new URL("../app/template.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/mode-dock.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/mode-dock.module.css", import.meta.url), "utf8"),
     readFile(new URL("../app/gcode/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/page.tsx", import.meta.url), "utf8"),
     readFile(new URL("../app/manual-campaign.tsx", import.meta.url), "utf8"),
@@ -111,6 +112,9 @@ test("global mode dock exposes both game surfaces", async () => {
   assert.match(dock, /MANUAL MILL/);
   assert.match(dock, /G\/\/CODE STAGE/);
   assert.match(dock, /ASSET LAB/);
+  assert.match(dock, /CNC LATHE/);
+  assert.match(dock, /href="\/turn"/);
+  assert.match(dockCss, /@media\(max-width:680px\).*small\{display:none\}/);
   assert.match(page, /INSPECTION FAILED/);
   assert.match(page, /toolpath-contracts/);
   assert.match(page, /scrollIntoView/);
@@ -126,7 +130,7 @@ test("global mode dock exposes both game surfaces", async () => {
   assert.match(manual, /LOCKOUT/);
   assert.match(manual, /LockKeyhole/);
   assert.match(manual, /REVIEW FINDINGS/);
-  assert.match(manual, /START FLAGSHIP CONTRACT/);
+  assert.match(manual, /START FIRST PART/);
   assert.match(manual, /FlagshipMachiningKit/);
   assert.match(manual, /SHARE RESULT CARD/);
   assert.match(manual, /COOLANT FIELD/);
@@ -188,10 +192,11 @@ test("global mode dock exposes both game surfaces", async () => {
   assert.match(manual, /MILESTONE PLATES/);
   assert.match(manual, /LAST 24 RUNS/);
   assert.match(manual, /shop_log_open/);
-  assert.match(manual, /3D TWIN/);
-  assert.match(manual, /DIGITAL TWIN \/ VISUAL REVIEW/);
-  assert.match(manual, /RETURN TO CUT MAP/);
-  assert.match(manual, /view_3d_twin/);
+  assert.match(manual, /3D CUT/);
+  assert.match(manual, /LIVE MACHINING CELL/);
+  assert.match(manual, /PROCESS MAP/);
+  assert.match(manual, /G54 DATUM/);
+  assert.match(manual, /view_3d_cut/);
   assert.match(manual, /PRIMARY OBJECTIVE/);
   assert.match(manual, /FLOW PTS/);
   assert.match(manual, /RUN SIGNATURE/);
@@ -203,6 +208,7 @@ test("global mode dock exposes both game surfaces", async () => {
   assert.match(manual, /aria-pressed=\{index === toolIndex\}/);
   assert.doesNotMatch(manual, /disabled=\{spindle\}/);
   assert.match(machiningKit, /variant === "full"/);
+  assert.match(machiningKit, /variant === "hero"/);
   assert.match(machiningKit, /DRAG TO ORBIT/);
   assert.match(machiningKit, /AUTO ORBIT/);
   assert.match(machiningKit, /onPointerMove/);

@@ -31,7 +31,7 @@ export type ParsedProgram = {
   points: ToolPoint[];
   diagnostics: ProgramDiagnostic[];
   errors: string[];
-  state: { units: "mm" | "inch"; absolute: boolean; spindle: boolean; coolant: boolean; tool: number };
+  state: { units: "mm" | "inch"; absolute: boolean; spindle: boolean; coolant: boolean; tool: number; workOffset: "G54"; toolLengthOffset: number | null };
 };
 
 export type MissionGrade = {
@@ -167,6 +167,8 @@ export function parseProgram(source: string): ParsedProgram {
   let units: "mm" | "inch" = "mm";
   let feed = 300;
   let tool = 1;
+  let workOffset: "G54" = "G54";
+  let toolLengthOffset: number | null = null;
 
   source.split("\n").forEach((raw, index) => {
     const lineNumber = index + 1;
@@ -176,16 +178,23 @@ export function parseProgram(source: string): ParsedProgram {
     const gCodes = [...clean.matchAll(/\bG0*(\d+)\b/g)].map((match) => Number(match[1]));
     const mCodes = [...clean.matchAll(/\bM0*(\d+)\b/g)].map((match) => Number(match[1]));
     for (const code of gCodes) {
-      if (![0, 1, 2, 3, 20, 21, 90, 91].includes(code)) diagnostics.push({ category: "unsupported-command", line: lineNumber, message: `G${code} is outside this creative controller` });
+      if (![0, 1, 2, 3, 17, 20, 21, 40, 41, 42, 43, 49, 54, 90, 91, 94].includes(code)) diagnostics.push({ category: "unsupported-command", line: lineNumber, message: `G${code} is outside this creative controller` });
     }
     if (gCodes.includes(20)) units = "inch";
     if (gCodes.includes(21)) units = "mm";
     if (gCodes.includes(90)) absolute = true;
     if (gCodes.includes(91)) absolute = false;
+    if (gCodes.includes(54)) workOffset = "G54";
+    if (gCodes.includes(43)) {
+      if (!words.has("H")) diagnostics.push({ category: "unsafe-state", line: lineNumber, message: "G43 tool-length compensation needs an H offset" });
+      else toolLengthOffset = Math.round(words.get("H")!);
+    }
+    if (gCodes.includes(49)) toolLengthOffset = null;
     if (mCodes.includes(3) || mCodes.includes(4)) spindle = true;
     if (mCodes.includes(5)) spindle = false;
     if (mCodes.includes(8)) coolant = true;
     if (mCodes.includes(9)) coolant = false;
+    if (mCodes.includes(6) && !words.has("T")) diagnostics.push({ category: "unsafe-state", line: lineNumber, message: "tool change needs a T selection" });
     if (words.has("T")) tool = clamp(Math.round(words.get("T")!), 1, 12);
     const unitScale = units === "inch" ? 25.4 : 1;
     if (words.has("F")) feed = clamp(words.get("F")! * unitScale, 20, 2400);
@@ -202,10 +211,14 @@ export function parseProgram(source: string): ParsedProgram {
     }
     const cutting = motionCode !== 0 && target.z < 0 && spindle;
     if (motionCode !== 0 && target.z < 0 && !spindle) diagnostics.push({ category: "unsafe-state", line: lineNumber, message: "feed below stock with spindle stopped" });
+    if (cutting && target.z < -2 && !coolant) diagnostics.push({ category: "unsafe-state", line: lineNumber, message: "deep feed below stock with coolant off" });
     // Rapids (G00) travel at full non-cutting speed with no engagement control.
     // A real controller never programs one below the stock surface - that is
     // a tool crash, not a slow feed, regardless of spindle or prior material state.
     if (motionCode === 0 && target.z < 0) diagnostics.push({ category: "collision", line: lineNumber, message: "rapid move targets Z below the stock - this crashes the tool" });
+    // The lesson stock is held in a vise. A powered cut past this envelope strikes a clamp
+    // rather than removing free material; it is intentionally independent of travel limits.
+    if (cutting && (target.x < 1.5 || target.x > 38.5 || target.y < 1.5 || target.y > 38.5)) diagnostics.push({ category: "collision", line: lineNumber, message: "cut enters the vise clamp envelope" });
     const kind: MotionKind = motionCode === 0 ? "rapid" : motionCode === 1 ? "feed-line" : motionCode === 2 ? "arc-cw" : "arc-ccw";
     let center: { x: number; y: number } | undefined;
     if (motionCode === 2 || motionCode === 3) {
@@ -224,7 +237,7 @@ export function parseProgram(source: string): ParsedProgram {
     position = generated.at(-1) ?? { ...target, cut: cutting, line: lineNumber, feed };
   });
 
-  return { canonical, points, diagnostics, errors: diagnostics.map((item) => `L${item.line}: ${item.message}`), state: { units, absolute, spindle, coolant, tool } };
+  return { canonical, points, diagnostics, errors: diagnostics.map((item) => `L${item.line}: ${item.message}`), state: { units, absolute, spindle, coolant, tool, workOffset, toolLengthOffset } };
 }
 
 function cellKey(point: ToolPoint) {
