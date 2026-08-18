@@ -31,6 +31,7 @@ type Props = {
   onToolInput?: (x: number, y: number, cutting: boolean) => void;
   onReady: () => void;
   onFailure: () => void;
+  coolantActive?: boolean;
 };
 
 const TOOL_NODE_BY_ID: Record<number, string> = { 1: "tool.endmill.flat.010", 2: "tool.endmill.rougher.020", 3: "tool.drill.030" };
@@ -396,7 +397,10 @@ export default function ThreeMachiningStage(props: Props) {
       });
       chips.instanceMatrix.needsUpdate = true;
 
-      mist.visible = live.spindle; const mistCount = Math.min(180, budget.mist);
+      // Coolant mist is real, player-toggleable state (manual-campaign.tsx's coolant field) as of
+      // the coolant model increment - it must not render just because the spindle is turning.
+      // Defaults to true for callers (asset-lab previews) that don't pass a real coolant toggle.
+      mist.visible = live.spindle && (live.coolantActive ?? true); const mistCount = Math.min(180, budget.mist);
       mist.geometry.setDrawRange(0, mistCount);
       for (let index = 0; index < mistCount; index += 1) {
         const age = (now * 0.00022 + index * 0.037) % 1, angle = index * 2.399963;

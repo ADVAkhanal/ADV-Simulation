@@ -11,7 +11,7 @@ type Vec3 = [number, number, number];
 type Mat4 = [number, number, number, number, number, number, number, number, number, number, number, number, number, number, number, number];
 type Face = { vertices: [Vec3, Vec3, Vec3]; color: string; node: string; metallic: number; roughness: number };
 type Scene = { faces: Face[]; bytes: number };
-type Props = { cursor: { x: number; y: number }; spindle: boolean; completion: number; load: number; heat?: number; condition?: number; finishPenalty?: number; variant?: "mini" | "full" | "hero"; material?: string; accent?: string; verbose?: boolean; cells?: Uint8Array; contractId?: ManualContract["id"]; toolpath?: Array<{ x: number; y: number }>; interactive?: boolean; toolId?: number; cameraMode?: MachineCameraMode; datumVisible?: boolean; inspectionActive?: boolean; inputMode?: "orbit" | "cut"; soundEnabled?: boolean; sceneCue?: "idle" | "tool-change" | "inspection"; onToolInput?: (x: number, y: number, cutting: boolean) => void };
+type Props = { cursor: { x: number; y: number }; spindle: boolean; completion: number; load: number; heat?: number; condition?: number; finishPenalty?: number; variant?: "mini" | "full" | "hero"; material?: string; accent?: string; verbose?: boolean; cells?: Uint8Array; contractId?: ManualContract["id"]; toolpath?: Array<{ x: number; y: number }>; interactive?: boolean; toolId?: number; cameraMode?: MachineCameraMode; datumVisible?: boolean; inspectionActive?: boolean; inputMode?: "orbit" | "cut"; soundEnabled?: boolean; sceneCue?: "idle" | "tool-change" | "inspection"; onToolInput?: (x: number, y: number, cutting: boolean) => void; coolantActive?: boolean };
 type ViewState = { yaw: number; pitch: number; zoom: number; autoOrbit: boolean };
 
 // Node names for every cutting tool the Blender kit ships (see
@@ -226,7 +226,12 @@ function draw(canvas: HTMLCanvasElement, scene: Scene | null, props: Props, fall
     context.save(); context.globalCompositeOperation = "screen";
     context.strokeStyle = `rgba(128,241,255,${pulse})`; context.lineWidth = 1.2; context.beginPath(); context.ellipse(cutter.x, cutter.y, 15 + props.load * .05, 5 + props.load * .018, 0, 0, Math.PI * 2); context.stroke();
     for (let blade = 0; blade < 3; blade += 1) { const angle = phase + blade * Math.PI * 2 / 3; context.strokeStyle = "rgba(226,253,255,.72)"; context.beginPath(); context.moveTo(cutter.x, cutter.y); context.lineTo(cutter.x + Math.cos(angle) * 14, cutter.y + Math.sin(angle) * 5); context.stroke(); }
-    for (const side of [-1, 1]) { context.strokeStyle = "rgba(93,225,244,.34)"; context.lineWidth = 1.1; context.beginPath(); context.moveTo(coolant.x + side * 8, coolant.y); context.quadraticCurveTo((coolant.x + cutter.x) / 2 + side * 15, cutter.y - 12, cutter.x + side * 5, cutter.y); context.stroke(); }
+    // Coolant jet is real, player-toggleable state (manual-campaign.tsx's coolant field) as of the
+    // coolant model increment - it must not draw as though flood were always on just because the
+    // spindle is turning. Defaults to true for callers (asset-lab previews) that don't pass it.
+    if (props.coolantActive ?? true) {
+      for (const side of [-1, 1]) { context.strokeStyle = "rgba(93,225,244,.34)"; context.lineWidth = 1.1; context.beginPath(); context.moveTo(coolant.x + side * 8, coolant.y); context.quadraticCurveTo((coolant.x + cutter.x) / 2 + side * 15, cutter.y - 12, cutter.x + side * 5, cutter.y); context.stroke(); }
+    }
     const chips = props.variant === "full" ? 20 : 9, chipColors = chipMaterialColors(props.material);
     for (let index = 0; index < chips; index += 1) { const age = ((time / 720 + index * .173) % 1), angle = -2.7 + (index % 7) * .23; const reach = (18 + (index % 5) * 7) * age; const x = cutter.x + Math.cos(angle) * reach, y = cutter.y + Math.sin(angle) * reach + age * age * 26; const isHot = (index * 7919) % 100 / 100 < chipColors.hotRate; context.fillStyle = isHot ? `rgba(${chipColors.hot},${.8 - age * .7})` : `rgba(${chipColors.cool},${1 - age})`; context.fillRect(x, y, 1.5 + (index % 2), .8); }
     context.restore();
