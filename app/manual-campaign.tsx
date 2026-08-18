@@ -5,6 +5,8 @@ import { animate, stagger } from "animejs";
 import { Activity, Award, BookOpen, CircleGauge, CircleHelp, Crosshair, Factory, Gamepad2, Gauge, Hexagon, LockKeyhole, Pause, Play, RotateCcw, ScanLine, Share2, ShieldCheck, Sparkles, Target, Volume2, VolumeX, Waves, Wrench, X, Zap } from "lucide-react";
 import { applyManualMillCut, applyManualMillCooldown, restoreManualMillTool, swapManualMillTool } from "@adv-simulation/simulation-core/src/index.ts";
 import { CATALOGED_GRIEVANCES, evaluateGrievanceTriggers } from "@adv-simulation/assessment/src/index.ts";
+import { createAcousticEngine, deriveAcousticState } from "@adv-simulation/procedural-audio/src/index.ts";
+import { rpm } from "@adv-simulation/units/src/index.ts";
 import {
   DEFAULT_MANUAL_SAVE,
   MANUAL_CONTRACTS,
@@ -101,6 +103,8 @@ export default function ManualCampaign() {
   const retryStartedAt = useRef(0);
   const audioRef = useRef<AudioContext | null>(null);
   const lastCutTone = useRef(0);
+  const acousticEngineRef = useRef<ReturnType<typeof createAcousticEngine> | null>(null);
+  const telemetryRef = useRef({ heat: 25, condition: 100, load: 0, spindle: false, spindleRpm: 7480, flutes: 4 });
   const chipsRef = useRef<Chip[]>([]);
   const toolpathRef = useRef<Array<{ x: number; y: number }>>([]);
   const materialRef = useRef(createManualStock());
@@ -170,6 +174,10 @@ export default function ManualCampaign() {
   // The target cursor remains the programmed coordinate so an incorrect zero is immediately legible.
   const machinePosition = { x: clamp(cursor.x + workOffsetError, 0, MILL_COLS - 1) / (MILL_COLS - 1) * 240, y: cursor.y / (MILL_ROWS - 1) * 140 };
   const spindleRpm = contract.material.includes("Ti") ? 2380 : contract.material.includes("7075") ? 6120 : 7480;
+  // Latest-value ref for the procedural-audio rAF loop below - reading these via a ref
+  // (rather than putting them in the loop's effect deps) lets the loop run smoothly at
+  // display refresh rate instead of only re-subscribing once per second-granularity render.
+  telemetryRef.current = { heat, condition, load, spindle, spindleRpm, flutes: tool.flutes };
   const programmedFeed = Math.round((contract.material.includes("Ti") ? 310 : contract.material.includes("7075") ? 780 : 940) * feed / 100);
   const chipLoad = programmedFeed / Math.max(1, spindleRpm * 3);
   const engagementAngle = Math.round(clamp(load * 1.65, 0, 165));
@@ -197,6 +205,31 @@ export default function ManualCampaign() {
     const timer = window.setInterval(() => setElapsed((value) => value + 1), 1000);
     return () => window.clearInterval(timer);
   }, [screen, spindle, paused]);
+
+  useEffect(() => {
+    acousticEngineRef.current = createAcousticEngine();
+    return () => acousticEngineRef.current?.dispose();
+  }, []);
+
+  useEffect(() => { acousticEngineRef.current?.setEnabled(soundOn); }, [soundOn]);
+
+  // Drives the continuous machining hum from live telemetry every animation frame -
+  // real-time, not the discrete per-cut tone() blips the rest of this file still uses
+  // for one-off stingers (fixture strikes, milestones, UI clicks).
+  useEffect(() => {
+    if (screen !== "play") return;
+    let frame: number;
+    const tick = () => {
+      const t = telemetryRef.current;
+      acousticEngineRef.current?.update(deriveAcousticState({
+        spindleRpm: rpm(t.spindleRpm), fluteCount: t.flutes, spindleOn: t.spindle,
+        load: t.load, heat: t.heat, condition: t.condition, toolBroke: false,
+      }));
+      frame = window.requestAnimationFrame(tick);
+    };
+    frame = window.requestAnimationFrame(tick);
+    return () => window.cancelAnimationFrame(frame);
+  }, [screen]);
 
   // Heat sheds fastest at safe Z (tool retracted, full coolant exposure) and
   // only trickles off while the spindle keeps spinning idle - feed hold is a
@@ -434,7 +467,10 @@ export default function ManualCampaign() {
     const now = performance.now();
     for (let chip = 0; chip < Math.min(10, cut.engagement + 2); chip += 1) { const angle = (chip / Math.max(1, cut.engagement + 2)) * Math.PI * 2 + now * .002; chipsRef.current.push({ x, y, dx: Math.cos(angle) * (1.2 + chip % 3), dy: Math.sin(angle) * (1 + chip % 2), born: now, hot: nextLoad > 78 || cut.overcut > 0 }); }
     chipsRef.current = chipsRef.current.slice(-48);
-    if (now - lastCutTone.current > 75) { tone(cut.overcut ? 92 : 230 + nextLoad * 2.2, .055, cut.overcut ? "sawtooth" : "square", cut.overcut ? .035 : .012); lastCutTone.current = now; }
+    // The continuous machining hum now comes from the real-time procedural-audio engine
+    // (driven by live heat/condition/load, see the rAF loop below) - only the discrete
+    // "you hit the glowing profile" warning stinger stays as a one-off tone() blip.
+    if (cut.overcut > 0 && now - lastCutTone.current > 75) { tone(92, .055, "sawtooth", .035); lastCutTone.current = now; }
     materialRef.current = cut.material; finishedRef.current = cut.finished;
     setMaterial(cut.material); setFinished(cut.finished); setOvercut((value) => value + cut.overcut); setFixtureStrikes((value) => value + cut.fixtureStrikes); setLoad(nextLoad);
     if (cut.fixtureStrikes > 0) {
@@ -463,7 +499,7 @@ export default function ManualCampaign() {
     setHeat((value) => applyManualMillCut({ heat: value, condition: 0, load: 0, finishPenalty: 0 }, cutInputs).nextState.heat);
     setCondition((value) => {
       const result = applyManualMillCut({ heat: 0, condition: value, load: 0, finishPenalty: 0 }, cutInputs);
-      if (result.toolBroke) { setBreaks((count) => count + 1); setSpindle(false); setMessage(cut.fixtureStrikes > 0 ? "TOOL FAILURE — the vise clamp took the edge off the cutter." : "TOOL FAILURE — reset the cutter and reduce engagement."); }
+      if (result.toolBroke) { setBreaks((count) => count + 1); setSpindle(false); setMessage(cut.fixtureStrikes > 0 ? "TOOL FAILURE — the vise clamp took the edge off the cutter." : "TOOL FAILURE — reset the cutter and reduce engagement."); acousticEngineRef.current?.triggerFractureTransient(); }
       return result.nextState.condition;
     });
     setFinishPenalty((value) => applyManualMillCut({ heat: 0, condition: 0, load: 0, finishPenalty: value }, cutInputs).nextState.finishPenalty);

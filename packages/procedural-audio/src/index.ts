@@ -59,3 +59,6 @@ export interface AcousticState {
  * against, rather than an unstructured continuous "wear amount."
  */
 export type AcousticWearStage = "healthy" | "progressive-wear" | "edge-damage" | "instability" | "severe-damage" | "fracture";
+
+export * from "./derive.ts";
+export * from "./engine.ts";
