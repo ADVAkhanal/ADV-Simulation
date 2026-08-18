@@ -7,6 +7,7 @@ import { applyManualMillCut, applyManualMillCooldown, deriveCoolantState, derive
 import { CATALOGED_GRIEVANCES, evaluateGrievanceTriggers } from "@adv-simulation/assessment/src/index.ts";
 import { createAcousticEngine, deriveAcousticState } from "@adv-simulation/procedural-audio/src/index.ts";
 import { rpm, toothPassFrequency } from "@adv-simulation/units/src/index.ts";
+import { deriveToolLatentState } from "@adv-simulation/tool-model/src/index.ts";
 import {
   DEFAULT_MANUAL_SAVE,
   MANUAL_CONTRACTS,
@@ -138,6 +139,7 @@ export default function ManualCampaign() {
   const [overcut, setOvercut] = useState(0);
   const [fixtureStrikes, setFixtureStrikes] = useState(0);
   const [finishPenalty, setFinishPenalty] = useState(0);
+  const [thermalDamageFraction, setThermalDamageFraction] = useState(0);
   const [breaks, setBreaks] = useState(0);
   const [elapsed, setElapsed] = useState(0);
   const [cursor, setCursor] = useState({ x: 3, y: 3 });
@@ -174,6 +176,11 @@ export default function ManualCampaign() {
   const contract = MANUAL_CONTRACTS[contractIndex];
   const operation = contract.operations[Math.min(operationIndex, contract.operations.length - 1)];
   const tool = MILL_TOOLS[toolIndex];
+  // flankWearMm/edgeCondition are pure functions of condition alone (heat/previousThermalDamageFraction
+  // are irrelevant to them - see tool-model's own test coverage) - safe to recompute every render.
+  // thermalDamageFraction itself is NOT read from here; it's genuinely cumulative and only advances
+  // inside cutAt's own setState call, never on a bare render.
+  const toolLatentState = useMemo(() => deriveToolLatentState({ condition, heat: 0, previousThermalDamageFraction: 0 }), [condition]);
   const completion = useMemo(() => manualCompletion(material, contract.id), [contract.id, material]);
   const operationProgress = useMemo(() => manualOperationProgress(material, finished, contract.id, operation.id), [contract.id, finished, material, operation.id]);
   const operationsComplete = useMemo(() => allManualOperationsComplete(material, finished, contract), [contract, finished, material]);
@@ -424,7 +431,7 @@ export default function ManualCampaign() {
     materialRef.current = freshStock; finishedRef.current = freshFinish; milestoneRef.current.clear(); grievanceRef.current.clear();
     setContractIndex(nextContract); setOperationIndex(0); setToolIndex(toolForOperation(next.operations[0].id));
     setMaterial(freshStock); setFinished(freshFinish); setSpindle(false); setHeat(20); setCondition(100);
-    setLoad(0); setOvercut(0); setFixtureStrikes(0); setFinishPenalty(0); setBreaks(0); setElapsed(0); setCursor({ x: 3, y: 3 }); setResult(null); setShareStatus(""); setViewMode("twin"); setDatumVisible(false); firstCutTracked.current = false; toolpathRef.current = []; setToolpath([]); chipsRef.current = [];
+    setLoad(0); setOvercut(0); setFixtureStrikes(0); setFinishPenalty(0); setThermalDamageFraction(0); setBreaks(0); setElapsed(0); setCursor({ x: 3, y: 3 }); setResult(null); setShareStatus(""); setViewMode("twin"); setDatumVisible(false); firstCutTracked.current = false; toolpathRef.current = []; setToolpath([]); chipsRef.current = [];
     setMeasured({}); setInspectionMistakes(0); setSelectedCharacteristic(next.inspection[0].id); setInstrument(next.inspection[0].instrument); setFixtureConfirmed(false); setZeroConfirmed(false); setToolLengthConfirmed(false); setWorkOffsetError(0);
     comboRef.current = 0; setCombo(0); setBestCombo(0); setFlowScore(0); setPaused(false); setGameEvent(null);
   }, [contractIndex]);
@@ -528,6 +535,7 @@ export default function ManualCampaign() {
       return result.nextState.condition;
     });
     setFinishPenalty((value) => applyManualMillCut({ heat: 0, condition: 0, load: 0, finishPenalty: value }, cutInputs).nextState.finishPenalty);
+    setThermalDamageFraction((previous) => deriveToolLatentState({ condition, heat, previousThermalDamageFraction: previous }).thermalDamageFraction);
     for (const grievanceId of evaluateGrievanceTriggers({ heat, condition, load: nextLoad, finishPenalty, overcut: cut.overcut, fixtureStrikes: cut.fixtureStrikes, spindleOn: spindle, workOffsetError, coolantFlowAdequate: coolantFlowAdequateRef.current })) {
       if (grievanceRef.current.has(grievanceId)) continue;
       grievanceRef.current.add(grievanceId);
@@ -559,7 +567,7 @@ export default function ManualCampaign() {
     if (cutting) cutAt(x, y); else setCursor({ x, y });
   };
 
-  const restoreTool = () => { const reset = restoreManualMillTool(); setCondition(reset.condition); setHeat(reset.heat); setSpindle(false); triggerSceneCue("tool-change"); tone(420, .11, "square", .018); setMessage("Fresh cutter loaded. Verify the active operation before restart."); };
+  const restoreTool = () => { const reset = restoreManualMillTool(); setCondition(reset.condition); setHeat(reset.heat); setThermalDamageFraction(0); setSpindle(false); triggerSceneCue("tool-change"); tone(420, .11, "square", .018); setMessage("Fresh cutter loaded. Verify the active operation before restart."); };
 
   const toggleCoolant = () => {
     coolantToggleHistoryRef.current.push(performance.now());
@@ -670,7 +678,7 @@ export default function ManualCampaign() {
     if (condition >= 98 && heat <= 30) { setMessage("Cutter is already fresh and cool. No swap needed."); return; }
     if (save.credits < SWAP_TOOL_COST) { setMessage(`Not enough credits for a tool swap — need ${SWAP_TOOL_COST} CR.`); return; }
     setSave((current) => ({ ...current, credits: current.credits - SWAP_TOOL_COST }));
-    const reset = swapManualMillTool(); setCondition(reset.condition); setHeat(reset.heat); triggerSceneCue("tool-change"); tone(420, .11, "square", .018);
+    const reset = swapManualMillTool(); setCondition(reset.condition); setHeat(reset.heat); setThermalDamageFraction(0); triggerSceneCue("tool-change"); tone(420, .11, "square", .018);
     setMessage(`Cutter swapped for ${SWAP_TOOL_COST} CR — fresh edge, safe temperature.`);
     trackAnonymous("manual_tool_swap", { contract: contract.id, tool: tool.id, cost: SWAP_TOOL_COST });
   };
@@ -746,7 +754,7 @@ export default function ManualCampaign() {
           <Meter icon={<Activity/>} label="TOOL HEAT" value={heat} suffix="°C" danger={heat > 78}/>
           <Meter icon={<Wrench/>} label="TOOL CONDITION" value={condition} suffix="%" danger={condition < 24}/>
           <button className={styles.coolant} aria-pressed={coolantActive} onClick={toggleCoolant}><Waves/><span><b>COOLANT FIELD</b>{coolantActive ? (spindle ? "FLOOD / CHIP EVACUATION" : "FLOOD / STANDBY") : "DRY — click to engage flood"}</span><i className={coolantActive ? styles.coolantLive : ""}/></button>
-          <dl><div><dt>ELAPSED</dt><dd>{String(Math.floor(elapsed/60)).padStart(2,"0")}:{String(elapsed%60).padStart(2,"0")}</dd></div><div><dt>OVERCUT CELLS</dt><dd className={overcut > contract.tolerance ? styles.bad : ""}>{overcut}</dd></div><div><dt>FIXTURE STRIKES</dt><dd className={fixtureStrikes > 0 ? styles.bad : ""}>{fixtureStrikes}</dd></div><div><dt>TOOL FIT</dt><dd className={!toolCompatible ? styles.bad : ""}>{toolCompatible ? "VALID" : "LOCKED"}</dd></div><div><dt>TOOL</dt><dd>T{tool.id} / {tool.diameter}</dd></div>{learningLevel !== "easy" && <><div><dt>SPINDLE / SIM</dt><dd>{spindleRpm.toLocaleString()} RPM</dd></div><div><dt>FEED / SIM</dt><dd>{programmedFeed} MM/MIN</dd></div></>}{learningLevel === "hard" && <><div><dt>CHIP LOAD / SIM</dt><dd>{chipLoad.toFixed(3)} MM</dd></div><div><dt>ENGAGEMENT</dt><dd>{engagementAngle}°</dd></div><div><dt>WORK OFFSET</dt><dd>G54</dd></div></>}</dl>
+          <dl><div><dt>ELAPSED</dt><dd>{String(Math.floor(elapsed/60)).padStart(2,"0")}:{String(elapsed%60).padStart(2,"0")}</dd></div><div><dt>OVERCUT CELLS</dt><dd className={overcut > contract.tolerance ? styles.bad : ""}>{overcut}</dd></div><div><dt>FIXTURE STRIKES</dt><dd className={fixtureStrikes > 0 ? styles.bad : ""}>{fixtureStrikes}</dd></div><div><dt>TOOL FIT</dt><dd className={!toolCompatible ? styles.bad : ""}>{toolCompatible ? "VALID" : "LOCKED"}</dd></div><div><dt>TOOL</dt><dd>T{tool.id} / {tool.diameter}</dd></div>{learningLevel !== "easy" && <><div><dt>SPINDLE / SIM</dt><dd>{spindleRpm.toLocaleString()} RPM</dd></div><div><dt>FEED / SIM</dt><dd>{programmedFeed} MM/MIN</dd></div></>}{learningLevel === "hard" && <><div><dt>CHIP LOAD / SIM</dt><dd>{chipLoad.toFixed(3)} MM</dd></div><div><dt>ENGAGEMENT</dt><dd>{engagementAngle}°</dd></div><div><dt>WORK OFFSET</dt><dd>G54</dd></div><div><dt>FLANK WEAR</dt><dd className={toolLatentState.flankWearMm > 0.24 ? styles.bad : ""}>{toolLatentState.flankWearMm.toFixed(3)} MM</dd></div><div><dt>EDGE</dt><dd className={toolLatentState.edgeCondition === "chipped" || toolLatentState.edgeCondition === "fractured" ? styles.bad : ""}>{toolLatentState.edgeCondition.toUpperCase()}</dd></div><div><dt>THERMAL DAMAGE</dt><dd className={thermalDamageFraction > 0.5 ? styles.bad : ""}>{Math.round(thermalDamageFraction * 100)}%</dd></div></>}</dl>
           <div className={styles.safety}><ShieldCheck/><p><b>CREATIVE SIMULATION</b>Not machine-operating guidance. Never transfer game values to physical equipment.</p></div>
         </aside>
       </section>}
