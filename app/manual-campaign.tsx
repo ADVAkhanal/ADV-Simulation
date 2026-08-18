@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { animate, stagger } from "animejs";
 import { Activity, Award, BookOpen, CircleGauge, CircleHelp, Crosshair, Factory, Gamepad2, Gauge, Hexagon, LockKeyhole, Pause, Play, RotateCcw, ScanLine, Share2, ShieldCheck, Sparkles, Target, Volume2, VolumeX, Waves, Wrench, X, Zap } from "lucide-react";
 import { applyManualMillCut, applyManualMillCooldown, restoreManualMillTool, swapManualMillTool } from "@adv-simulation/simulation-core/src/index.ts";
+import { CATALOGED_GRIEVANCES, evaluateGrievanceTriggers } from "@adv-simulation/assessment/src/index.ts";
 import {
   DEFAULT_MANUAL_SAVE,
   MANUAL_CONTRACTS,
@@ -105,6 +106,7 @@ export default function ManualCampaign() {
   const materialRef = useRef(createManualStock());
   const finishedRef = useRef(createManualFinishMap());
   const milestoneRef = useRef(new Set<number>());
+  const grievanceRef = useRef(new Set<string>());
   const eventTimerRef = useRef<number | null>(null);
   const lastComboCutRef = useRef(0);
   const comboRef = useRef(0);
@@ -361,7 +363,7 @@ export default function ManualCampaign() {
   const resetRun = useCallback((nextContract = contractIndex) => {
     const next = MANUAL_CONTRACTS[nextContract];
     const freshStock = createManualStock(); const freshFinish = createManualFinishMap();
-    materialRef.current = freshStock; finishedRef.current = freshFinish; milestoneRef.current.clear();
+    materialRef.current = freshStock; finishedRef.current = freshFinish; milestoneRef.current.clear(); grievanceRef.current.clear();
     setContractIndex(nextContract); setOperationIndex(0); setToolIndex(toolForOperation(next.operations[0].id));
     setMaterial(freshStock); setFinished(freshFinish); setSpindle(false); setHeat(20); setCondition(100);
     setLoad(0); setOvercut(0); setFixtureStrikes(0); setFinishPenalty(0); setBreaks(0); setElapsed(0); setCursor({ x: 3, y: 3 }); setResult(null); setShareStatus(""); setViewMode("twin"); setDatumVisible(false); firstCutTracked.current = false; toolpathRef.current = []; setToolpath([]); chipsRef.current = [];
@@ -465,6 +467,13 @@ export default function ManualCampaign() {
       return result.nextState.condition;
     });
     setFinishPenalty((value) => applyManualMillCut({ heat: 0, condition: 0, load: 0, finishPenalty: value }, cutInputs).nextState.finishPenalty);
+    for (const grievanceId of evaluateGrievanceTriggers({ heat, condition, load: nextLoad, finishPenalty, overcut: cut.overcut, fixtureStrikes: cut.fixtureStrikes, spindleOn: spindle, workOffsetError })) {
+      if (grievanceRef.current.has(grievanceId)) continue;
+      grievanceRef.current.add(grievanceId);
+      const grievance = CATALOGED_GRIEVANCES.find((entry) => entry.id === grievanceId);
+      if (!grievance) continue;
+      announceGameEvent({ kind: "warning", title: grievance.title.toUpperCase(), detail: grievance.consequences[0]?.description ?? grievance.triggerConditions[0]?.description ?? "" });
+    }
   };
 
   const millAt = (clientX: number, clientY: number) => {
