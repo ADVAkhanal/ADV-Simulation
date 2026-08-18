@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { animate, stagger } from "animejs";
 import { Activity, Award, BookOpen, CircleGauge, CircleHelp, Crosshair, Factory, Gamepad2, Gauge, Hexagon, LockKeyhole, Pause, Play, RotateCcw, ScanLine, Share2, ShieldCheck, Sparkles, Target, Volume2, VolumeX, Waves, Wrench, X, Zap } from "lucide-react";
-import { applyManualMillCut, applyManualMillCooldown, restoreManualMillTool, swapManualMillTool } from "@adv-simulation/simulation-core/src/index.ts";
+import { applyManualMillCut, applyManualMillCooldown, deriveVibrationState, estimateMaxLoadForTool, restoreManualMillTool, swapManualMillTool } from "@adv-simulation/simulation-core/src/index.ts";
 import { CATALOGED_GRIEVANCES, evaluateGrievanceTriggers } from "@adv-simulation/assessment/src/index.ts";
 import { createAcousticEngine, deriveAcousticState } from "@adv-simulation/procedural-audio/src/index.ts";
-import { rpm } from "@adv-simulation/units/src/index.ts";
+import { rpm, toothPassFrequency } from "@adv-simulation/units/src/index.ts";
 import {
   DEFAULT_MANUAL_SAVE,
   MANUAL_CONTRACTS,
@@ -60,6 +60,8 @@ const LEGACY_SAVE_KEY = "toolpath-manual-campaign-v2";
 const SWAP_TOOL_COST = 45;
 const clamp = (value: number, min: number, max: number) => Math.max(min, Math.min(max, value));
 const STOCK_VIEW = { x: 80, y: 52, width: 960, height: 560 }; // 240 × 140 mm at an exact 4 px/mm drawing scale.
+/** This game's tool roster's own largest radius - the reference this game normalizes toolStiffnessFraction against, per chatter.ts's own note that this normalization is app-level knowledge, not something simulation-core should know. */
+const MAX_TOOL_RADIUS_MM = Math.max(...MILL_TOOLS.map((millTool) => millTool.radius));
 const LEARNING_LENSES = {
   easy: { label: "Easy", eyebrow: "First Cut", title: "Keep the shape. Clear the space.", summary: "The glowing shape is the part you are saving. Silver is extra material. Start the spindle, drag through silver, and stop before the cutter touches the glow.", concepts: [["CUTTER", "The circle under your pointer removes material."], ["LOAD", "Green is comfortable. Red means pause and take a smaller bite."], ["WIN", "Sign off every operation, then prove quality in the inspection bay."]], play: "Silver goes. Glow stays. Use the smaller cutter near the edge." },
   medium: { label: "Medium", eyebrow: "Apprentice View", title: "Control engagement, not just motion.", summary: "Cutter size and radial engagement determine how much material each move removes. Open areas reward a rougher; tight profiles reward a smaller finishing tool. Each operation only accepts tools rated for it.", concepts: [["ENGAGEMENT", "The amber arc shows how much of the cutter is buried in stock."], ["PROCESS", "Higher engagement raises simulated spindle load, heat, and finish risk."], ["SEQUENCE", "Sign off profile, pocket, or drill work before the finishing pass is available."]], play: "Watch the amber engagement arc. Reduce tool size or feed near constrained geometry." },
@@ -104,7 +106,8 @@ export default function ManualCampaign() {
   const audioRef = useRef<AudioContext | null>(null);
   const lastCutTone = useRef(0);
   const acousticEngineRef = useRef<ReturnType<typeof createAcousticEngine> | null>(null);
-  const telemetryRef = useRef({ heat: 25, condition: 100, load: 0, spindle: false, spindleRpm: 7480, flutes: 4 });
+  const telemetryRef = useRef({ heat: 25, condition: 100, load: 0, spindle: false, spindleRpm: 7480, flutes: 4, toolRadius: MILL_TOOLS[0].radius, toolLoadCoefficient: MILL_TOOLS[0].load, feed: 100 });
+  const chatterActiveRef = useRef(false);
   const chipsRef = useRef<Chip[]>([]);
   const toolpathRef = useRef<Array<{ x: number; y: number }>>([]);
   const materialRef = useRef(createManualStock());
@@ -177,7 +180,7 @@ export default function ManualCampaign() {
   // Latest-value ref for the procedural-audio rAF loop below - reading these via a ref
   // (rather than putting them in the loop's effect deps) lets the loop run smoothly at
   // display refresh rate instead of only re-subscribing once per second-granularity render.
-  telemetryRef.current = { heat, condition, load, spindle, spindleRpm, flutes: tool.flutes };
+  telemetryRef.current = { heat, condition, load, spindle, spindleRpm, flutes: tool.flutes, toolRadius: tool.radius, toolLoadCoefficient: tool.load, feed };
   const programmedFeed = Math.round((contract.material.includes("Ti") ? 310 : contract.material.includes("7075") ? 780 : 940) * feed / 100);
   const chipLoad = programmedFeed / Math.max(1, spindleRpm * 3);
   const engagementAngle = Math.round(clamp(load * 1.65, 0, 165));
@@ -221,9 +224,19 @@ export default function ManualCampaign() {
     let frame: number;
     const tick = () => {
       const t = telemetryRef.current;
+      const toothPassFrequencyHz = toothPassFrequency(rpm(t.spindleRpm), t.flutes);
+      const vibration = deriveVibrationState({
+        spindleOn: t.spindle, load: t.load, toothPassFrequencyHz,
+        loadCeiling: estimateMaxLoadForTool(t.toolRadius, t.toolLoadCoefficient, t.feed),
+        toolStiffnessFraction: t.toolRadius / MAX_TOOL_RADIUS_MM,
+      });
+      if (vibration.chatterActive !== chatterActiveRef.current) {
+        chatterActiveRef.current = vibration.chatterActive;
+        if (vibration.chatterActive) announceGameEvent({ kind: "warning", title: "CHATTER ONSET", detail: "Reduce engagement, feed, or stickout - the cut has entered self-excited vibration." });
+      }
       acousticEngineRef.current?.update(deriveAcousticState({
         spindleRpm: rpm(t.spindleRpm), fluteCount: t.flutes, spindleOn: t.spindle,
-        load: t.load, heat: t.heat, condition: t.condition, toolBroke: false,
+        load: t.load, heat: t.heat, condition: t.condition, toolBroke: false, vibration,
       }));
       frame = window.requestAnimationFrame(tick);
     };

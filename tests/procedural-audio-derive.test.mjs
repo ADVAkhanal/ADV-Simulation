@@ -65,8 +65,22 @@ test("fractureTransientPending mirrors the tool-wear model's own edge-triggered 
   assert.equal(deriveAcousticState({ ...baseline, toolBroke: true }).fractureTransientPending, true);
 });
 
-test("resonanceBands and coolantAudioActive stay at their honest inert default - no chatter or coolant model exists yet", () => {
+test("resonanceBands stay empty when no vibration input is provided (no chatter model output available)", () => {
   const state = deriveAcousticState({ ...baseline, load: 100, heat: 100, condition: 1 });
   assert.deepEqual(state.resonanceBands, []);
+});
+
+test("resonanceBands stay empty when vibration is provided but not chattering", () => {
+  const state = deriveAcousticState({ ...baseline, vibration: { amplitudeFraction: 0.1, dominantFrequencyHz: null, chatterActive: false } });
+  assert.deepEqual(state.resonanceBands, []);
+});
+
+test("resonanceBands populate from the real chatter-model vibration snapshot, not a separate invented one", () => {
+  const state = deriveAcousticState({ ...baseline, vibration: { amplitudeFraction: 0.62, dominantFrequencyHz: 748.3, chatterActive: true } });
+  assert.deepEqual(state.resonanceBands, [{ frequencyHz: 748.3, relativeAmplitude: 0.62 }]);
+});
+
+test("coolantAudioActive stays at its honest inert default - no coolant model exists yet", () => {
+  const state = deriveAcousticState({ ...baseline, load: 100, heat: 100, condition: 1 });
   assert.equal(state.coolantAudioActive, false);
 });

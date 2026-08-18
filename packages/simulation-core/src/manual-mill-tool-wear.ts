@@ -67,6 +67,23 @@ export function applyManualMillCooldown(state: ManualMillToolState, spindleOn: b
   };
 }
 
+/**
+ * A tool's realistic peak spindle-load ceiling under a given feed override -
+ * the same nextLoad formula and constants as applyManualMillCut above (7.6,
+ * /55), fed the tool's full circular footprint (pi * radius^2) as the
+ * theoretical maximum engagement instead of a real per-cut engagement value.
+ * Exists so callers (the chatter model) can express "how loaded is this tool
+ * relative to what IT can realistically reach" instead of against a fixed
+ * 0-100 scale a small-radius tool can never approach - see chatter.ts's own
+ * header note. Deliberately reuses these exact constants rather than
+ * duplicating them, so the ceiling can never silently drift from the real
+ * per-cut formula it's estimating a bound for.
+ */
+export function estimateMaxLoadForTool(toolRadius: number, toolLoadCoefficient: number, feedOverridePercent: number): number {
+  const maxEngagement = Math.PI * toolRadius * toolRadius;
+  return clamp(Math.round(maxEngagement * 7.6 * toolLoadCoefficient * (feedOverridePercent / 55)), 1, 100);
+}
+
 /** Ported from restoreTool() (line ~485 at extraction time) - the free, failure-triggered recovery path. Heat resets to 25, not 20; this asymmetry with swapManualMillTool is in the original code and is preserved deliberately, not a bug. */
 export function restoreManualMillTool(): { heat: number; condition: number } {
   return { heat: 25, condition: 100 };

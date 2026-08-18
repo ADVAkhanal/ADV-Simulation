@@ -8,14 +8,21 @@ import type { AcousticState, AcousticWearStage, HarmonicComponent } from "./inde
  * values already driving the visible telemetry meters and the grievance
  * evaluator, not a second, invented "how scary should this sound" input.
  *
- * Two fields are intentionally left at their honest inert default rather than
- * populated with plausible-looking numbers, because nothing in simulation-core
- * models them yet:
- *  - resonanceBands: the chatter model (§11) doesn't exist yet. Always [].
- *  - coolantAudioActive: no coolant state exists yet. Always false.
- * Wire these for real once those systems land - inventing values now would be
- * exactly the "hardcoded danger sound" anti-pattern §12 prohibits, just moved
- * one field over.
+ * resonanceBands is now wired to simulation-core's real chatter model
+ * (@adv-simulation/simulation-core's deriveVibrationState, see chatter.ts) -
+ * this package takes the resulting vibration snapshot as an input and turns
+ * an active-chatter flag into a resonance band, it does not compute chatter
+ * itself. That vibration snapshot is accepted as a small structurally-typed
+ * shape (matching simulation-core's VibrationState field-for-field) rather
+ * than an actual import of that type, specifically to avoid a circular
+ * package dependency: simulation-core already depends on this package (for
+ * SimulationState.acoustic), so this package importing back from
+ * simulation-core would create a cycle.
+ *
+ * coolantAudioActive is still left at its honest inert default (always false)
+ * because no coolant state exists anywhere in simulation-core yet - wire it
+ * for real once one does. Inventing it now would be the same "hardcoded
+ * danger sound" anti-pattern §12 prohibits, just moved one field over.
  */
 export interface AcousticDerivationInput {
   spindleRpm: Rpm;
@@ -29,6 +36,12 @@ export interface AcousticDerivationInput {
   condition: number;
   /** True only on the tick condition crosses from >0 to <=0 - applyManualMillCut's own edge-triggered flag, not re-derived here. */
   toolBroke: boolean;
+  /**
+   * Optional - matches simulation-core's VibrationState field-for-field (see
+   * this file's header note on why it's not literally imported). Omit or pass
+   * chatterActive: false while no chatter model output is available yet.
+   */
+  vibration?: { amplitudeFraction: number; dominantFrequencyHz: number | null; chatterActive: boolean };
 }
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
@@ -69,12 +82,17 @@ export function deriveAcousticState(input: AcousticDerivationInput): AcousticSta
       ]
     : [];
 
+  const resonanceBands: HarmonicComponent[] =
+    input.vibration?.chatterActive && input.vibration.dominantFrequencyHz !== null
+      ? [{ frequencyHz: hz(input.vibration.dominantFrequencyHz), relativeAmplitude: clamp01(input.vibration.amplitudeFraction) }]
+      : [];
+
   return {
     rotationFrequencyHz,
     toothPassFrequencyHz,
     harmonics,
     broadbandNoiseLevel: clamp01(engagementFraction * (0.3 + 0.5 * heatFraction)),
-    resonanceBands: [], // pending §11's chatter model - see header note.
+    resonanceBands,
     toothToToothAsymmetry: wearFraction,
     fractureTransientPending: input.toolBroke,
     coolantAudioActive: false, // pending a real coolant model - see header note.
