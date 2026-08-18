@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { animate, stagger } from "animejs";
 import { Activity, Award, BookOpen, CircleGauge, CircleHelp, Crosshair, Factory, Gamepad2, Gauge, Hexagon, LockKeyhole, Pause, Play, RotateCcw, ScanLine, Share2, ShieldCheck, Sparkles, Target, Volume2, VolumeX, Waves, Wrench, X, Zap } from "lucide-react";
-import { applyManualMillCut, applyManualMillCooldown, deriveVibrationState, estimateMaxLoadForTool, restoreManualMillTool, swapManualMillTool } from "@adv-simulation/simulation-core/src/index.ts";
+import { applyManualMillCut, applyManualMillCooldown, deriveCoolantState, deriveVibrationState, estimateMaxLoadForTool, restoreManualMillTool, swapManualMillTool } from "@adv-simulation/simulation-core/src/index.ts";
 import { CATALOGED_GRIEVANCES, evaluateGrievanceTriggers } from "@adv-simulation/assessment/src/index.ts";
 import { createAcousticEngine, deriveAcousticState } from "@adv-simulation/procedural-audio/src/index.ts";
 import { rpm, toothPassFrequency } from "@adv-simulation/units/src/index.ts";
@@ -62,6 +62,8 @@ const clamp = (value: number, min: number, max: number) => Math.max(min, Math.mi
 const STOCK_VIEW = { x: 80, y: 52, width: 960, height: 560 }; // 240 × 140 mm at an exact 4 px/mm drawing scale.
 /** This game's tool roster's own largest radius - the reference this game normalizes toolStiffnessFraction against, per chatter.ts's own note that this normalization is app-level knowledge, not something simulation-core should know. */
 const MAX_TOOL_RADIUS_MM = Math.max(...MILL_TOOLS.map((millTool) => millTool.radius));
+/** How far back deriveCoolantState's recentToggleCount looks for "is this dabbing" - a UX tuning knob, not a validated thermal-cycling window. */
+const COOLANT_TOGGLE_WINDOW_MS = 4000;
 const LEARNING_LENSES = {
   easy: { label: "Easy", eyebrow: "First Cut", title: "Keep the shape. Clear the space.", summary: "The glowing shape is the part you are saving. Silver is extra material. Start the spindle, drag through silver, and stop before the cutter touches the glow.", concepts: [["CUTTER", "The circle under your pointer removes material."], ["LOAD", "Green is comfortable. Red means pause and take a smaller bite."], ["WIN", "Sign off every operation, then prove quality in the inspection bay."]], play: "Silver goes. Glow stays. Use the smaller cutter near the edge." },
   medium: { label: "Medium", eyebrow: "Apprentice View", title: "Control engagement, not just motion.", summary: "Cutter size and radial engagement determine how much material each move removes. Open areas reward a rougher; tight profiles reward a smaller finishing tool. Each operation only accepts tools rated for it.", concepts: [["ENGAGEMENT", "The amber arc shows how much of the cutter is buried in stock."], ["PROCESS", "Higher engagement raises simulated spindle load, heat, and finish risk."], ["SEQUENCE", "Sign off profile, pocket, or drill work before the finishing pass is available."]], play: "Watch the amber engagement arc. Reduce tool size or feed near constrained geometry." },
@@ -106,8 +108,12 @@ export default function ManualCampaign() {
   const audioRef = useRef<AudioContext | null>(null);
   const lastCutTone = useRef(0);
   const acousticEngineRef = useRef<ReturnType<typeof createAcousticEngine> | null>(null);
-  const telemetryRef = useRef({ heat: 25, condition: 100, load: 0, spindle: false, spindleRpm: 7480, flutes: 4, toolRadius: MILL_TOOLS[0].radius, toolLoadCoefficient: MILL_TOOLS[0].load, feed: 100 });
+  const telemetryRef = useRef({ heat: 25, condition: 100, load: 0, spindle: false, spindleRpm: 7480, flutes: 4, toolRadius: MILL_TOOLS[0].radius, toolLoadCoefficient: MILL_TOOLS[0].load, feed: 100, coolantActive: true });
   const chatterActiveRef = useRef(false);
+  /** Timestamps (ms) of recent coolant on/off toggles - drives deriveCoolantState's recentToggleCount, the real "is this dabbing" signal. */
+  const coolantToggleHistoryRef = useRef<number[]>([]);
+  /** Latest deriveCoolantState().flowAdequate, updated every rAF tick, read by cutAt's (event-driven, not per-frame) grievance evaluation. */
+  const coolantFlowAdequateRef = useRef(true);
   const chipsRef = useRef<Chip[]>([]);
   const toolpathRef = useRef<Array<{ x: number; y: number }>>([]);
   const materialRef = useRef(createManualStock());
@@ -147,6 +153,7 @@ export default function ManualCampaign() {
   const [retryMs, setRetryMs] = useState<number | null>(null);
   const [shareStatus, setShareStatus] = useState("");
   const [soundOn, setSoundOn] = useState(true);
+  const [coolantActive, setCoolantActive] = useState(true);
   const [learningLevel, setLearningLevel] = useState<LearningLevel>("easy");
   const [logOpen, setLogOpen] = useState(false);
   const [viewMode, setViewMode] = useState<"map" | "twin">("twin");
@@ -180,7 +187,7 @@ export default function ManualCampaign() {
   // Latest-value ref for the procedural-audio rAF loop below - reading these via a ref
   // (rather than putting them in the loop's effect deps) lets the loop run smoothly at
   // display refresh rate instead of only re-subscribing once per second-granularity render.
-  telemetryRef.current = { heat, condition, load, spindle, spindleRpm, flutes: tool.flutes, toolRadius: tool.radius, toolLoadCoefficient: tool.load, feed };
+  telemetryRef.current = { heat, condition, load, spindle, spindleRpm, flutes: tool.flutes, toolRadius: tool.radius, toolLoadCoefficient: tool.load, feed, coolantActive };
   const programmedFeed = Math.round((contract.material.includes("Ti") ? 310 : contract.material.includes("7075") ? 780 : 940) * feed / 100);
   const chipLoad = programmedFeed / Math.max(1, spindleRpm * 3);
   const engagementAngle = Math.round(clamp(load * 1.65, 0, 165));
@@ -234,9 +241,14 @@ export default function ManualCampaign() {
         chatterActiveRef.current = vibration.chatterActive;
         if (vibration.chatterActive) announceGameEvent({ kind: "warning", title: "CHATTER ONSET", detail: "Reduce engagement, feed, or stickout - the cut has entered self-excited vibration." });
       }
+      const now = performance.now();
+      coolantToggleHistoryRef.current = coolantToggleHistoryRef.current.filter((ts) => now - ts < COOLANT_TOGGLE_WINDOW_MS);
+      const coolant = deriveCoolantState({ active: t.coolantActive, recentToggleCount: coolantToggleHistoryRef.current.length });
+      coolantFlowAdequateRef.current = coolant.flowAdequate;
       acousticEngineRef.current?.update(deriveAcousticState({
         spindleRpm: rpm(t.spindleRpm), fluteCount: t.flutes, spindleOn: t.spindle,
         load: t.load, heat: t.heat, condition: t.condition, toolBroke: false, vibration,
+        coolantActive: coolant.active,
       }));
       frame = window.requestAnimationFrame(tick);
     };
@@ -516,7 +528,7 @@ export default function ManualCampaign() {
       return result.nextState.condition;
     });
     setFinishPenalty((value) => applyManualMillCut({ heat: 0, condition: 0, load: 0, finishPenalty: value }, cutInputs).nextState.finishPenalty);
-    for (const grievanceId of evaluateGrievanceTriggers({ heat, condition, load: nextLoad, finishPenalty, overcut: cut.overcut, fixtureStrikes: cut.fixtureStrikes, spindleOn: spindle, workOffsetError })) {
+    for (const grievanceId of evaluateGrievanceTriggers({ heat, condition, load: nextLoad, finishPenalty, overcut: cut.overcut, fixtureStrikes: cut.fixtureStrikes, spindleOn: spindle, workOffsetError, coolantFlowAdequate: coolantFlowAdequateRef.current })) {
       if (grievanceRef.current.has(grievanceId)) continue;
       grievanceRef.current.add(grievanceId);
       const grievance = CATALOGED_GRIEVANCES.find((entry) => entry.id === grievanceId);
@@ -548,6 +560,16 @@ export default function ManualCampaign() {
   };
 
   const restoreTool = () => { const reset = restoreManualMillTool(); setCondition(reset.condition); setHeat(reset.heat); setSpindle(false); triggerSceneCue("tool-change"); tone(420, .11, "square", .018); setMessage("Fresh cutter loaded. Verify the active operation before restart."); };
+
+  const toggleCoolant = () => {
+    coolantToggleHistoryRef.current.push(performance.now());
+    setCoolantActive((value) => {
+      const next = !value;
+      tone(next ? 340 : 260, .06, "sine", .015);
+      setMessage(next ? "COOLANT ON — flood engaged." : "COOLANT OFF — dry cutting.");
+      return next;
+    });
+  };
 
   const toggleSpindle = () => {
     if (condition <= 0) { restoreTool(); return; }
@@ -723,7 +745,7 @@ export default function ManualCampaign() {
           <Meter icon={<Gauge/>} label="SPINDLE LOAD" value={load} suffix="%" danger={load > 84}/>
           <Meter icon={<Activity/>} label="TOOL HEAT" value={heat} suffix="°C" danger={heat > 78}/>
           <Meter icon={<Wrench/>} label="TOOL CONDITION" value={condition} suffix="%" danger={condition < 24}/>
-          <div className={styles.coolant}><Waves/><span><b>COOLANT FIELD</b>{spindle ? "ACTIVE / CHIP EVACUATION" : "STANDBY / SAFE Z"}</span><i className={spindle ? styles.coolantLive : ""}/></div>
+          <button className={styles.coolant} aria-pressed={coolantActive} onClick={toggleCoolant}><Waves/><span><b>COOLANT FIELD</b>{coolantActive ? (spindle ? "FLOOD / CHIP EVACUATION" : "FLOOD / STANDBY") : "DRY — click to engage flood"}</span><i className={coolantActive ? styles.coolantLive : ""}/></button>
           <dl><div><dt>ELAPSED</dt><dd>{String(Math.floor(elapsed/60)).padStart(2,"0")}:{String(elapsed%60).padStart(2,"0")}</dd></div><div><dt>OVERCUT CELLS</dt><dd className={overcut > contract.tolerance ? styles.bad : ""}>{overcut}</dd></div><div><dt>FIXTURE STRIKES</dt><dd className={fixtureStrikes > 0 ? styles.bad : ""}>{fixtureStrikes}</dd></div><div><dt>TOOL FIT</dt><dd className={!toolCompatible ? styles.bad : ""}>{toolCompatible ? "VALID" : "LOCKED"}</dd></div><div><dt>TOOL</dt><dd>T{tool.id} / {tool.diameter}</dd></div>{learningLevel !== "easy" && <><div><dt>SPINDLE / SIM</dt><dd>{spindleRpm.toLocaleString()} RPM</dd></div><div><dt>FEED / SIM</dt><dd>{programmedFeed} MM/MIN</dd></div></>}{learningLevel === "hard" && <><div><dt>CHIP LOAD / SIM</dt><dd>{chipLoad.toFixed(3)} MM</dd></div><div><dt>ENGAGEMENT</dt><dd>{engagementAngle}°</dd></div><div><dt>WORK OFFSET</dt><dd>G54</dd></div></>}</dl>
           <div className={styles.safety}><ShieldCheck/><p><b>CREATIVE SIMULATION</b>Not machine-operating guidance. Never transfer game values to physical equipment.</p></div>
         </aside>

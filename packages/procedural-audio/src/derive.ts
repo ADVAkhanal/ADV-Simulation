@@ -19,10 +19,10 @@ import type { AcousticState, AcousticWearStage, HarmonicComponent } from "./inde
  * SimulationState.acoustic), so this package importing back from
  * simulation-core would create a cycle.
  *
- * coolantAudioActive is still left at its honest inert default (always false)
- * because no coolant state exists anywhere in simulation-core yet - wire it
- * for real once one does. Inventing it now would be the same "hardcoded
- * danger sound" anti-pattern §12 prohibits, just moved one field over.
+ * coolantAudioActive is now wired to simulation-core's real coolant model
+ * (deriveCoolantState, see coolant.ts) the same way resonanceBands is wired to
+ * the chatter model - accepted as a plain boolean input (the game's real
+ * coolant.active toggle), not re-derived here.
  */
 export interface AcousticDerivationInput {
   spindleRpm: Rpm;
@@ -42,6 +42,8 @@ export interface AcousticDerivationInput {
    * chatterActive: false while no chatter model output is available yet.
    */
   vibration?: { amplitudeFraction: number; dominantFrequencyHz: number | null; chatterActive: boolean };
+  /** simulation-core's real coolant.active - defaults to false (no coolant sound) when omitted. */
+  coolantActive?: boolean;
 }
 
 const clamp01 = (value: number) => Math.max(0, Math.min(1, value));
@@ -95,7 +97,7 @@ export function deriveAcousticState(input: AcousticDerivationInput): AcousticSta
     resonanceBands,
     toothToToothAsymmetry: wearFraction,
     fractureTransientPending: input.toolBroke,
-    coolantAudioActive: false, // pending a real coolant model - see header note.
+    coolantAudioActive: input.coolantActive ?? false,
     chipImpactRatePerSecond: engagementFraction > 0 ? (toothPassFrequencyHz as number) : 0,
   } satisfies AcousticState;
 }

@@ -28,6 +28,8 @@ const MAX_HARMONICS = 3;
 const SMOOTHING_SECONDS = 0.08;
 /** Fixed LFSR period for a mid-grit broadband texture - only level is state-driven this increment, not color. */
 const NOISE_PERIOD_SAMPLES_AT_44K = 40;
+/** A shorter period than the cutting noise's - a higher-pitched, hiss-like texture distinct from cutting grit, reusing the same LFSR technique rather than a second noise generator. */
+const COOLANT_NOISE_PERIOD_SAMPLES = 12;
 
 function generateLfsrNoiseBuffer(audioContext: BaseAudioContext, durationSeconds: number, periodSamples: number): AudioBuffer {
   const sampleRate = audioContext.sampleRate;
@@ -64,6 +66,7 @@ export function createAcousticEngine(): AcousticEngine {
   let ctx: AudioContext | null = null;
   let masterGain: GainNode | null = null;
   let noiseGain: GainNode | null = null;
+  let coolantGain: GainNode | null = null;
   let harmonicOscillators: OscillatorNode[] = [];
   let harmonicGains: GainNode[] = [];
 
@@ -84,6 +87,14 @@ export function createAcousticEngine(): AcousticEngine {
       noiseGain.gain.value = 0;
       noiseSource.connect(noiseGain).connect(masterGain);
       noiseSource.start();
+
+      const coolantSource = ctx.createBufferSource();
+      coolantSource.buffer = generateLfsrNoiseBuffer(ctx, 2, COOLANT_NOISE_PERIOD_SAMPLES);
+      coolantSource.loop = true;
+      coolantGain = ctx.createGain();
+      coolantGain.gain.value = 0;
+      coolantSource.connect(coolantGain).connect(masterGain);
+      coolantSource.start();
 
       for (let i = 0; i < MAX_HARMONICS; i++) {
         const osc = ctx.createOscillator();
@@ -120,6 +131,7 @@ export function createAcousticEngine(): AcousticEngine {
     }
 
     noiseGain.gain.setTargetAtTime(state.broadbandNoiseLevel * 0.05, now, SMOOTHING_SECONDS);
+    coolantGain?.gain.setTargetAtTime(state.coolantAudioActive ? 0.025 : 0, now, SMOOTHING_SECONDS);
   }
 
   function triggerFractureTransient() {
@@ -162,6 +174,7 @@ export function createAcousticEngine(): AcousticEngine {
     ctx = null;
     masterGain = null;
     noiseGain = null;
+    coolantGain = null;
   }
 
   return { update, triggerFractureTransient, setEnabled, dispose };

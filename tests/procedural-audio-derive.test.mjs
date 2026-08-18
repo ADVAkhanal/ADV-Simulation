@@ -80,7 +80,12 @@ test("resonanceBands populate from the real chatter-model vibration snapshot, no
   assert.deepEqual(state.resonanceBands, [{ frequencyHz: 748.3, relativeAmplitude: 0.62 }]);
 });
 
-test("coolantAudioActive stays at its honest inert default - no coolant model exists yet", () => {
+test("coolantAudioActive defaults to false when no coolant input is provided", () => {
   const state = deriveAcousticState({ ...baseline, load: 100, heat: 100, condition: 1 });
   assert.equal(state.coolantAudioActive, false);
+});
+
+test("coolantAudioActive mirrors the real coolant.active input, not a separate invented flag", () => {
+  assert.equal(deriveAcousticState({ ...baseline, coolantActive: true }).coolantAudioActive, true);
+  assert.equal(deriveAcousticState({ ...baseline, coolantActive: false }).coolantAudioActive, false);
 });

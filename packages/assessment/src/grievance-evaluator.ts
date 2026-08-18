@@ -34,6 +34,8 @@ export interface ManualMillTelemetrySnapshot {
   spindleOn: boolean;
   /** The manual-mill campaign's existing G54 work-offset training scenario (0 = correct, 2.5 = hidden cell shift). */
   workOffsetError: number;
+  /** simulation-core's real deriveCoolantState().flowAdequate - false specifically means intermittent (dabbing) contact, not "coolant off." */
+  coolantFlowAdequate: boolean;
 }
 
 export interface GrievanceTrigger {
@@ -50,10 +52,26 @@ export interface GrievanceTrigger {
  * this is a real wiring, not an invented one: the trigger fires once actual
  * cutting begins on top of the unresolved offset.
  */
+/**
+ * grievance.thermal-shock-insert-failure's real condition is intermittent
+ * coolant contact on a hot edge (see coolant.ts's deriveCoolantState -
+ * flowAdequate is false specifically for that dabbing pattern, not for a
+ * steady dry choice). Gated on heat also being meaningfully elevated: dabbing
+ * coolant on a cold, idle tool isn't the thermal-cycling risk the grievance
+ * describes. The heat threshold is a qualitative tuning knob (matches the
+ * granularity of classifyWearStage's condition thresholds elsewhere in this
+ * codebase), not a validated thermal-shock onset point.
+ */
+const HOT_EDGE_HEAT_THRESHOLD = 55;
+
 const MANUAL_MILL_GRIEVANCE_TRIGGERS: GrievanceTrigger[] = [
   {
     grievanceId: "grievance.setup-carried-over-from-prior-job",
     evaluate: (snapshot) => snapshot.workOffsetError > 0 && snapshot.spindleOn,
+  },
+  {
+    grievanceId: "grievance.thermal-shock-insert-failure",
+    evaluate: (snapshot) => !snapshot.coolantFlowAdequate && snapshot.spindleOn && snapshot.heat > HOT_EDGE_HEAT_THRESHOLD,
   },
 ];
 
