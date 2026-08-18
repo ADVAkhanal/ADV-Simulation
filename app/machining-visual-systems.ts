@@ -1,4 +1,5 @@
 import * as THREE from "three";
+import type { EdgeCondition } from "@adv-simulation/tool-model/src/index.ts";
 
 export type MachineCameraMode = "establishing" | "operator" | "machining" | "macro" | "datum" | "inspection" | "tool-change" | "release" | "failure";
 export type ProcessVisualState = {
@@ -48,5 +49,30 @@ export function surfaceState(finishPenalty: number, load: number, heat: number) 
     color: new THREE.Color().lerpColors(new THREE.Color(0x51686e), new THREE.Color(0x765148), distress),
     roughness: THREE.MathUtils.lerp(.36, .92, distress),
     metalness: THREE.MathUtils.lerp(.78, .42, distress),
+  };
+}
+
+/** sharp=0, worn=1/3, chipped=2/3, fractured=1 - the same four-stage progression the TOOL FIT/EDGE telemetry readout already names, given a visual scale here. */
+const EDGE_CONDITION_WEAR_FRACTION: Record<EdgeCondition, number> = { sharp: 0, worn: 1 / 3, chipped: 2 / 3, fractured: 1 };
+
+/**
+ * A discolored, duller tool tip as real edge wear and real coating
+ * degradation (tool-model's own deriveToolLatentState) progress - both were
+ * decomposed from manual-mill-tool-wear.ts's condition several increments ago
+ * but had never been shown anywhere except hard-mode telemetry text. Mirrors
+ * surfaceState's own blend-toward-distress pattern above, applied to the tool
+ * instead of the workpiece.
+ */
+export function toolWearTint(edgeCondition: EdgeCondition, coatingDegradationFraction: number) {
+  const wear = THREE.MathUtils.clamp(
+    Math.max(EDGE_CONDITION_WEAR_FRACTION[edgeCondition], coatingDegradationFraction),
+    0,
+    1,
+  );
+  return {
+    wear,
+    color: new THREE.Color().lerpColors(new THREE.Color(0x7ff1ff), new THREE.Color(0x8a6a4a), wear),
+    roughness: THREE.MathUtils.lerp(.18, .68, wear),
+    metalness: THREE.MathUtils.lerp(.94, .5, wear),
   };
 }

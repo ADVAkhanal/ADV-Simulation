@@ -140,3 +140,18 @@ test("Machining Kit v3 makes the Three.js cell the playable process surface", as
   assert.match(campaign, /onToolInput=\{moveToolFromTwin\}/);
   assert.match(campaign, /METROLOGY MODE/);
 });
+
+test("the mounted tool's real edge condition and coating wear are visually represented, not just left in hard-mode telemetry text", async () => {
+  const [stage, wrapper, systems, campaign] = await Promise.all([
+    readFile(new URL("../app/three-machining-stage.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/flagship-machining-kit.tsx", import.meta.url), "utf8"),
+    readFile(new URL("../app/machining-visual-systems.ts", import.meta.url), "utf8"),
+    readFile(new URL("../app/manual-campaign.tsx", import.meta.url), "utf8"),
+  ]);
+  assert.match(systems, /toolWearTint/);
+  assert.match(stage, /toolWearTint/);
+  assert.match(stage, /coatingDegradationFraction/);
+  assert.match(wrapper, /edgeCondition/);
+  assert.match(campaign, /edgeCondition=\{toolLatentState\.edgeCondition\}/);
+  assert.match(campaign, /coatingDegradationFraction=\{toolLatentState\.coatingDegradationFraction\}/);
+});

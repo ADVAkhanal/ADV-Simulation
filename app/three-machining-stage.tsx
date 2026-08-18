@@ -4,7 +4,8 @@ import { useEffect, useRef } from "react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import type { ManualContract } from "./manual-campaign-engine";
-import { CAMERA_PRESETS, damp, deriveMachineMood, qualityBudget, surfaceState, type MachineCameraMode } from "./machining-visual-systems";
+import { CAMERA_PRESETS, damp, deriveMachineMood, qualityBudget, surfaceState, toolWearTint, type MachineCameraMode } from "./machining-visual-systems";
+import type { EdgeCondition } from "@adv-simulation/tool-model/src/index.ts";
 
 type Props = {
   cursor: { x: number; y: number };
@@ -32,6 +33,8 @@ type Props = {
   onReady: () => void;
   onFailure: () => void;
   coolantActive?: boolean;
+  edgeCondition?: EdgeCondition;
+  coatingDegradationFraction?: number;
 };
 
 const TOOL_NODE_BY_ID: Record<number, string> = { 1: "tool.endmill.flat.010", 2: "tool.endmill.rougher.020", 3: "tool.drill.030" };
@@ -365,7 +368,18 @@ export default function ThreeMachiningStage(props: Props) {
       const plunge = live.spindle ? 15 + Math.min(live.load, 80) * .07 : 0;
       movingNodes.forEach((object) => { const base = basePosition.get(object)!; object.position.x = base.x + toolX; object.position.y = base.y - plunge; object.position.z = base.z + toolZ; });
       const activeTool = TOOL_NODE_BY_ID[live.toolId ?? 1] ?? TOOL_NODE_BY_ID[1];
-      toolNodes.forEach((tool) => { tool.visible = tool.name === activeTool; if (live.spindle) tool.rotation.y += dt * 38; });
+      const tint = toolWearTint(live.edgeCondition ?? "sharp", live.coatingDegradationFraction ?? 0);
+      toolNodes.forEach((tool) => {
+        tool.visible = tool.name === activeTool;
+        if (live.spindle) tool.rotation.y += dt * 38;
+        if (!tool.visible) return;
+        // The named tool node may be the mesh itself or a group wrapping it (GLB-authoring-dependent) - traverse to cover both.
+        tool.traverse((node) => {
+          if (!(node instanceof THREE.Mesh)) return;
+          const material = node.material as THREE.MeshStandardMaterial;
+          if (material?.isMeshStandardMaterial) { material.color.copy(tint.color); material.roughness = tint.roughness; material.metalness = tint.metalness; }
+        });
+      });
 
       model?.updateMatrixWorld(true);
       stock?.traverse((object) => {
