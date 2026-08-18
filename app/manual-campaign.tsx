@@ -176,11 +176,14 @@ export default function ManualCampaign() {
   const contract = MANUAL_CONTRACTS[contractIndex];
   const operation = contract.operations[Math.min(operationIndex, contract.operations.length - 1)];
   const tool = MILL_TOOLS[toolIndex];
-  // flankWearMm/edgeCondition are pure functions of condition alone (heat/previousThermalDamageFraction
-  // are irrelevant to them - see tool-model's own test coverage) - safe to recompute every render.
-  // thermalDamageFraction itself is NOT read from here; it's genuinely cumulative and only advances
-  // inside cutAt's own setState call, never on a bare render.
-  const toolLatentState = useMemo(() => deriveToolLatentState({ condition, heat: 0, previousThermalDamageFraction: 0 }), [condition]);
+  // flankWearMm/edgeCondition/builtUpEdgeTendency are pure functions of the current tick's inputs -
+  // safe to recompute every render. coatingDegradationFraction blends wear with the REAL accumulated
+  // thermalDamageFraction state (not re-derived here) - heat is passed as 0 specifically so this
+  // render-only call adds no phantom extra increment on top of the real per-cut accumulator below.
+  const toolLatentState = useMemo(
+    () => deriveToolLatentState({ condition, heat: 0, previousThermalDamageFraction: thermalDamageFraction, aluminumMaterial: !contract.material.includes("Ti"), coolantActive, spindleOn: spindle, load }),
+    [condition, thermalDamageFraction, contract.material, coolantActive, spindle, load],
+  );
   const completion = useMemo(() => manualCompletion(material, contract.id), [contract.id, material]);
   const operationProgress = useMemo(() => manualOperationProgress(material, finished, contract.id, operation.id), [contract.id, finished, material, operation.id]);
   const operationsComplete = useMemo(() => allManualOperationsComplete(material, finished, contract), [contract, finished, material]);
@@ -535,7 +538,7 @@ export default function ManualCampaign() {
       return result.nextState.condition;
     });
     setFinishPenalty((value) => applyManualMillCut({ heat: 0, condition: 0, load: 0, finishPenalty: value }, cutInputs).nextState.finishPenalty);
-    setThermalDamageFraction((previous) => deriveToolLatentState({ condition, heat, previousThermalDamageFraction: previous }).thermalDamageFraction);
+    setThermalDamageFraction((previous) => deriveToolLatentState({ condition, heat, previousThermalDamageFraction: previous, aluminumMaterial: !contract.material.includes("Ti"), coolantActive, spindleOn: spindle, load: nextLoad }).thermalDamageFraction);
     for (const grievanceId of evaluateGrievanceTriggers({ heat, condition, load: nextLoad, finishPenalty, overcut: cut.overcut, fixtureStrikes: cut.fixtureStrikes, spindleOn: spindle, workOffsetError, coolantFlowAdequate: coolantFlowAdequateRef.current })) {
       if (grievanceRef.current.has(grievanceId)) continue;
       grievanceRef.current.add(grievanceId);
@@ -754,7 +757,7 @@ export default function ManualCampaign() {
           <Meter icon={<Activity/>} label="TOOL HEAT" value={heat} suffix="°C" danger={heat > 78}/>
           <Meter icon={<Wrench/>} label="TOOL CONDITION" value={condition} suffix="%" danger={condition < 24}/>
           <button className={styles.coolant} aria-pressed={coolantActive} onClick={toggleCoolant}><Waves/><span><b>COOLANT FIELD</b>{coolantActive ? (spindle ? "FLOOD / CHIP EVACUATION" : "FLOOD / STANDBY") : "DRY — click to engage flood"}</span><i className={coolantActive ? styles.coolantLive : ""}/></button>
-          <dl><div><dt>ELAPSED</dt><dd>{String(Math.floor(elapsed/60)).padStart(2,"0")}:{String(elapsed%60).padStart(2,"0")}</dd></div><div><dt>OVERCUT CELLS</dt><dd className={overcut > contract.tolerance ? styles.bad : ""}>{overcut}</dd></div><div><dt>FIXTURE STRIKES</dt><dd className={fixtureStrikes > 0 ? styles.bad : ""}>{fixtureStrikes}</dd></div><div><dt>TOOL FIT</dt><dd className={!toolCompatible ? styles.bad : ""}>{toolCompatible ? "VALID" : "LOCKED"}</dd></div><div><dt>TOOL</dt><dd>T{tool.id} / {tool.diameter}</dd></div>{learningLevel !== "easy" && <><div><dt>SPINDLE / SIM</dt><dd>{spindleRpm.toLocaleString()} RPM</dd></div><div><dt>FEED / SIM</dt><dd>{programmedFeed} MM/MIN</dd></div></>}{learningLevel === "hard" && <><div><dt>CHIP LOAD / SIM</dt><dd>{chipLoad.toFixed(3)} MM</dd></div><div><dt>ENGAGEMENT</dt><dd>{engagementAngle}°</dd></div><div><dt>WORK OFFSET</dt><dd>G54</dd></div><div><dt>FLANK WEAR</dt><dd className={toolLatentState.flankWearMm > 0.24 ? styles.bad : ""}>{toolLatentState.flankWearMm.toFixed(3)} MM</dd></div><div><dt>EDGE</dt><dd className={toolLatentState.edgeCondition === "chipped" || toolLatentState.edgeCondition === "fractured" ? styles.bad : ""}>{toolLatentState.edgeCondition.toUpperCase()}</dd></div><div><dt>THERMAL DAMAGE</dt><dd className={thermalDamageFraction > 0.5 ? styles.bad : ""}>{Math.round(thermalDamageFraction * 100)}%</dd></div></>}</dl>
+          <dl><div><dt>ELAPSED</dt><dd>{String(Math.floor(elapsed/60)).padStart(2,"0")}:{String(elapsed%60).padStart(2,"0")}</dd></div><div><dt>OVERCUT CELLS</dt><dd className={overcut > contract.tolerance ? styles.bad : ""}>{overcut}</dd></div><div><dt>FIXTURE STRIKES</dt><dd className={fixtureStrikes > 0 ? styles.bad : ""}>{fixtureStrikes}</dd></div><div><dt>TOOL FIT</dt><dd className={!toolCompatible ? styles.bad : ""}>{toolCompatible ? "VALID" : "LOCKED"}</dd></div><div><dt>TOOL</dt><dd>T{tool.id} / {tool.diameter}</dd></div>{learningLevel !== "easy" && <><div><dt>SPINDLE / SIM</dt><dd>{spindleRpm.toLocaleString()} RPM</dd></div><div><dt>FEED / SIM</dt><dd>{programmedFeed} MM/MIN</dd></div></>}{learningLevel === "hard" && <><div><dt>CHIP LOAD / SIM</dt><dd>{chipLoad.toFixed(3)} MM</dd></div><div><dt>ENGAGEMENT</dt><dd>{engagementAngle}°</dd></div><div><dt>WORK OFFSET</dt><dd>G54</dd></div><div><dt>FLANK WEAR</dt><dd className={toolLatentState.flankWearMm > 0.24 ? styles.bad : ""}>{toolLatentState.flankWearMm.toFixed(3)} MM</dd></div><div><dt>EDGE</dt><dd className={toolLatentState.edgeCondition === "chipped" || toolLatentState.edgeCondition === "fractured" ? styles.bad : ""}>{toolLatentState.edgeCondition.toUpperCase()}</dd></div><div><dt>THERMAL DAMAGE</dt><dd className={thermalDamageFraction > 0.5 ? styles.bad : ""}>{Math.round(thermalDamageFraction * 100)}%</dd></div><div><dt>COATING WEAR</dt><dd className={toolLatentState.coatingDegradationFraction > 0.6 ? styles.bad : ""}>{Math.round(toolLatentState.coatingDegradationFraction * 100)}%</dd></div><div><dt>BUE RISK</dt><dd className={toolLatentState.builtUpEdgeTendency > 0.5 ? styles.bad : ""}>{Math.round(toolLatentState.builtUpEdgeTendency * 100)}%</dd></div></>}</dl>
           <div className={styles.safety}><ShieldCheck/><p><b>CREATIVE SIMULATION</b>Not machine-operating guidance. Never transfer game values to physical equipment.</p></div>
         </aside>
       </section>}

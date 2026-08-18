@@ -51,6 +51,8 @@ export type MillTool = {
   removal: number;
   /** Flute/tooth count - drives tooth-pass frequency for procedural audio (rotation_frequency * flutes, per PRODUCT_SPEC.md §9). Not cosmetic. */
   flutes: number;
+  /** Real coating class per tool-model's ToolGeometry - drives coatingDegradationFraction, not decorative. */
+  coating: "none" | "tin" | "ticn" | "altin" | "diamond";
   role: string;
   operations: ManualOperationId[];
   limitation: string;
@@ -128,9 +130,9 @@ export const MANUAL_CONTRACTS: ManualContract[] = [
 ];
 
 export const MILL_TOOLS: MillTool[] = [
-  { id: 1, name: "FINISHER", diameter: "6 MM", radius: .78, load: .62, wear: .72, finish: .28, removal: .58, flutes: 4, role: "Low load and tight access", operations: ["profile", "finish"], limitation: "Slow bulk removal; cannot pocket or drill." },
-  { id: 2, name: "ROUGHER", diameter: "12 MM", radius: 1.35, load: 1, wear: 1, finish: .9, removal: 1, flutes: 2, role: "Fast profile and pocket removal", operations: ["profile", "pocket"], limitation: "Cannot enter drilled features or certify a finish pass." },
-  { id: 3, name: "DRILL", diameter: "8 MM", radius: .72, load: 1.24, wear: .82, finish: 1.2, removal: 1.35, flutes: 2, role: "Fast axial feature making", operations: ["drill"], limitation: "Plunge-only; lateral profile and pocket cuts are locked out." },
+  { id: 1, name: "FINISHER", diameter: "6 MM", radius: .78, load: .62, wear: .72, finish: .28, removal: .58, flutes: 4, coating: "altin", role: "Low load and tight access", operations: ["profile", "finish"], limitation: "Slow bulk removal; cannot pocket or drill." },
+  { id: 2, name: "ROUGHER", diameter: "12 MM", radius: 1.35, load: 1, wear: 1, finish: .9, removal: 1, flutes: 2, coating: "ticn", role: "Fast profile and pocket removal", operations: ["profile", "pocket"], limitation: "Cannot enter drilled features or certify a finish pass." },
+  { id: 3, name: "DRILL", diameter: "8 MM", radius: .72, load: 1.24, wear: .82, finish: 1.2, removal: 1.35, flutes: 2, coating: "tin", role: "Fast axial feature making", operations: ["drill"], limitation: "Plunge-only; lateral profile and pocket cuts are locked out." },
 ];
 
 export const DEFAULT_MANUAL_SAVE: ManualSaveData = { version: 3, credits: 250, reputation: 0, cleared: [], totalAttempts: 0, mastery: {}, bests: {}, log: [] };
