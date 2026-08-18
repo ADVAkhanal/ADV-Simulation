@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { animate, stagger } from "animejs";
 import { Activity, Award, BookOpen, CircleGauge, CircleHelp, Crosshair, Factory, Gamepad2, Gauge, Hexagon, LockKeyhole, Pause, Play, RotateCcw, ScanLine, Share2, ShieldCheck, Sparkles, Target, Volume2, VolumeX, Waves, Wrench, X, Zap } from "lucide-react";
+import { applyManualMillCut, applyManualMillCooldown, restoreManualMillTool, swapManualMillTool } from "@adv-simulation/simulation-core/src/index.ts";
 import {
   DEFAULT_MANUAL_SAVE,
   MANUAL_CONTRACTS,
@@ -201,8 +202,10 @@ export default function ManualCampaign() {
   useEffect(() => {
     if (screen !== "play" || paused) return;
     const timer = window.setInterval(() => {
-      setHeat((value) => clamp(value - (spindle ? 0.35 : 2.4), 18, 100));
-      setLoad((value) => Math.max(0, value - 4));
+      // Ported to @adv-simulation/simulation-core - see docs/EXTRACTION_PLAN.md.
+      // Condition and finishPenalty pass through unchanged; only heat/load shed here.
+      setHeat((heatValue) => applyManualMillCooldown({ heat: heatValue, condition: 100, load: 0, finishPenalty: 0 }, spindle).heat);
+      setLoad((loadValue) => applyManualMillCooldown({ heat: 0, condition: 100, load: loadValue, finishPenalty: 0 }, spindle).load);
     }, 1000);
     return () => window.clearInterval(timer);
   }, [screen, spindle, paused]);
@@ -417,13 +420,19 @@ export default function ManualCampaign() {
     if (!cut.engagement) { setLoad(0); if (cut.mismatch) setMessage(`${operation.label.toUpperCase()} ACTIVE — that stock belongs to another operation.`); return; }
     toolpathRef.current.push({ x, y }); toolpathRef.current = toolpathRef.current.slice(-320); setToolpath(toolpathRef.current);
     if (!firstCutTracked.current) { firstCutTracked.current = true; trackAnonymous("first_cut", { contract: contract.id, tool: tool.id, feed }); }
-    const nextLoad = clamp(Math.round(cut.engagement * 7.6 * tool.load * (feed / 55)), 0, 100);
+    // Cut math ported to @adv-simulation/simulation-core (docs/EXTRACTION_PLAN.md).
+    // `nextLoad` depends only on cutInputs, never on prior state, so it's safe to
+    // read once here and reuse below. heat/condition/finishPenalty each still go
+    // through their own functional setState updater (unchanged from the original)
+    // so rapid successive cuts within one React batch never read a stale value -
+    // this is why each call below passes only its own field's previous value and
+    // zeroes the rest, rather than sharing one combined state snapshot.
+    const cutInputs = { engagement: cut.engagement, overcut: cut.overcut, fixtureStrikes: cut.fixtureStrikes, correct: cut.correct, toolLoad: tool.load, toolWear: tool.wear, toolFinish: tool.finish, feed, operationIsFinish: operation.id === "finish" };
+    const nextLoad = applyManualMillCut({ heat: 0, condition: 0, load: 0, finishPenalty: 0 }, cutInputs).nextState.load;
     const now = performance.now();
     for (let chip = 0; chip < Math.min(10, cut.engagement + 2); chip += 1) { const angle = (chip / Math.max(1, cut.engagement + 2)) * Math.PI * 2 + now * .002; chipsRef.current.push({ x, y, dx: Math.cos(angle) * (1.2 + chip % 3), dy: Math.sin(angle) * (1 + chip % 2), born: now, hot: nextLoad > 78 || cut.overcut > 0 }); }
     chipsRef.current = chipsRef.current.slice(-48);
     if (now - lastCutTone.current > 75) { tone(cut.overcut ? 92 : 230 + nextLoad * 2.2, .055, cut.overcut ? "sawtooth" : "square", cut.overcut ? .035 : .012); lastCutTone.current = now; }
-    const heatGain = cut.engagement * .45 * tool.load * (feed / 50);
-    const wear = cut.engagement * .055 * tool.wear * (1 + Math.max(0, feed - 70) / 35) + cut.fixtureStrikes * 14;
     materialRef.current = cut.material; finishedRef.current = cut.finished;
     setMaterial(cut.material); setFinished(cut.finished); setOvercut((value) => value + cut.overcut); setFixtureStrikes((value) => value + cut.fixtureStrikes); setLoad(nextLoad);
     if (cut.fixtureStrikes > 0) {
@@ -449,15 +458,13 @@ export default function ManualCampaign() {
       announceGameEvent({ kind: threshold === 90 ? "reward" : "objective", title, detail: threshold === 90 ? "Sign off the final operation and open inspection." : `Material removal reached ${threshold}%. Keep the profile protected.` });
       tone(threshold === 90 ? 740 : 440 + threshold * 2, .16, "sine", .025);
     }
-    setHeat((value) => clamp(value + heatGain, 18, 100));
+    setHeat((value) => applyManualMillCut({ heat: value, condition: 0, load: 0, finishPenalty: 0 }, cutInputs).nextState.heat);
     setCondition((value) => {
-      const next = clamp(value - wear, 0, 100);
-      if (next <= 0 && value > 0) { setBreaks((count) => count + 1); setSpindle(false); setMessage(cut.fixtureStrikes > 0 ? "TOOL FAILURE — the vise clamp took the edge off the cutter." : "TOOL FAILURE — reset the cutter and reduce engagement."); }
-      return next;
+      const result = applyManualMillCut({ heat: 0, condition: value, load: 0, finishPenalty: 0 }, cutInputs);
+      if (result.toolBroke) { setBreaks((count) => count + 1); setSpindle(false); setMessage(cut.fixtureStrikes > 0 ? "TOOL FAILURE — the vise clamp took the edge off the cutter." : "TOOL FAILURE — reset the cutter and reduce engagement."); }
+      return result.nextState.condition;
     });
-    setFinishPenalty((value) => operation.id === "finish"
-      ? Math.max(0, value - cut.correct * .075)
-      : value + Math.max(0, nextLoad - 82) * .018 * tool.finish + cut.overcut * .25);
+    setFinishPenalty((value) => applyManualMillCut({ heat: 0, condition: 0, load: 0, finishPenalty: value }, cutInputs).nextState.finishPenalty);
   };
 
   const millAt = (clientX: number, clientY: number) => {
@@ -482,7 +489,7 @@ export default function ManualCampaign() {
     if (cutting) cutAt(x, y); else setCursor({ x, y });
   };
 
-  const restoreTool = () => { setCondition(100); setHeat(25); setSpindle(false); triggerSceneCue("tool-change"); tone(420, .11, "square", .018); setMessage("Fresh cutter loaded. Verify the active operation before restart."); };
+  const restoreTool = () => { const reset = restoreManualMillTool(); setCondition(reset.condition); setHeat(reset.heat); setSpindle(false); triggerSceneCue("tool-change"); tone(420, .11, "square", .018); setMessage("Fresh cutter loaded. Verify the active operation before restart."); };
 
   const toggleSpindle = () => {
     if (condition <= 0) { restoreTool(); return; }
@@ -583,7 +590,7 @@ export default function ManualCampaign() {
     if (condition >= 98 && heat <= 30) { setMessage("Cutter is already fresh and cool. No swap needed."); return; }
     if (save.credits < SWAP_TOOL_COST) { setMessage(`Not enough credits for a tool swap — need ${SWAP_TOOL_COST} CR.`); return; }
     setSave((current) => ({ ...current, credits: current.credits - SWAP_TOOL_COST }));
-    setCondition(100); setHeat(20); triggerSceneCue("tool-change"); tone(420, .11, "square", .018);
+    const reset = swapManualMillTool(); setCondition(reset.condition); setHeat(reset.heat); triggerSceneCue("tool-change"); tone(420, .11, "square", .018);
     setMessage(`Cutter swapped for ${SWAP_TOOL_COST} CR — fresh edge, safe temperature.`);
     trackAnonymous("manual_tool_swap", { contract: contract.id, tool: tool.id, cost: SWAP_TOOL_COST });
   };
