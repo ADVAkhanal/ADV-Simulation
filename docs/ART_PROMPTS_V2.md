@@ -37,13 +37,17 @@ incident reporting — see `docs/INDUSTRY_GRIEVANCES.md` for citations.
 
 ## Trademark note — read before generating
 
-The existing set has legible real trademarks: **KURT** on a vise, **Mitutoyo** on
-metrology instruments, **"HAAS NGC"** and **VF-750** in HUD text. That is fine for
-internal concept art but is real exposure in a shipped commercial product, especially
-given the game's own "no real shop inventory or controller procedure" disclaimer.
+**Verified status (see `docs/ARCHITECTURE_ASSESSMENT.md`): the 9 image assets
+actually shipped in `public/assets/` contain zero legible trademarks.** The concern
+below was real for the raw `.codex/generated_images` batch this project's art was
+sourced from — some of those files had legible **KURT**, **Mitutoyo**, and
+**"HAAS NGC"/"VF-750"** branding — but that batch was never shipped as-is; every
+shipped asset was individually cropped or generated clean.
 
-**Every prompt below ends with an unbranded clause. Keep it.** A cleanup pass on the
-existing art is worth doing before any public build.
+**Every prompt below still ends with an unbranded clause. Keep it.** The reason isn't
+existing exposure, it's staying clean going forward — build the forbidden-brand CI
+scan from `PRODUCT_SPEC.md` §2 so this is enforced automatically rather than by
+someone remembering to check.
 
 ---
 

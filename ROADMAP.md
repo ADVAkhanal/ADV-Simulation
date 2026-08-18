@@ -23,16 +23,23 @@ work in ADV-WI-Studio: Fourier-series waveforms and an LFSR noise generator, zer
 sample licensing, zero recording cost) and it's disproportionately effective per
 dollar spent compared to chasing physically-based cutting simulation.
 
-## Immediate must-do: trademark cleanup
+## Trademark status — verified, corrected
 
-The inherited art set has real, legible trademarks — **KURT** on the vise, **Mitutoyo**
-on calipers/micrometers/height gauges, **"HAAS NGC"** and **VF-750** in HUD text. That
-was acceptable as internal concept art; it is real exposure the moment this becomes
-sellable software, and it directly contradicts the "no real shop inventory or
-controller procedure" framing this product needs for credibility with buyers who will
-ask about IP. Every new asset must follow the unbranded clause already written into
-`docs/ART_PROMPTS_V2.md`'s style kits — that constraint was written for exactly this
-fork. Treat re-generating the branded assets as Phase 0 work, not later cleanup.
+**Update:** the claim below, written before anyone actually checked, turned out to be
+wrong about what's shipped. A full scan (`docs/ARCHITECTURE_ASSESSMENT.md`) found
+**zero legible trademarks in any of the 9 image assets actually in `public/assets/`**.
+The KURT/Mitutoyo/HAAS NGC/VF-750 exposure was real, but only in the raw
+`.codex/generated_images` cache, which was never shipped. Leaving the original claim
+below for the record, since the discipline it argues for is still correct going
+forward — just don't repeat "the game has trademarks in it" as fact without checking.
+
+~~The inherited art set has real, legible trademarks — **KURT** on the vise,
+**Mitutoyo** on calipers/micrometers/height gauges, **"HAAS NGC"** and **VF-750** in
+HUD text.~~ That would have been acceptable as internal concept art but real exposure
+the moment this becomes sellable software. Every new asset must still follow the
+unbranded clause already written into `docs/ART_PROMPTS_V2.md`'s style kits, and a
+forbidden-brand CI scan (per `PRODUCT_SPEC.md` §2) should exist so this stays true by
+enforcement rather than by luck.
 
 ## What carries over as-is (don't rebuild)
 
@@ -78,10 +85,11 @@ fork. Treat re-generating the branded assets as Phase 0 work, not later cleanup.
 
 ## Roadmap
 
-**Phase 0 — De-risk before anything else.** Scrub trademarks from all inherited art
-(regenerate using the unbranded prompts already written). Rename away from
-"Project Toolpath" if that title doesn't read as procurement-appropriate — a training
-buyer's first impression matters more here than in a consumer game. Do not add the
+**Phase 0 — De-risk before anything else.** Trademark scan is done and shipped assets
+are verified clean — build the forbidden-brand CI check so future assets stay that
+way automatically. Rename away from "Project Toolpath" if that title doesn't read as
+procurement-appropriate — a training buyer's first impression matters more here than
+in a consumer game. Do not add the
 audio-wear system or new machine types on top of branded art you'll have to redo.
 
 **Phase 1 — Internal pilot at Advanced PMC.** You already have the real customer:

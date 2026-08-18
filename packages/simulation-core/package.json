@@ -1,0 +1,15 @@
+{
+  "name": "@adv-simulation/simulation-core",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "dependencies": {
+    "@adv-simulation/units": "*",
+    "@adv-simulation/machine-model": "*",
+    "@adv-simulation/tool-model": "*",
+    "@adv-simulation/procedural-audio": "*",
+    "@adv-simulation/telemetry": "*"
+  }
+}

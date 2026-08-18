@@ -1,16 +1,19 @@
 {
-  "name": "project-toolpath-prototype",
+  "name": "adv-simulation",
   "version": "0.1.0",
   "private": true,
   "engines": {
     "node": ">=22.13.0"
   },
+  "workspaces": [
+    "packages/*"
+  ],
   "scripts": {
     "dev": "node ./node_modules/vinext/dist/cli.js dev",
     "build": "node ./node_modules/vinext/dist/cli.js build",
     "factory": "node tools/game-factory.mjs",
     "start": "node ./node_modules/vinext/dist/cli.js start",
-    "test": "npm run build && node --test tests/homepage.test.mjs tests/rendered-html.test.mjs tests/gcode-engine.test.mjs tests/manual-campaign.test.mjs tests/glb-asset.test.mjs tests/machining-kit.test.mjs tests/tool-crib.test.mjs tests/2d-art-pack.test.mjs tests/turning-cell.test.mjs",
+    "test": "npm run build && node --test tests/homepage.test.mjs tests/rendered-html.test.mjs tests/gcode-engine.test.mjs tests/manual-campaign.test.mjs tests/glb-asset.test.mjs tests/machining-kit.test.mjs tests/tool-crib.test.mjs tests/2d-art-pack.test.mjs tests/turning-cell.test.mjs tests/units.test.mjs tests/telemetry.test.mjs",
     "lint": "eslint . --ignore-pattern dist --ignore-pattern .next",
     "db:generate": "drizzle-kit generate"
   },
